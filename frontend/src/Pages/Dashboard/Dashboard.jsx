@@ -5,7 +5,7 @@ import SummaryCards from "../../Second_Person/src/compenents/summarycards";
 import ACCharts from "../../Second_Person/src/compenents/ACCharts";
 import ACTable from "../../Second_Person/src/compenents/ACTable";
 
-const API_URL = "http://192.168.1.8:8000/api/ac-data/";
+const API_URL = "http://192.168.1.17:8000/api/ac-data/";
 
 function Dashboard() {
     const [data, setData] = useState([]);

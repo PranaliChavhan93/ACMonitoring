@@ -13,7 +13,6 @@ export const authHeaders = () => {
 const asList = (r) =>
     Array.isArray(r) ? r : Array.isArray(r?.data) ? r.data : Array.isArray(r?.results) ? r.results : [];
 
-/** Lets deeply nested tree rows open the dialog without prop drilling. */
 export const SiteActionsContext = createContext({ canAssign: false, openAssign: () => {} });
 
 const box = {
@@ -35,10 +34,6 @@ const box = {
     primary: { padding: "9px 16px", borderRadius: 8, border: 0, background: "#2563eb", color: "#fff", cursor: "pointer" },
 };
 
-/**
- * Assign a site (tree branch) to a customer + its admins / engineers.
- * Every AC placed in the site inherits these owners automatically.
- */
 export default function SiteOwnerModal({ branch, hierarchyType, role, onClose, onSaved }) {
     const isSuper = role === "ORG_SUPER_ADMIN";
 
@@ -89,7 +84,7 @@ export default function SiteOwnerModal({ branch, hierarchyType, role, onClose, o
 
     const onCustomerChange = (value) => {
         setCustomerId(value);
-        setAdminIds([]);          // admins belong to one customer - clear on change
+        setAdminIds([]);
         setEngineerIds([]);
     };
 

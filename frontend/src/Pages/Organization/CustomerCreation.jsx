@@ -10,7 +10,7 @@ import {
   FiMapPin,
 } from "react-icons/fi";
 
-import "./AdminCreation.css";
+import "./CustomerCreation.css";
 
 const API_BASE = "http://localhost:8000/api";
 const CUSTOMERS_URL = `${API_BASE}/customers/`;
@@ -73,6 +73,18 @@ const companyOf = (customer) => customer?.company ?? customer?.name ?? "";
 
 const emailOf = (customer) => customer?.company_email ?? customer?.email ?? "";
 
+const CUSTOMER_ROLE_VALUES = new Set(["CUSTOMER", "customer", "Customer"]);
+
+const isCustomerRole = (row) => {
+  if (!row) return false;
+
+  if (typeof row.role === "string" && row.role.trim() !== "") {
+    return CUSTOMER_ROLE_VALUES.has(row.role.trim());
+  }
+
+  return Boolean(row.login_email);
+};
+
 function Customer_Creation() {
   const [view, setView] = useState("list");
   const [customers, setCustomers] = useState([]);
@@ -128,11 +140,12 @@ function Customer_Creation() {
   ========================================================= */
 
   const filteredCustomers = useMemo(() => {
+    const customerRows = customers.filter(isCustomerRole);
+
     const q = search.trim().toLowerCase();
+    if (!q) return customerRows;
 
-    if (!q) return customers;
-
-    return customers.filter((customer) =>
+    return customerRows.filter((customer) =>
       [
         companyOf(customer),
         customer.code,
@@ -479,7 +492,8 @@ function Customer_Creation() {
             />
 
             <span className="admins-count">
-              {filteredCustomers.length} of {customers.length} customers
+              {filteredCustomers.length} of{" "}
+              {customers.filter(isCustomerRole).length} customers
             </span>
           </div>
 

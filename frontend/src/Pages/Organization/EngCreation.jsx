@@ -1327,11 +1327,11 @@ import {
   FiTrash2, FiPlus, FiArrowLeft, FiMapPin, FiCheckCircle,
   FiUserPlus, FiEdit2, FiEdit3,
 } from "react-icons/fi";
-import "./AdminCreation.css";   // same stylesheet as Admin_Creation
+import "./AdminCreation.css";
 import { useAuth } from "../Layout/AuthContext";
 
 const API_BASE  = "http://localhost:8000/api";
-const USERS_URL = `${API_BASE}/admins/`;   // reuse admin endpoints; filter by role on client
+const USERS_URL = `${API_BASE}/admins/`;
 const SITES_URL = `${API_BASE}/sites/`;
 const CUSTOMERS_URL = `${API_BASE}/customers/`;
 

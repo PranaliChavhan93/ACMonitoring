@@ -1,196 +1,3 @@
-
-// import React, {
-//     useCallback,
-//     useEffect,
-//     useMemo,
-//     useState,
-// } from "react";
-
-// import "./Org_Dashboard.css";
-
-// import FilterDashboard from "./FilterDashboard";
-// import ACDashboard from "../../Second_Person/Forntend/ACDashboard";
-
-// const API_URL = "http://192.168.1.9:8000/api/ac-data/";
-
-// const FILTER_KEYS = [
-//     "zone",
-//     "state",
-//     "district",
-//     "taluka",
-//     "circle",
-//     "region",
-//     "division",
-//     "city",
-//     "branch",
-//     "floor",
-// ];
-
-// const FILTER_LABELS = {
-//     zone:     "Zone",
-//     state:    "State",
-//     district: "District",
-//     taluka:   "Taluka",
-//     circle:   "Circle",
-//     region:   "Region",
-//     division: "Division",
-//     city:     "City",
-//     branch:   "Branch",
-//     floor:    "Floor",
-// };
-
-// const EMPTY_FILTERS = {
-//     hierarchy: "",
-//     ...Object.fromEntries(FILTER_KEYS.map((k) => [k, ""])),
-// };
-
-// const getToken = () =>
-//     localStorage.getItem("token") ||
-//     localStorage.getItem("authToken") ||
-//     localStorage.getItem("access_token") ||
-//     localStorage.getItem("accessToken") ||
-//     "";
-
-// const normalizeResponse = (result) => {
-//     if (Array.isArray(result)) return result;
-//     if (result && Array.isArray(result.data)) return result.data;
-//     if (result && Array.isArray(result.results)) return result.results;
-//     return [];
-// };
-
-// function Org_Dashboard() {
-//     const [apiData, setApiData]         = useState([]);
-//     const [loading, setLoading]         = useState(true);
-//     const [error, setError]             = useState("");
-//     const [lastUpdated, setLastUpdated] = useState(null);
-//     const [filters, setFilters]         = useState(EMPTY_FILTERS);
-
-//     const fetchACData = useCallback(async () => {
-//         try {
-//             setLoading(true);
-
-//             const token  = getToken();
-//             const params = new URLSearchParams();
-
-//             if (filters.hierarchy) {
-//                 params.append("hierarchy", filters.hierarchy);
-//             }
-
-//             FILTER_KEYS.forEach((key) => {
-//                 const value = filters[key];
-//                 if (value) params.append(key, value);
-//             });
-
-//             params.append("t", Date.now());
-
-//             const url = `${API_URL}?${params.toString()}`;
-//             console.log("FILTERED API URL:", url);
-
-//             const response = await fetch(url, {
-//                 method: "GET",
-//                 cache: "no-store",
-//                 headers: {
-//                     "Content-Type": "application/json",
-//                     ...(token ? { Authorization: `Token ${token}` } : {}),
-//                 },
-//             });
-
-//             if (response.status === 401) {
-//                 throw new Error("401 Unauthorized. Please login again.");
-//             }
-//             if (!response.ok) {
-//                 // throw new Error(`HTTP ${response.status}`);
-//                 throw new Error(`3TP Error`);
-//             }
-
-//             const result  = await response.json();
-//             const records = normalizeResponse(result);
-
-//             console.log("FILTERED API DATA:", result);
-
-//             setApiData(records);
-//             setLastUpdated(new Date());
-//             setError("");
-
-//         } catch (err) {
-//             console.error("AC API ERROR:", err);
-//             setError(err.message || "Unable to fetch AC data.");
-//         } finally {
-//             setLoading(false);
-//         }
-//     }, [filters]);
-
-//     useEffect(() => {
-//         fetchACData();
-//         const interval = setInterval(fetchACData, 2000);
-//         return () => clearInterval(interval);
-//     }, [fetchACData]);
-
-//     const handleFilterChange = useCallback((newFilters) => {
-//         console.log("SELECTED FILTERS:", newFilters);
-
-//         setFilters({
-//             hierarchy: newFilters?.hierarchy ?? "",
-//             ...Object.fromEntries(
-//                 FILTER_KEYS.map((k) => [k, newFilters?.[k] ?? ""])
-//             ),
-//         });
-//     }, []);
-
-//     const handleResetFilters = useCallback(() => {
-//         setFilters(EMPTY_FILTERS);
-//     }, []);
-
-//     const filterSummary = useMemo(() => {
-//         const parts = FILTER_KEYS
-//             .filter((k) => filters[k])
-//             .map((k) => `${FILTER_LABELS[k]}: ${filters[k]}`);
-
-//         return parts.length ? parts.join("  •  ") : "All Locations";
-//     }, [filters]);
-
-//     const lastUpdatedText = lastUpdated
-//         ? lastUpdated.toLocaleTimeString()
-//         : "--";
-
-//     return (
-//         <div className="organization-dashboard">
-//             <div className="organization-filter-card">
-//                 <FilterDashboard
-//                     value={filters}
-//                     onFilterChange={handleFilterChange}
-//                     onReset={handleResetFilters}
-//                 />
-//                 <br />
-//             </div>
-
-//             {/* <div className="organization-filter-card"> */}
-//                 {error && (
-//                     <div className="organization-error">
-//                         <strong>Data API Error:</strong>
-//                         <span>{error}</span>
-//                     </div>
-//                 )}
-//             {/* </div> */}
-
-//             {loading && apiData.length === 0 ? (
-//                 <div className="organization-loading">
-//                     <div className="loading-spinner"></div>
-//                     <span>Loading AC data...</span>
-//                 </div>
-//             ) : (
-//                 <ACDashboard
-//                     data={apiData}
-//                     filters={filters}
-//                 />
-//             )}
-//         </div>
-//     );
-// }
-
-// export default Org_Dashboard;
-
-
 import React, {
     useCallback,
     useEffect,
@@ -202,8 +9,9 @@ import "./Org_Dashboard.css";
 
 import FilterDashboard from "./FilterDashboard";
 import ACDashboard from "../../Second_Person/Forntend/ACDashboard";
+import { useAuth } from "../Layout/AuthContext";
 
-const API_BASE = "http://192.168.1.9:8000/api";
+const API_BASE = "http://192.168.1.17:8000/api";
 const API_URL = `${API_BASE}/ac-data/`;
 const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 
@@ -295,6 +103,42 @@ const normalizeFilters = (input = {}) => ({
 });
 
 function Org_Dashboard() {
+    // IMPORTANT: hooks must run inside the component body.
+    const { user: currentUser } = useAuth();
+
+    // Restrict hierarchy/filter scope based on the logged-in user.
+    const filterAccess = useMemo(() => {
+        const role = currentUser?.role;
+        const hierarchy = currentUser?.customer_hierarchy_type;
+
+        if (role === "CUSTOMER" || role === "BR_ADMIN" || role === "ENGINEER") {
+            const allowed = hierarchy === "ZONAL"
+                ? ["ZONAL"]
+                : hierarchy === "GEOGRAPHICAL"
+                    ? ["GEOGRAPHICAL"]
+                    : [];
+
+            const lockedValues = {};
+
+            // Admin/engineer can only work inside their assigned top-level scope.
+            if (role === "BR_ADMIN" || role === "ENGINEER") {
+                if (hierarchy === "ZONAL" && currentUser?.zone_name) {
+                    lockedValues.zone = currentUser.zone_name;
+                }
+                if (hierarchy === "GEOGRAPHICAL" && currentUser?.state_name) {
+                    lockedValues.state = currentUser.state_name;
+                }
+            }
+
+            return { allowed, lockedValues };
+        }
+
+        return {
+            allowed: ["GEOGRAPHICAL", "ZONAL"],
+            lockedValues: {},
+        };
+    }, [currentUser]);
+
     const [apiData, setApiData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -416,9 +260,17 @@ function Org_Dashboard() {
     }, []);
 
     const handleResetFilters = useCallback(() => {
-        setFilters(EMPTY_FILTERS);
+        const hierarchy = filterAccess.allowed[0] || EMPTY_FILTERS.hierarchy;
+        const scoped = {
+            hierarchy,
+            ...Object.fromEntries(FILTER_KEYS.map((key) => [
+                key, filterAccess.lockedValues?.[key] || "",
+            ])),
+        };
+        setFilters(scoped);
         setCardFilters({});
-    }, []);
+        setRestoreVersion((value) => value + 1);
+    }, [filterAccess]);
 
     const handleCardFilterChange = useCallback((nextCardFilters) => {
         setCardFilters((previous) => ({
@@ -614,23 +466,19 @@ function Org_Dashboard() {
                 <FilterDashboard
                     initialValue={filters}
                     restoreVersion={restoreVersion}
+                    allowedHierarchies={filterAccess.allowed}
+                    lockedValues={filterAccess.lockedValues}
                     onFilterChange={handleFilterChange}
                     onReset={handleResetFilters}
                 />
 
-                <div
-                    style={{
-                        marginTop: "8px",
-                        display: "flex",
-                        justifyContent: "space-between",
-                        gap: "10px",
-                        flexWrap: "wrap",
-                        fontSize: "12px",
-                        color: "#64748b",
-                    }}
-                >
-                    <span>{filterSummary}</span>
-                    <span>Last updated: {lastUpdatedText}</span>
+                <div className="filter-summary-bar">
+                    <span className="filter-summary-text">{filterSummary}</span>
+
+                    <span className="filter-last-updated">
+                        <span className="last-updated-dot" />
+                        Last updated: <strong>{lastUpdatedText}</strong>
+                    </span>
                 </div>
             </div>
 
@@ -644,7 +492,7 @@ function Org_Dashboard() {
             {loading && apiData.length === 0 ? (
                 <div className="organization-loading">
                     <div className="loading-spinner"></div>
-                    <span>Loading AC data...</span>
+                    <span>Loading AC Energy Data...</span>
                 </div>
             ) : (
                 <ACDashboard

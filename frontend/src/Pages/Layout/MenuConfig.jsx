@@ -75,14 +75,14 @@ export const MENU_CONFIG = {
 
   [ROLES.CUSTOMER]: [
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
-    {
-      label: "Master",
-      icon: UserCog,
-      children: [
+    // {
+    //   label: "Master",
+    //   icon: UserCog,
+    //   children: [
         { label: "Admins", path: "/admins", icon: HardHat },
         { label: "Engineers", path: "/engineers", icon: Wrench },
-      ],
-    },
+    //   ],
+    // },
     { label: "Sites", path: "/locations", icon: MapPinned },
     { label: "AC's", path: "/device", icon: AirVent },
     { label: "Reports", path: "/reports", icon: FileBarChart },

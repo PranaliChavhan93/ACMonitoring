@@ -143,9 +143,9 @@ function Layout({ children }) {
             <div className="welcome-text">
               <p>Welcome,</p>
               <h4>{displayName}</h4>
-              {secondaryName && (
+              {/* {secondaryName && (
                 <span className="profile-sub">{secondaryName}</span>
-              )}
+              )} */}
               {role && <span className="role-badge">{roleLabel}</span>}
             </div>
 
