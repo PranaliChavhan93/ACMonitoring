@@ -1,0 +1,58 @@
+{
+  "dashboard_name": "AC Energy Dashboard",
+  "generated_at": "2026-10-07T10:30:00+05:30",
+  "filters": {
+    "state": "Maharashtra",
+    "city": "Pune",
+    "branch": "Branch 2",
+    "floor": "All"
+  },
+  "kpis": {
+    "total_ac": 640,
+    "active_ac": 582,
+    "inactive_ac": 58,
+    "total_energy_kwh": 1245.7,
+    "active_energy_kwh": 84.3,
+    "average_power_w": 1168.4,
+    "average_temperature_c": 25.8,
+    "average_humidity_percent": 57.2
+  },
+  "trends": [
+    {"time": "10:00", "energy_kwh": 118.2, "power_w": 10950},
+    {"time": "10:05", "energy_kwh": 121.7, "power_w": 11210},
+    {"time": "10:10", "energy_kwh": 126.4, "power_w": 11780},
+    {"time": "10:15", "energy_kwh": 132.1, "power_w": 12450},
+    {"time": "10:20", "energy_kwh": 138.9, "power_w": 13180},
+    {"time": "10:25", "energy_kwh": 146.7, "power_w": 14320}
+  ],
+  "zones": [
+    {"zone": "West", "energy_kwh": 410.4},
+    {"zone": "East", "energy_kwh": 286.1},
+    {"zone": "South", "energy_kwh": 301.7},
+    {"zone": "North", "energy_kwh": 247.5}
+  ],
+  "branches": [
+    {"branch": "Pune Branch 2", "energy_kwh": 245.6, "change_percent": 18.4},
+    {"branch": "Pune Branch 1", "energy_kwh": 188.3, "change_percent": 7.1},
+    {"branch": "Pune Branch 3", "energy_kwh": 166.2, "change_percent": -2.8}
+  ],
+  "ac_health": {
+    "healthy": 590,
+    "warning": 33,
+    "critical": 17
+  },
+  "alerts": [
+    {
+      "type": "HIGH_POWER",
+      "severity": "HIGH",
+      "count": 12,
+      "message": "Power consumption is above configured threshold"
+    },
+    {
+      "type": "TEMPERATURE",
+      "severity": "MEDIUM",
+      "count": 5,
+      "message": "Indoor temperature above target"
+    }
+  ]
+}

@@ -525,6 +525,113 @@ def _tpt_extract_id(data):
     return ""
 
 
+def _has_field(model, name):
+    return any(f.name == name for f in model._meta.get_fields())
+
+
+def get_3tp_device_profile_id(request):
+    res = requests.get(f"{CLOUD_URL}/api/deviceProfiles",
+                       params={"pageSize": 10, "page": 0},
+                       headers=_tpt_user_headers(request), timeout=15)
+    if res.status_code != 200:
+        raise ThreeTPError("Failed to fetch device profiles.", status=res.status_code,
+                           payload=res.text)
+    profiles = res.json().get("data", [])
+    if not profiles:
+        raise ThreeTPError("No device profile found in 3TP.")
+    default = next((p for p in profiles if p.get("default")), profiles[0])
+    return default["id"]["id"]
+
+
+def find_3tp_device_by_name(request, name):
+    res = requests.get(f"{CLOUD_URL}/api/tenant/devices", params={"deviceName": name},
+                       headers=_tpt_user_headers(request), timeout=15)
+    return res.json() if res.status_code == 200 else None
+
+
+def delete_3tp_device(request, tpt_device_id):
+    try:
+        r = requests.delete(f"{CLOUD_URL}/api/device/{tpt_device_id}",
+                            headers=_tpt_user_headers(request), timeout=15)
+        return r.status_code in (200, 204, 404)
+    except requests.RequestException:
+        return False
+
+
+def create_3tp_device(request, *, name, label, tpt_customer_id,
+                      client_id, username, password, latitude=None, longitude=None):
+    """Create device (MQTT_BASIC) -> assign to customer -> save attributes.
+    Returns (tpt_device_id, created_new)."""
+    headers = _tpt_user_headers(request)
+    created_new = True
+
+    res = requests.post(
+        f"{CLOUD_URL}/api/device-with-credentials", headers=headers, timeout=15,
+        json={
+            "device": {
+                "name": name, "label": label or name,
+                "deviceProfileId": {"id": get_3tp_device_profile_id(request),
+                                    "entityType": "DEVICE_PROFILE"},
+            },
+            "credentials": {
+                "credentialsType": "MQTT_BASIC",
+                "credentialsValue": json.dumps({"clientId": client_id,
+                                                "userName": username,
+                                                "password": password}),
+            },
+        },
+    )
+
+    if res.status_code == 400 and "already exists" in res.text:
+        # orphan from an earlier failed attempt: reuse it if it has no local record
+        existing = find_3tp_device_by_name(request, name)
+        existing_id = _id_of(existing) if existing else ""
+        if (not existing_id
+                or (_has_field(ACDevice, "tpt_device_id")
+                    and ACDevice.objects.filter(tpt_device_id=existing_id).exists())):
+            raise ThreeTPError(f"A device named '{name}' already exists in 3TP.")
+        tpt_device_id, created_new = existing_id, False
+    elif res.status_code not in (200, 201):
+        raise ThreeTPError(f"3TP device creation failed: {res.text}", status=res.status_code)
+    else:
+        tpt_device_id = _id_of(res.json())
+
+    if not tpt_device_id:
+        raise ThreeTPError("3TP did not return a device id.")
+
+    try:
+        r = requests.post(f"{CLOUD_URL}/api/customer/{tpt_customer_id}/device/{tpt_device_id}",
+                          headers=headers, timeout=15)
+        if r.status_code not in (200, 201):
+            raise ThreeTPError(f"Assigning device to customer failed: {r.text}",
+                               status=r.status_code)
+
+        attrs = {k: v for k, v in {"latitude": latitude, "longitude": longitude}.items()
+                 if v not in (None, "")}
+        if attrs:
+            requests.post(
+                f"{CLOUD_URL}/api/plugins/telemetry/DEVICE/{tpt_device_id}/SERVER_SCOPE",
+                json=attrs, headers=headers, timeout=15)
+    except Exception:
+        if created_new:
+            delete_3tp_device(request, tpt_device_id)
+        raise
+
+    return tpt_device_id, created_new
+
+
+def link_3tp_device_to_site(request, tpt_asset_id, tpt_device_id):
+    """ASSET --Contains--> DEVICE, same as the old assign_device_to_site."""
+    r = requests.post(
+        f"{CLOUD_URL}/api/relation", headers=_tpt_user_headers(request), timeout=15,
+        json={"from": {"entityType": "ASSET", "id": tpt_asset_id},
+              "to": {"entityType": "DEVICE", "id": tpt_device_id},
+              "type": "Contains", "typeGroup": "COMMON"},
+    )
+    if r.status_code not in (200, 201):
+        raise ThreeTPError(f"Linking device to site failed: {r.text}", status=r.status_code)
+
+
 def sync_customer(customer):
     """Push a local Customer to 3TP.
 
@@ -2361,157 +2468,6 @@ class CustomerListView(CustomerScopeMixin, generics.ListCreateAPIView):
         if warning:
             resp["X-3TP-Warning"] = warning  # single line, safe for headers
         return resp
-
-    # ----------------------------------------------------------------- POST
-    # def create(self, request, *args, **kwargs):
-    #     auth_header = request.headers.get("Authorization", "")
-    #     if not _raw_token(request):
-    #         return Response({"status": "error", "message": "Auth token required."},
-    #                         status=status.HTTP_401_UNAUTHORIZED)
-    #     auth_header = request.headers.get("Authorization", "")
-
-    #     user = request.user
-    #     if user.role != Role.ORG_SUPER_ADMIN:
-    #         return Response({"status": "error",
-    #                          "message": "Only organization super admin can create customers."},
-    #                         status=status.HTTP_403_FORBIDDEN)
-
-    #     serializer = self.get_serializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
-    #     d = serializer.validated_data
-
-    #     company        = (d.get("company") or "").strip()
-    #     company_email  = (d.get("company_email") or "").strip().lower()
-    #     contact_person = (d.get("contact_person") or "").strip()
-    #     phone          = (d.get("phone") or "").strip()
-
-    #     if not company_email:
-    #         return Response({"status": "error", "message": "company_email is required."},
-    #                         status=status.HTTP_400_BAD_REQUEST)
-
-    #     # ---- local duplicate checks
-    #     if Customer.objects.filter(organization=user.organization,
-    #                                company_email__iexact=company_email, is_active=True).exists():
-    #         return Response({"status": "error",
-    #                          "message": "A customer with this email already exists."}, status=400)
-    #     if User.objects.filter(email__iexact=company_email).exists():
-    #         return Response({"status": "error",
-    #                          "message": "A user with this email already exists."}, status=400)
-
-    #     headers = _tpt_user_headers(auth_header)
-    #     raw_password = request.data.get("password") or generate_password()
-
-    #     tpt_customer_id = None
-    #     try:
-    #         # ---- A. customer in 3TP
-    #         res = requests.post(f"{CLOUD_URL}/api/customer", headers=headers, timeout=15, json={
-    #             "title": company,
-    #             "email": company_email,
-    #             "phone": phone,
-    #             "address": d.get("address") or d.get("address_line_1") or "",
-    #             "city": d.get("city") or "",
-    #             "state": d.get("state") or "",
-    #             "country": "India",
-    #             "zip": d.get("pincode") or "",
-    #         })
-    #         created_new_in_3tp = True
-    #         res = requests.post(f"{CLOUD_URL}/api/customer", headers=headers, timeout=15, json={...})
-
-    #         if res.status_code == 400 and "already exists" in res.text:
-    #             existing = find_3tp_customer_by_title(request, company)
-    #             existing_id = _id_of(existing) if existing else ""
-    #             already_local = (
-    #                 _customer_has_field("tpt_customer_id")
-    #                 and Customer.objects.filter(tpt_customer_id=existing_id).exists()
-    #             )
-    #             if not existing_id or already_local:
-    #                 return Response(
-    #                     {"status": "error",
-    #                      "message": f"A customer named '{company}' already exists. Use a different name."},
-    #                     status=400)
-    #             # orphan from an earlier failed attempt: reuse it
-    #             tpt_customer_id = existing_id
-                
-    #             created_new_in_3tp = False
-    #         elif res.status_code not in (200, 201):
-    #             return Response({"status": "error", "message": "Failed to create customer in 3TP.",
-    #                              "details": res.text}, status=res.status_code)
-    #         else:
-    #             tpt_customer_id = _id_of(res.json())
-
-    #         if not tpt_customer_id:
-    #             return Response({"status": "error",
-    #                              "message": "3TP did not return a customer id."}, status=502)
-            
-    #         return Response({"status": "error",
-    #                              "message": "3TP did not return a customer id."}, status=502)
-
-    #         # ---- B. CUSTOMER_USER in 3TP
-    #         res = requests.post(
-    #             f"{CLOUD_URL}/api/user", params={"sendActivationMail": "false"},
-    #             headers=headers, timeout=15,
-    #             json={"email": company_email, "authority": "CUSTOMER_USER",
-    #                   "firstName": contact_person or company, "lastName": "", "phone": phone,
-    #                   "customerId": {"id": tpt_customer_id, "entityType": "CUSTOMER"}},
-    #         )
-    #         if res.status_code not in (200, 201):
-    #             _rollback_3tp_customer(auth_header, tpt_customer_id)
-    #             return Response({"status": "error",
-    #                              "message": "Failed to create CUSTOMER_USER in 3TP.",
-    #                              "details": res.text}, status=res.status_code)
-    #         tpt_user_id = _id_of(res.json())
-
-    #         # ---- C. activate user with the password
-    #         _activate_3tp_user(auth_header, tpt_user_id, raw_password)
-
-    #     except (requests.RequestException, ThreeTPError) as exc:
-    #         if tpt_customer_id:
-    #             _rollback_3tp_customer(auth_header, tpt_customer_id)
-    #         return Response({"status": "error", "message": f"3TP error: {exc}"},
-    #                         status=status.HTTP_502_BAD_GATEWAY)
-
-    #     # ---- D. local customer + local customer user (atomic)
-    #     try:
-    #         with transaction.atomic():
-    #             extra = {"organization": user.organization}
-    #             if hasattr(Customer, "tpt_customer_id"):
-    #                 extra["tpt_customer_id"] = tpt_customer_id
-    #             customer = serializer.save(**extra)
-
-    #             admin = User(
-    #                 name=contact_person or company,
-    #                 email=company_email,
-    #                 phone=phone,
-    #                 role=Role.CUSTOMER,
-    #                 organization=user.organization,
-    #                 customer=customer,
-    #                 is_active=True,
-    #             )
-    #             admin.set_password(raw_password)
-    #             admin.save()
-    #     except Exception as exc:
-    #         _rollback_3tp_customer(auth_header, tpt_customer_id)  # also removes its users
-    #         return Response({"status": "error",
-    #                          "message": "Local creation failed; 3TP changes were rolled back.",
-    #                          "details": str(exc)}, status=500)
-
-    #     # send_login_credentials(company_email, raw_password, user_type="customer_admin")  # if you port the mailer
-
-    #     return Response({
-    #         "status": "success",
-    #         "message": "Customer created successfully.",
-    #         "data": {
-    #             "id": customer.id,
-    #             "company": customer.company,
-    #             "code": customer.code,
-    #             "company_email": customer.company_email,
-    #             "tpt_customer_id": tpt_customer_id,
-    #             "tpt_user_id": tpt_user_id,
-    #             "customer_admin": {"name": admin.name, "email": admin.email, "role": admin.role},
-    #             # only returned when it was auto-generated, so the admin can hand it over
-    #             "generated_password": None if request.data.get("password") else raw_password,
-    #         },
-    #     }, status=status.HTTP_201_CREATED)
 
     def create(self, request, *args, **kwargs):
         try:

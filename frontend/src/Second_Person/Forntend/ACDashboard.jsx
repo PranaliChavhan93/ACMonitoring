@@ -1,5 +1,5 @@
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRollingAverage } from "./hooks/useRollingAverage";
 
@@ -214,6 +214,31 @@ function ACDashboard({
         navigate("/org/dashboard/trends");
     };
 
+    const analyzeDashboard = () => {
+        const payload = {
+            dashboard_name: "AC Energy Monitoring",
+            generated_at: new Date().toISOString(),
+            filters,
+            kpis: {
+                total_ac: metrics.totalACs,
+                active_ac: metrics.activeACs,
+                total_energy_kwh: metrics.totalEnergy,
+                active_energy_kwh: metrics.activeEnergy,
+                total_power_w: metrics.totalPower,
+                average_temperature_c: metrics.averageTemperature,
+                average_humidity_percent: metrics.averageHumidity,
+                alert_count: metrics.alertCount,
+            },
+            trends: trendHistory,
+            ac_data: filteredData,
+            additional_data: {
+                device_data: deviceData,
+            },
+        };
+
+        navigate("/org/dashboard/ai-analysis", { state: { payload } });
+    };
+
     return (
         <div className="ac-dashboard">
             <div className="ac-dashboard-header">
@@ -223,6 +248,14 @@ function ACDashboard({
                 </div>
 
                 <div className="dashboard-header-actions">
+                    <button
+                        type="button"
+                        className="trends-button"
+                        onClick={analyzeDashboard}
+                    >
+                        Analyze Dashboard
+                    </button>
+                    
                     <button
                         type="button"
                         className="trends-button"

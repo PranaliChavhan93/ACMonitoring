@@ -14,10 +14,10 @@ from .views import (
     FloorListView,
     OrganizationListView,
     SiteListView,
-    site_assignment,
     TalukaListView,
     UserListView,
     ZoneListView, StateListView, DistrictListView,
+    site_assignment,
     ac_data,
     branch_assignments,
     branch_ownership,
@@ -50,7 +50,7 @@ urlpatterns = [
     path( "dashboard/preferences/<uuid:pk>/", dashboard_preference_detail ),
 
     path( "v1/filters/locations/", locations),
-    path("v1/filters/locations/<str:location_type>/<int:location_id>/", location_detail),
+    path( "v1/filters/locations/<str:location_type>/<int:location_id>/", location_detail),
     
     path( "devices/", devices ),
     path( "devices/unassigned/", unassigned_devices ),
@@ -93,7 +93,7 @@ urlpatterns = [
     # path( "reports/"),
     # path( "settings/"),
     
-    path("cloud/customers/", CloudCustomerListView.as_view()),
-    path("cloud/users/", CloudUserListView.as_view()),
+    path( "cloud/customers/", CloudCustomerListView.as_view()),
+    path( "cloud/users/", CloudUserListView.as_view()),
 
 ]

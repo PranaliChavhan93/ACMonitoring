@@ -19,6 +19,7 @@ import Locations from "./Pages/Organization/Locations";
 import ACCreation from "./Pages/Organization/ACCreation";
 import Treands from "./Second_Person/Forntend/Treands";
 
+import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
 
 function RootRedirect() {
   const { user } = useAuth();
@@ -127,6 +128,14 @@ export default function App() {
             element={
               <Page roles={[ROLES.CUSTOMER]}>
                 <ACCreation />
+              </Page>
+            }
+          />
+
+          <Route path="/org/dashboard/ai-analysis"
+            element={
+              <Page>
+                <AIAnalysisPage />
               </Page>
             }
           />
