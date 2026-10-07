@@ -2,6 +2,43 @@ from django.urls import path
 
 from .cloud_views import CloudCustomerListView, CloudUserListView
 
+# from .views import (
+#     AdminDetailView,
+#     AdminListView,
+#     BranchListView,
+#     CircleListView,
+#     CustomerDetailView,
+#     CustomerListView,
+#     EngDetailView,
+#     EngListView,
+#     FloorListView,
+#     OrganizationListView,
+#     SiteListView,
+#     TalukaListView,
+#     UserListView,
+#     ZoneListView, StateListView, DistrictListView,
+#     site_assignment,
+#     ac_data,
+#     branch_assignments,
+#     branch_ownership,
+#     dashboard_preference_detail,
+#     dashboard_preferences,
+#     unassigned_devices,
+#     dashboard_summary_view,
+#     device,
+#     devices,
+#     latest_ac_data,
+#     location_detail,
+#     locations,
+#     login_view,
+#     logout_view,
+#     me_view,
+#     ac_data_with_location,
+#     telemetry_status,
+#     LocationListView,
+#     treands,
+# )
+
 from .views import (
     AdminDetailView,
     AdminListView,
@@ -16,7 +53,21 @@ from .views import (
     SiteListView,
     TalukaListView,
     UserListView,
-    ZoneListView, StateListView, DistrictListView,
+    ZoneListView,
+    StateListView,
+    DistrictListView,
+    DeviceCreateView,
+
+    # SiteCreateView,
+    # CustomerSiteMappingView,
+    # SiteDeviceMappingView,
+    # CustomerDeviceMappingView,
+
+    assign_device_to_customer,
+    assign_device_to_site,
+    create_device,
+    create_site,
+
     site_assignment,
     ac_data,
     branch_assignments,
@@ -38,6 +89,7 @@ from .views import (
     LocationListView,
     treands,
 )
+
 
 urlpatterns = [
     path( "ac-data/", ac_data),
@@ -74,6 +126,12 @@ urlpatterns = [
     path( "circles/", CircleListView.as_view()),
     path( "sites/", SiteListView.as_view()),
     path( "sites/<uuid:pk>/assignment/", site_assignment),
+
+    path("sites/create/", create_site),
+    path("devices/create/", create_device),
+
+    path("devices/assign/customer/", assign_device_to_customer),
+    path("devices/assign/site/", assign_device_to_site),
 
     path( "states/", StateListView.as_view()),
     path( "districts/", DistrictListView.as_view()),

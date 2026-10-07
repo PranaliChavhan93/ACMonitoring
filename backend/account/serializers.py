@@ -4,10 +4,28 @@ from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.db import transaction
 from .models import (
-    ACData, DashboardPreference, User, Organization, Customer, HierarchyType,
-    Zone, Circle, Region, Division,
-    State, District, Taluka, City,
-    Branch, Floor, Site, Role,
+    ACData,
+    DashboardPreference,
+    User,
+    Organization,
+    Customer,
+    HierarchyType,
+    Zone,
+    Circle,
+    Region,
+    Division,
+    State,
+    District,
+    Taluka,
+    City,
+    Branch,
+    Floor,
+    Site,
+    ACDevice,
+    CustomerSiteMapping,
+    SiteDeviceMapping,
+    CustomerDeviceMapping,
+    Role,
 )
 
 class ACDataSerializer(serializers.ModelSerializer):
@@ -30,108 +48,6 @@ class OrganizationSerializer(serializers.ModelSerializer):
         model = Organization
         fields = "__all__"
 
-# class CustomerSerializer(serializers.ModelSerializer):
-#     password = serializers.CharField(
-#         write_only=True, required=False, allow_blank=True, min_length=6,
-#     )
-#     login_email = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = Customer
-#         fields = "__all__"
-#         read_only_fields = ["organization"]
-#         validators = []
-
-#     def get_login_email(self, obj):
-#         return (
-#             User.objects.filter(customer=obj, role=Role.CUSTOMER)
-#             .values_list("email", flat=True)
-#             .first()
-#         )
-
-#     @staticmethod
-#     def _login_email_for(customer):
-#         return (customer.contact_person_email or customer.company_email or "").strip().lower()
-
-#     def _ensure_login(self, customer, password):
-#         login = User.objects.filter(customer=customer, role=Role.CUSTOMER).first()
-#         if login:
-#             login.set_password(password)
-#             login.save()
-#             return login
-
-#         email = self._login_email_for(customer)
-#         if not email:
-#             raise serializers.ValidationError(
-#                 {"contact_person_email": "An email is required to create the customer's login."}
-#             )
-#         if User.objects.filter(email__iexact=email).exists():
-#             raise serializers.ValidationError(
-#                 {"contact_person_email": "A user with this email already exists."}
-#             )
-
-#         login = User(
-#             email=email,
-#             name=customer.contact_person or customer.company,
-#             phone=customer.phone,
-#             role=Role.CUSTOMER,
-#             organization=customer.organization,
-#             customer=customer,
-#             is_active=customer.is_active,
-#         )
-#         login.set_password(password)
-#         login.save()
-#         return login
-
-#     def create(self, validated_data):
-#         password = validated_data.pop("password", "")
-#         with transaction.atomic():
-#             customer = super().create(validated_data)
-#             if password:
-#                 self._ensure_login(customer, password)
-#         return customer
-
-#     def update(self, instance, validated_data):
-#         password = validated_data.pop("password", "")
-#         with transaction.atomic():
-#             customer = super().update(instance, validated_data)
-#             if password:
-#                 self._ensure_login(customer, password)
-#         return customer
-
-#     def validate(self, attrs):
-#         request = self.context.get("request")
-#         org_id = (
-#             self.instance.organization_id
-#             if self.instance is not None
-#             else getattr(getattr(request, "user", None), "organization_id", None)
-#         )
-#         code = attrs.get("code") or getattr(self.instance, "code", None)
-#         if org_id and code:
-#             dupes = Customer.objects.filter(organization_id=org_id, code=code)
-#             if self.instance is not None:
-#                 dupes = dupes.exclude(pk=self.instance.pk)
-#             if dupes.exists():
-#                 raise serializers.ValidationError(
-#                     {"code": "A customer with this code already exists in your organization."}
-#                 )
-
-#         if self.instance is None:
-#             if not attrs.get("hierarchy_type"):
-#                 raise serializers.ValidationError(
-#                     {"hierarchy_type": "Select Geographical or Zonal before creating the customer."}
-#                 )
-#         else:
-#             new_value = attrs.get("hierarchy_type")
-#             if (
-#                 new_value
-#                 and new_value != self.instance.hierarchy_type
-#                 and self.instance.branches.exists()
-#             ):
-#                 raise serializers.ValidationError(
-#                     {"hierarchy_type": "This customer already has branches; the hierarchy type is locked."}
-#                 )
-#         return attrs
 
 class CustomerSerializer(serializers.ModelSerializer):
 
@@ -627,7 +543,6 @@ class CustomerSerializer(serializers.ModelSerializer):
         return customer
 
 
-
 class ZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = Zone
@@ -659,17 +574,16 @@ class DistrictSerializer(serializers.ModelSerializer):
         model = District
         fields = "__all__"
 
-
 class TalukaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Taluka
         fields = "__all__"
 
-
 class CitySerializer(serializers.ModelSerializer):
     class Meta:
         model = City
         fields = "__all__"
+
 
 class BranchSerializer(serializers.ModelSerializer):
     # ----- Geographical ancestors -----
@@ -689,12 +603,6 @@ class BranchSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Branch
         fields = "__all__"
-
-
-# class FloorSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Floor
-#         fields = "__all__"
 
 class FloorSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(
@@ -721,16 +629,6 @@ class FloorSerializer(serializers.ModelSerializer):
         ]
 
 class SiteSerializer(serializers.ModelSerializer):
-    """
-    Site is the single source of truth for AC placement.
-
-    Relationship:
-        Site -> Branch -> Customer
-        Site -> User(site=Site) -> site admins
-
-    The frontend never needs to send a customer when assigning an AC.
-    It is always derived from the selected Site.
-    """
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     floor_name = serializers.CharField(source="floor.name", read_only=True, default=None)
 
@@ -845,6 +743,333 @@ class SiteSerializer(serializers.ModelSerializer):
                     })
 
         return attrs
+
+class ACDeviceSerializer(serializers.ModelSerializer):
+
+    site_name = serializers.CharField(
+        source="site.name",
+        read_only=True,
+        allow_null=True
+    )
+
+    branch_id = serializers.UUIDField(
+        source="site.branch_id",
+        read_only=True,
+        allow_null=True
+    )
+
+    branch_name = serializers.CharField(
+        source="site.branch.name",
+        read_only=True,
+        allow_null=True
+    )
+
+    customer_id = serializers.UUIDField(
+        source="site.branch.customer_id",
+        read_only=True,
+        allow_null=True
+    )
+
+    customer_name = serializers.CharField(
+        source="site.branch.customer.company",
+        read_only=True,
+        allow_null=True
+    )
+
+    class Meta:
+        model = ACDevice
+
+        fields = [
+            "id",
+            "ac_id",
+            "device_name",
+            "site",
+            "site_name",
+            "branch_id",
+            "branch_name",
+            "customer_id",
+            "customer_name",
+            "status",
+            "capacity_ton",
+            "installation_date",
+            "last_maintenance_date",
+            "assigned_by",
+            "tpt_device_id",
+            "tpt_sync_status",
+            "tpt_sync_error",
+            "created_at",
+            "updated_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "site_name",
+            "branch_id",
+            "branch_name",
+            "customer_id",
+            "customer_name",
+            "tpt_device_id",
+            "tpt_sync_status",
+            "tpt_sync_error",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate_ac_id(self, value):
+        value = value.strip()
+
+        if not value:
+            raise serializers.ValidationError(
+                "AC ID is required."
+            )
+
+        return value
+
+    def validate(self, attrs):
+
+        site = attrs.get(
+            "site",
+            getattr(self.instance, "site", None)
+        )
+
+        if site:
+
+            if not site.branch_id:
+                raise serializers.ValidationError({
+                    "site": "Selected site is not assigned to a branch."
+                })
+
+            if not site.branch.customer_id:
+                raise serializers.ValidationError({
+                    "site": "Selected site is not assigned to a customer."
+                })
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+
+        if user and user.is_authenticated:
+
+            if user.role == Role.CUSTOMER:
+
+                if (
+                    site
+                    and site.branch.customer_id
+                    != user.customer_id
+                ):
+                    raise serializers.ValidationError({
+                        "site":
+                        "You can only assign devices to your customer sites."
+                    })
+
+            elif user.role == Role.BR_ADMIN:
+
+                if (
+                    site
+                    and site.branch_id
+                    != user.branch_id
+                ):
+                    raise serializers.ValidationError({
+                        "site":
+                        "You can only assign devices to your branch sites."
+                    })
+
+            elif user.role == Role.ENGINEER:
+
+                if (
+                    site
+                    and site.id != user.site_id
+                ):
+                    raise serializers.ValidationError({
+                        "site":
+                        "You can only assign devices to your assigned site."
+                    })
+
+        return attrs
+
+# ============================================================
+# CUSTOMER → SITE
+# ============================================================
+
+class CustomerSiteMappingSerializer(
+    serializers.ModelSerializer
+):
+
+    customer_name = serializers.CharField(
+        source="customer.company",
+        read_only=True
+    )
+
+    site_name = serializers.CharField(
+        source="site.name",
+        read_only=True
+    )
+
+    class Meta:
+        model = CustomerSiteMapping
+
+        fields = [
+            "id",
+            "customer",
+            "customer_name",
+            "site",
+            "site_name",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "customer_name",
+            "site_name",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+
+        customer = attrs["customer"]
+        site = attrs["site"]
+
+        # Site must belong to the same customer
+        if (
+            site.branch_id
+            and site.branch.customer_id
+            and site.branch.customer_id != customer.id
+        ):
+            raise serializers.ValidationError({
+                "site":
+                "This site belongs to another customer."
+            })
+
+        if not site.branch_id:
+            raise serializers.ValidationError({
+                "site":
+                "Site is not assigned to a branch."
+            })
+
+        return attrs
+
+
+# ============================================================
+# SITE → DEVICE
+# ============================================================
+
+class SiteDeviceMappingSerializer(
+    serializers.ModelSerializer
+):
+
+    site_name = serializers.CharField(
+        source="site.name",
+        read_only=True
+    )
+
+    device_name = serializers.CharField(
+        source="device.device_name",
+        read_only=True
+    )
+
+    ac_id = serializers.CharField(
+        source="device.ac_id",
+        read_only=True
+    )
+
+    class Meta:
+        model = SiteDeviceMapping
+
+        fields = [
+            "id",
+            "site",
+            "site_name",
+            "device",
+            "device_name",
+            "ac_id",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "site_name",
+            "device_name",
+            "ac_id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+
+        site = attrs["site"]
+        device = attrs["device"]
+
+        if not site.branch_id:
+            raise serializers.ValidationError({
+                "site":
+                "Site is not assigned to a branch."
+            })
+
+        if not site.branch.customer_id:
+            raise serializers.ValidationError({
+                "site":
+                "Site is not assigned to a customer."
+            })
+
+        return attrs
+
+
+# ============================================================
+# CUSTOMER → DEVICE
+# ============================================================
+
+class CustomerDeviceMappingSerializer( serializers.ModelSerializer ):
+    customer_name = serializers.CharField( source="customer.company", read_only=True )
+    device_name = serializers.CharField( source="device.device_name", read_only=True )
+    ac_id = serializers.CharField( source="device.ac_id", read_only=True )
+
+    class Meta:
+        model = CustomerDeviceMapping
+
+        fields = [
+            "id",
+            "customer",
+            "customer_name",
+            "device",
+            "device_name",
+            "ac_id",
+            "is_active",
+            "created_at",
+            "updated_at",
+        ]
+
+        read_only_fields = [
+            "id",
+            "customer_name",
+            "device_name",
+            "ac_id",
+            "created_at",
+            "updated_at",
+        ]
+
+    def validate(self, attrs):
+
+        customer = attrs["customer"]
+        device = attrs["device"]
+
+        if device.site_id:
+
+            site_customer_id = (
+                device.site.branch.customer_id
+            )
+
+            if site_customer_id != customer.id:
+                raise serializers.ValidationError({
+                    "device":
+                    "This device belongs to a site of another customer."
+                })
+
+        return attrs
+
 
 class UserSerializer(serializers.ModelSerializer):
     scope_name = serializers.CharField(read_only=True)
@@ -1124,593 +1349,3 @@ class DashboardPreferenceSerializer(serializers.ModelSerializer):
             "updated_at",
         ]
 
-
-
-# from rest_framework import serializers
-# from django.contrib.auth import authenticate
-# from django.db import transaction
-# from .models import (
-#     ACData, DashboardPreference, User, Organization, Customer, HierarchyType,
-#     Zone, Circle, Region, Division,
-#     State, District, Taluka, City,
-#     Branch, Floor, Site, Role,
-# )
-
-# class ACDataSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = ACData
-#         fields = [
-#             "id",
-#             "timestamp",
-#             "ac_id",
-#             "indoor_temperature",
-#             "outdoor_temperature",
-#             "indoor_humidity",
-#             "outdoor_humidity",
-#             "voltage",
-#             "current",
-#         ]
-
-# class OrganizationSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Organization
-#         fields = "__all__"
-
-# class CustomerSerializer(serializers.ModelSerializer):
-#     password = serializers.CharField(
-#         write_only=True, required=False, allow_blank=True, min_length=6,
-#     )
-#     login_email = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = Customer
-#         fields = "__all__"
-#         read_only_fields = ["organization"]
-#         validators = []
-
-#     def get_login_email(self, obj):
-#         return (
-#             User.objects.filter(customer=obj, role=Role.CUSTOMER)
-#             .values_list("email", flat=True)
-#             .first()
-#         )
-
-#     @staticmethod
-#     def _login_email_for(customer):
-#         return (customer.contact_person_email or customer.company_email or "").strip().lower()
-
-#     def _ensure_login(self, customer, password):
-#         login = User.objects.filter(customer=customer, role=Role.CUSTOMER).first()
-#         if login:
-#             login.set_password(password)
-#             login.save()
-#             return login
-
-#         email = self._login_email_for(customer)
-#         if not email:
-#             raise serializers.ValidationError(
-#                 {"contact_person_email": "An email is required to create the customer's login."}
-#             )
-#         if User.objects.filter(email__iexact=email).exists():
-#             raise serializers.ValidationError(
-#                 {"contact_person_email": "A user with this email already exists."}
-#             )
-
-#         login = User(
-#             email=email,
-#             name=customer.contact_person or customer.company,
-#             phone=customer.phone,
-#             role=Role.CUSTOMER,
-#             organization=customer.organization,
-#             customer=customer,
-#             is_active=customer.is_active,
-#         )
-#         login.set_password(password)
-#         login.save()
-#         return login
-
-#     def create(self, validated_data):
-#         password = validated_data.pop("password", "")
-#         with transaction.atomic():
-#             customer = super().create(validated_data)
-#             if password:
-#                 self._ensure_login(customer, password)
-#         return customer
-
-#     def update(self, instance, validated_data):
-#         password = validated_data.pop("password", "")
-#         with transaction.atomic():
-#             customer = super().update(instance, validated_data)
-#             if password:
-#                 self._ensure_login(customer, password)
-#         return customer
-
-#     def validate(self, attrs):
-#         request = self.context.get("request")
-#         org_id = (
-#             self.instance.organization_id
-#             if self.instance is not None
-#             else getattr(getattr(request, "user", None), "organization_id", None)
-#         )
-#         code = attrs.get("code") or getattr(self.instance, "code", None)
-#         if org_id and code:
-#             dupes = Customer.objects.filter(organization_id=org_id, code=code)
-#             if self.instance is not None:
-#                 dupes = dupes.exclude(pk=self.instance.pk)
-#             if dupes.exists():
-#                 raise serializers.ValidationError(
-#                     {"code": "A customer with this code already exists in your organization."}
-#                 )
-
-#         if self.instance is None:
-#             if not attrs.get("hierarchy_type"):
-#                 raise serializers.ValidationError(
-#                     {"hierarchy_type": "Select Geographical or Zonal before creating the customer."}
-#                 )
-#         else:
-#             new_value = attrs.get("hierarchy_type")
-#             if (
-#                 new_value
-#                 and new_value != self.instance.hierarchy_type
-#                 and self.instance.branches.exists()
-#             ):
-#                 raise serializers.ValidationError(
-#                     {"hierarchy_type": "This customer already has branches; the hierarchy type is locked."}
-#                 )
-#         return attrs
-
-# class ZoneSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Zone
-#         fields = "__all__"
-
-# class CircleSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Circle
-#         fields = "__all__"
-
-# class RegionSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Region
-#         fields = "__all__"
-
-# class DivisionSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Division
-#         fields = "__all__"
-
-# class StateSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = State
-#         fields = "__all__"
-
-
-# class DistrictSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = District
-#         fields = "__all__"
-
-
-# class TalukaSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Taluka
-#         fields = "__all__"
-
-
-# class CitySerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = City
-#         fields = "__all__"
-
-# class BranchSerializer(serializers.ModelSerializer):
-#     # ----- Geographical ancestors -----
-#     city_name     = serializers.CharField(source="city.name",                         read_only=True, default=None)
-#     taluka_name   = serializers.CharField(source="city.taluka.name",                  read_only=True, default=None)
-#     district_name = serializers.CharField(source="city.taluka.district.name",         read_only=True, default=None)
-#     state_name    = serializers.CharField(source="city.taluka.district.state.name",   read_only=True, default=None)
-
-#     # ----- Zonal ancestors -----
-#     division_name = serializers.CharField(source="division.name",                          read_only=True, default=None)
-#     region_name   = serializers.CharField(source="division.region.name",                   read_only=True, default=None)
-#     circle_name   = serializers.CharField(source="division.region.circle.name",            read_only=True, default=None)
-#     zone_name     = serializers.CharField(source="division.region.circle.zone.name",       read_only=True, default=None)
-
-#     customer_name = serializers.CharField(source="customer.company", read_only=True, default=None)
-
-#     class Meta:
-#         model  = Branch
-#         fields = "__all__"
-
-
-# # class FloorSerializer(serializers.ModelSerializer):
-# #     class Meta:
-# #         model = Floor
-# #         fields = "__all__"
-
-# class FloorSerializer(serializers.ModelSerializer):
-#     branch_name = serializers.CharField(
-#         source="branch.name",
-#         read_only=True
-#     )
-
-#     customer_id = serializers.IntegerField(
-#         source="branch.customer_id",
-#         read_only=True
-#     )
-
-#     class Meta:
-#         model = Floor
-#         fields = [
-#             "id",
-#             "name",
-#             "code",
-#             "branch",
-#             "branch_name",
-#             "customer_id",
-#             "is_active",
-#             "created_at",
-#         ]
-
-# class SiteSerializer(serializers.ModelSerializer):
-#     """
-#     Site is the single source of truth for AC placement.
-
-#     Relationship:
-#         Site -> Branch -> Customer
-#         Site -> User(site=Site) -> site admins
-
-#     The frontend never needs to send a customer when assigning an AC.
-#     It is always derived from the selected Site.
-#     """
-#     branch_name = serializers.CharField(source="branch.name", read_only=True)
-#     floor_name = serializers.CharField(source="floor.name", read_only=True, default=None)
-
-#     customer_id = serializers.IntegerField(
-#         source="branch.customer_id", read_only=True, allow_null=True
-#     )
-#     customer_name = serializers.CharField(
-#         source="branch.customer.company", read_only=True, allow_null=True
-#     )
-#     organization_id = serializers.UUIDField(
-#         source="branch.customer.organization_id", read_only=True, allow_null=True
-#     )
-
-#     admins = serializers.SerializerMethodField()
-#     engineers = serializers.SerializerMethodField()
-
-#     class Meta:
-#         model = Site
-#         fields = [
-#             "id",
-#             "name",
-#             "code",
-#             "address",
-#             "latitude",
-#             "longitude",
-#             "branch",
-#             "branch_name",
-#             "floor",
-#             "floor_name",
-#             "customer_id",
-#             "customer_name",
-#             "organization_id",
-#             "admins",
-#             "engineers",
-#             "is_active",
-#             "created_at",
-#         ]
-#         read_only_fields = [
-#             "id",
-#             "branch_name",
-#             "floor_name",
-#             "customer_id",
-#             "customer_name",
-#             "organization_id",
-#             "admins",
-#             "engineers",
-#             "created_at",
-#         ]
-
-#     def get_admins(self, obj):
-#         customer = getattr(obj.branch, "customer", None)
-#         if not customer:
-#             return []
-
-#         if customer.hierarchy_type == HierarchyType.GEOGRAPHICAL:
-#             try:
-#                 state_id = obj.branch.city.taluka.district.state_id
-#             except AttributeError:
-#                 state_id = None
-#             if not state_id:
-#                 return []
-#             return list(
-#                 User.objects.filter(
-#                     role=Role.BR_ADMIN,
-#                     is_active=True,
-#                     customer_id=customer.id,
-#                     state_id=state_id,
-#                 ).values(
-#                     "id", "name", "email", "phone", "role",
-#                     "state_id", "zone_id", "branch_id", "site_id"
-#                 )
-#             )
-
-#         if customer.hierarchy_type == HierarchyType.ZONAL:
-#             try:
-#                 zone_id = obj.branch.division.region.circle.zone_id
-#             except AttributeError:
-#                 zone_id = None
-#             if not zone_id:
-#                 return []
-#             return list(
-#                 User.objects.filter(
-#                     role=Role.BR_ADMIN,
-#                     is_active=True,
-#                     customer_id=customer.id,
-#                     zone_id=zone_id,
-#                 ).values(
-#                     "id", "name", "email", "phone", "role",
-#                     "state_id", "zone_id", "branch_id", "site_id"
-#                 )
-#             )
-
-#         return []
-
-#     def get_engineers(self, obj):
-#         return list(
-#             obj.users.filter(
-#                 role=Role.ENGINEER,
-#                 is_active=True,
-#             ).values(
-#                 "id", "name", "email", "phone", "role", "branch_id", "site_id"
-#             )
-#         )
-
-#     def validate(self, attrs):
-#         branch = attrs.get("branch") or getattr(self.instance, "branch", None)
-#         floor = attrs.get("floor", getattr(self.instance, "floor", None))
-
-#         if not branch:
-#             raise serializers.ValidationError(
-#                 {"branch": "A site must belong to a branch."}
-#             )
-
-#         if not branch.customer_id:
-#             raise serializers.ValidationError(
-#                 {"branch": "The selected branch is not assigned to a customer."}
-#             )
-
-#         if floor and floor.branch_id != branch.id:
-#             raise serializers.ValidationError({
-#                 "floor": "Selected floor does not belong to the selected branch."
-#             })
-
-#         request = self.context.get("request")
-#         user = getattr(request, "user", None)
-
-#         if user and user.is_authenticated:
-#             if user.role == Role.CUSTOMER:
-#                 if branch.customer_id != user.customer_id:
-#                     raise serializers.ValidationError({
-#                         "branch": "You can only use sites belonging to your customer."
-#                     })
-#             elif user.role == Role.BR_ADMIN:
-#                 if branch.id != user.branch_id:
-#                     raise serializers.ValidationError({
-#                         "branch": "You can only use sites belonging to your branch."
-#                     })
-#             elif user.role == Role.ENGINEER:
-#                 if self.instance is None or self.instance.id != user.site_id:
-#                     raise serializers.ValidationError({
-#                         "branch": "You can only use your assigned site."
-#                     })
-#             elif user.role == Role.ORG_SUPER_ADMIN:
-#                 if branch.customer.organization_id != user.organization_id:
-#                     raise serializers.ValidationError({
-#                         "branch": "This site is outside your organization."
-#                     })
-
-#         return attrs
-
-# class UserSerializer(serializers.ModelSerializer):
-#     scope_name = serializers.CharField(read_only=True)
-#     scope_id = serializers.SerializerMethodField()
-#     customer_hierarchy_type = serializers.SerializerMethodField()
-#     zone_name = serializers.CharField(source="zone.name", read_only=True, default=None)
-#     circle_name = serializers.CharField(source="circle.name", read_only=True, default=None)
-#     state_name = serializers.CharField(source="state.name", read_only=True, default=None)
-#     district_name = serializers.CharField(source="district.name", read_only=True, default=None)
-
-#     class Meta:
-#         model = User
-#         fields = [
-#             "id", "email", "name", "phone", "role",
-#             "organization", "customer", "zone", "circle", "state", "district", "branch", "site",
-#             "scope_name", "scope_id", "customer_hierarchy_type", "customer_name",
-#             "zone_name", "circle_name", "state_name", "district_name",
-#             "is_active", "date_joined", "last_login",
-#         ]
-#         read_only_fields = ["id", "date_joined", "last_login"]
-
-#     def get_scope_id(self, obj):
-#         _, scope_id = obj.get_scope()
-#         return str(scope_id) if scope_id else None
-
-#     def get_customer_hierarchy_type(self, obj):
-#         return obj.customer.hierarchy_type if obj.customer_id and obj.customer else None
-
-
-# class LoginSerializer(serializers.Serializer):
-#     email = serializers.EmailField()
-#     password = serializers.CharField(write_only=True, min_length=6)
-#     role = serializers.ChoiceField(choices=Role.choices)
-
-#     def validate(self, data):
-#         user = authenticate(
-#             request=self.context.get("request"),
-#             username=data["email"],
-#             password=data["password"],
-#         )
-#         if not user:
-#             raise serializers.ValidationError("Invalid email or password.")
-#         if not user.is_active:
-#             raise serializers.ValidationError("This account is disabled.")
-#         if user.role != data["role"]:
-#             raise serializers.ValidationError(
-#                 f"This account belongs to '{user.get_role_display()}'. "
-#                 f"Please select the correct role."
-#             )
-#         data["user"] = user
-#         return data
-
-# class AdminSerializer(serializers.ModelSerializer):
-#     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
-#     scope_name = serializers.CharField(read_only=True)
-#     scope_id = serializers.SerializerMethodField()
-#     customer_hierarchy_type = serializers.SerializerMethodField()
-#     customer_name = serializers.CharField(source="customer.company", read_only=True, default=None)
-
-#     zone_name = serializers.CharField(source="zone.name", read_only=True, default=None)
-#     circle_name = serializers.CharField(source="circle.name", read_only=True, default=None)
-#     region_name = serializers.CharField(source="region.name", read_only=True, default=None)
-#     division_name = serializers.CharField(source="division.name", read_only=True, default=None)
-#     state_name = serializers.CharField(source="state.name", read_only=True, default=None)
-#     district_name = serializers.CharField(source="district.name", read_only=True, default=None)
-#     taluka_name = serializers.CharField(source="taluka.name", read_only=True, default=None)
-#     city_name = serializers.CharField(source="city.name", read_only=True, default=None)
-
-#     class Meta:
-#         model = User
-#         fields = [
-#             "id", "email", "name", "phone", "role",
-#             "organization", "customer",
-#             "zone", "circle", "region", "division",
-#             "state", "district", "taluka", "city",
-#             "branch", "site",
-#             "scope_name", "scope_id", "customer_hierarchy_type",
-#             "zone_name", "circle_name", "region_name", "division_name",
-#             "state_name", "district_name", "taluka_name", "city_name",
-#             "password", "is_active", "date_joined", "last_login",
-#         ]
-#         read_only_fields = [
-#             "id", "date_joined", "last_login", "scope_name", "scope_id",
-#         ]
-#         extra_kwargs = {
-#             field: {"required": False}
-#             for field in [
-#                 "organization", "customer", "zone", "circle", "region", "division",
-#                 "state", "district", "taluka", "city", "branch", "site",
-#             ]
-#         }
-
-#     def get_scope_id(self, obj):
-#         _, scope_id = obj.get_scope()
-#         return str(scope_id) if scope_id else None
-
-#     def get_customer_hierarchy_type(self, obj):
-#         return obj.customer.hierarchy_type if obj.customer_id and obj.customer else None
-
-#     CREATABLE_ROLES = (Role.BR_ADMIN, Role.ENGINEER)
-
-#     def validate_role(self, value):
-#         if value not in self.CREATABLE_ROLES:
-#             raise serializers.ValidationError(
-#                 "Only Branch Admin and Engineer accounts can be created here."
-#             )
-#         return value
-
-#     def validate_customer(self, value):
-#         request = self.context.get("request")
-#         acting = getattr(request, "user", None)
-#         if value is None or acting is None:
-#             return value
-#         if acting.role == Role.ORG_SUPER_ADMIN and value.organization_id != acting.organization_id:
-#             raise serializers.ValidationError("Customer does not belong to your organization.")
-#         if acting.role == Role.CUSTOMER and value.pk != acting.customer_id:
-#             raise serializers.ValidationError("You can only assign users to your own customer.")
-#         return value
-
-#     def validate(self, attrs):
-#         attrs = super().validate(attrs)
-#         request = self.context.get("request")
-#         acting = getattr(request, "user", None)
-
-#         customer = attrs.get("customer") or getattr(self.instance, "customer", None)
-#         if not customer and acting and acting.role == Role.CUSTOMER:
-#             customer = acting.customer
-#             attrs["customer"] = customer
-
-#         if not customer:
-#             return attrs
-
-#         hierarchy = customer.hierarchy_type
-#         state = attrs.get("state") if "state" in attrs else getattr(self.instance, "state", None)
-#         zone = attrs.get("zone") if "zone" in attrs else getattr(self.instance, "zone", None)
-
-#         # Branch Admin scope is always the customer's top-level node.
-#         if (attrs.get("role") or getattr(self.instance, "role", None)) == Role.BR_ADMIN:
-#             if hierarchy == HierarchyType.GEOGRAPHICAL:
-#                 if not state:
-#                     raise serializers.ValidationError(
-#                         {"state": "Select the State where this admin belongs."}
-#                     )
-#                 if state.customer_id != customer.pk:
-#                     raise serializers.ValidationError(
-#                         {"state": "Selected state does not belong to the selected customer."}
-#                     )
-#                 if zone:
-#                     raise serializers.ValidationError(
-#                         {"zone": "A geographical customer uses State, not Zone, as the admin scope."}
-#                     )
-#                 attrs["zone"] = None
-#                 for field in ("circle", "region", "division", "district", "taluka", "city", "branch", "site"):
-#                     if field in attrs:
-#                         attrs[field] = None
-
-#             elif hierarchy == HierarchyType.ZONAL:
-#                 if not zone:
-#                     raise serializers.ValidationError(
-#                         {"zone": "Select the Zone where this admin belongs."}
-#                     )
-#                 if zone.customer_id != customer.pk:
-#                     raise serializers.ValidationError(
-#                         {"zone": "Selected zone does not belong to the selected customer."}
-#                     )
-#                 if state:
-#                     raise serializers.ValidationError(
-#                         {"state": "A zonal customer uses Zone, not State, as the admin scope."}
-#                     )
-#                 attrs["state"] = None
-#                 for field in ("circle", "region", "division", "district", "taluka", "city", "branch", "site"):
-#                     if field in attrs:
-#                         attrs[field] = None
-#             else:
-#                 raise serializers.ValidationError(
-#                     {"customer": "The customer must have a Geographical or Zonal hierarchy."}
-#                 )
-
-#         return attrs
-
-
-# class DashboardPreferenceSerializer(serializers.ModelSerializer):
-
-#     class Meta:
-#         model = DashboardPreference
-#         fields = [
-#             "id",
-#             "name",
-#             "customer",
-#             "main_filters",
-#             "card_filters",
-#             "visible_widgets",
-#             "is_default",
-#             "created_at",
-#             "updated_at",
-#         ]
-
-#         read_only_fields = [
-#             "id",
-#             "customer",
-#             "created_at",
-#             "updated_at",
-#         ]

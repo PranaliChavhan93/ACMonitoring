@@ -117,6 +117,8 @@ function CustomerCreation() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [toast, setToast] = useState(null);
+  
   const isEditing = Boolean(form.id);
 
   /* =========================================================
@@ -372,29 +374,32 @@ function CustomerCreation() {
 
       const saved = await res.json();
 
-      await fetchCustomers();
+            await fetchCustomers();
 
       if (isEditing) {
         backToList();
+        showToast("success", "Customer updated successfully.");
         return;
       }
 
       setForm((prev) => ({ ...prev, id: saved.id }));
       setFormError("");
       setView("hierarchy");
+      showToast("success", "Customer created successfully.");
     } catch (err) {
-      setFormError(err.message || "Could not save customer.");
+      const msg = err.message || "Could not save customer.";
+      setFormError(msg);
+      showToast("error", msg);
     } finally {
       setSaving(false);
     }
   };
 
-  /* =========================================================
-     DELETE
-  ========================================================= */
-
   const handleDelete = async () => {
     if (!confirmDelete || deleting) return;
+
+    const name =
+      customerNameOf(confirmDelete) || confirmDelete.code || "Customer";
 
     setDeleting(true);
 
@@ -412,23 +417,28 @@ function CustomerCreation() {
         prev.filter((customer) => customer.id !== confirmDelete.id)
       );
       setConfirmDelete(null);
+      showToast("success", `${name} deleted successfully.`);
     } catch (err) {
-      setError(err.message || "Could not delete customer.");
+      const msg = err.message || "Could not delete customer.";
+      setError(msg);
       setConfirmDelete(null);
+      showToast("error", msg);
     } finally {
       setDeleting(false);
     }
   };
 
-  /* =========================================================
-     HIERARCHY NAME
-  ========================================================= */
-
   const hierarchyName = HIERARCHY_LABEL[selectedHierarchy] || "-";
 
-  /* =========================================================
-     RENDER
-  ========================================================= */
+  const showToast = useCallback((type, message) => {
+    setToast({ type, message, id: Date.now() });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   return (
     <div className="admins-page">
@@ -1171,6 +1181,19 @@ function CustomerCreation() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          key={toast.id}
+          className={`admins-toast admins-toast-${toast.type}`}
+          role="status"
+        >
+          <span className="admins-toast-icon">
+            {toast.type === "success" ? "✓" : "!"}
+          </span>
+          <span>{toast.message}</span>
         </div>
       )}
     </div>

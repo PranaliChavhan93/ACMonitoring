@@ -237,7 +237,7 @@
 
 // // // // import React, { useEffect, useMemo, useState } from "react";
 
-// // // // const API_BASE = "http://192.168.1.17:8000/api/v1/filters/locations/";
+// // // // const API_BASE = "http://192.168.1.12:8000/api/v1/filters/locations/";
 
 // // // // const HIERARCHY_CONFIG = {
 // // // //   GEOGRAPHICAL: {
@@ -493,7 +493,7 @@
 
 // // // import React, { useEffect, useMemo, useState } from "react";
 
-// // // const API_BASE = "http://192.168.1.17:8000/api/v1/filters/locations/";
+// // // const API_BASE = "http://192.168.1.12:8000/api/v1/filters/locations/";
 
 // // // export const HIERARCHY_CONFIG = {
 // // //   GEOGRAPHICAL: {
@@ -807,7 +807,7 @@
 
 // // import React, { useEffect, useMemo, useState } from "react";
 
-// // const API_BASE = "http://192.168.1.17:8000/api/v1/filters/locations/";
+// // const API_BASE = "http://192.168.1.12:8000/api/v1/filters/locations/";
 
 // // export const HIERARCHY_CONFIG = {
 // //   GEOGRAPHICAL: {
@@ -1182,7 +1182,7 @@
 // import React, { useEffect, useMemo, useState } from "react";
 
 // const API_BASE =
-//   "http://192.168.1.17:8000/api/v1/filters/locations/";
+//   "http://192.168.1.12:8000/api/v1/filters/locations/";
 
 // export const HIERARCHY_CONFIG = {
 //   GEOGRAPHICAL: {
@@ -1855,7 +1855,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 const API_BASE =
-  "http://192.168.1.17:8000/api/v1/filters/locations/";
+  "http://192.168.1.12:8000/api/v1/filters/locations/";
 
 export const HIERARCHY_CONFIG = {
   GEOGRAPHICAL: {

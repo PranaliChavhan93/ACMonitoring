@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { FiEdit3, FiRefreshCw, FiSearch, FiUserPlus } from "react-icons/fi";
+import { FiEdit3, FiTrash2, FiRefreshCw, FiSearch, FiUserPlus } from "react-icons/fi";
 import "./AdminCreation.css";
 import { useAuth } from "../Layout/AuthContext";
 
@@ -55,6 +55,7 @@ const hierarchyLabel = {
 };
 
 const Admin_Creation = () => {
+  const [toast, setToast] = useState(null);
   const { user: currentUser } = useAuth();
   const isCustomerUser = currentUser?.role === "CUSTOMER";
   const isSuperAdmin = currentUser?.role === "ORG_SUPER_ADMIN";
@@ -72,6 +73,19 @@ const Admin_Creation = () => {
   const [locationsLoading, setLocationsLoading] = useState(false);
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  
+  const showToast = useCallback((type, message) => {
+    setToast({ type, message, id: Date.now() });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(timer);
+}, [toast]);
 
   const currentCustomerId = useMemo(() => {
     if (!isCustomerUser) return "";
@@ -238,6 +252,49 @@ const Admin_Creation = () => {
     setView("form");
   };
 
+  const openDeleteConfirm = (admin) => {
+    setDeleteTarget(admin);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (deleting) return; // don't close mid-request
+    setDeleteTarget(null);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+
+    const name = deleteTarget.name || deleteTarget.email || "Admin";
+
+    setDeleting(true);
+    setError("");
+    try {
+      const response = await fetch(`${USERS_URL}${deleteTarget.id}/`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+
+      if (!response.ok && response.status !== 204) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(
+          result?.detail || result?.message || `HTTP ${response.status}`
+        );
+      }
+
+      setAdmins((previous) =>
+        previous.filter((item) => item.id !== deleteTarget.id)
+      );
+      setDeleteTarget(null);
+      showToast("success", `${name} deleted successfully.`);
+    } catch (err) {
+      setError(err.message || "Could not delete admin.");
+      setDeleteTarget(null);
+      showToast("error", err.message || "Could not delete admin.");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleCustomerChange = (customerId) => {
     const customer = customers.find((item) => String(item.id) === String(customerId));
     setForm((previous) => ({
@@ -274,6 +331,8 @@ const Admin_Creation = () => {
     if (hierarchyType === "ZONAL" && !form.zone) {
       return setFormError("Select the Zone where the admin belongs.");
     }
+
+    const wasEditing = Boolean(form.id);
 
     const payload = {
       name: form.name.trim(),
@@ -316,8 +375,13 @@ const Admin_Creation = () => {
       await fetchAdmins();
       setView("list");
       resetForm();
+      showToast(
+        "success",
+        wasEditing ? "Admin updated successfully." : "Admin created successfully."
+      );
     } catch (err) {
       setFormError(err.message || "Could not save admin.");
+      showToast("error", err.message || "Could not save admin.");
     } finally {
       setSaving(false);
     }
@@ -384,9 +448,9 @@ const Admin_Creation = () => {
               />
             </div>
             <span className="admins-count">{filteredAdmins.length} admins</span>
-            <button type="button" className="btn-secondary" onClick={fetchAdmins}>
+            {/* <button type="button" className="btn-secondary" onClick={fetchAdmins}>
               <FiRefreshCw /> Refresh
-            </button>
+            </button> */}
           </div>
 
           {error && <div className="admins-error">{error}</div>}
@@ -430,6 +494,15 @@ const Admin_Creation = () => {
                           title="Edit"
                         >
                           <FiEdit3 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          onClick={() => openDeleteConfirm(admin)}
+                          title="Delete"
+                          style={{ color: "#dc2626" }}
+                        >
+                          <FiTrash2 size={16} />
                         </button>
                       </td>
                     </tr>
@@ -595,6 +668,63 @@ const Admin_Creation = () => {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="admins-modal-overlay" onClick={closeDeleteConfirm}>
+          <div
+            className="admins-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="admins-modal-header">
+              <FiTrash2 size={20} style={{ color: "#dc2626" }} />
+              <h3>Delete Admin</h3>
+            </div>
+
+            <div className="admins-modal-body">
+              <p>
+                Are you sure you want to delete{" "}
+                <strong>{deleteTarget.name || deleteTarget.email}</strong>?
+              </p>
+              <p className="admins-modal-warning">
+                This removes the admin from both the AC Monitoring system and 3TP.
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="admins-modal-actions">
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={closeDeleteConfirm}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn-danger"
+                onClick={confirmDelete}
+                disabled={deleting}
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div
+          key={toast.id}
+          className={`admins-toast admins-toast-${toast.type}`}
+          role="status"
+        >
+          <span className="admins-toast-icon">
+            {toast.type === "success" ? "✓" : "!"}
+          </span>
+          <span>{toast.message}</span>
         </div>
       )}
     </div>

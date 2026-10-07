@@ -7,6 +7,8 @@ import threading
 import traceback
 import hashlib
 
+from django.views.decorators.csrf import csrf_exempt
+
 import requests
 
 from django.conf import settings
@@ -26,8 +28,20 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import AllowAny, BasePermission, SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
 
-# from backend.account.cloud_sync import provision_customer, provision_user, create_3tp_customer_user
-from .cloud_sync import provision_customer, provision_user
+# from .cloud_sync import provision_customer, provision_user
+
+from .cloud_sync import (
+    provision_customer,
+    provision_user,
+    # sync_customer,
+    # sync_site,
+    # sync_device,
+    # link_3tp_device_to_site,
+    # create_3tp_device,
+    # ThreeTPError,
+    # ThreeTPAPIError,
+)
+
 
 from .models import (
     LocationCircle,
@@ -53,6 +67,7 @@ from .models import (
 )
 
 from .serializers import (
+    ACDeviceSerializer,
     AdminSerializer,
     CitySerializer,
     DivisionSerializer,
@@ -360,6 +375,23 @@ def fetch_3tp_customers(request):
         total_pages = data.get("totalPages", 1)
         page += 1
     return out
+
+
+def map_3tp_customer_to_device(request, tpt_customer_id, tpt_device_id):
+    r = requests.post(
+        f"{CLOUD_URL}/api/customer/{tpt_customer_id}/device/{tpt_device_id}",
+        headers=_tpt_user_headers(request),
+        timeout=15,
+    )
+
+    if r.status_code not in (200, 201, 204):
+        raise ThreeTPError(
+            f"Mapping customer to device failed: {r.text}",
+            status=r.status_code,
+            payload=r.text,
+        )
+
+    return True
 
 class ThreeTPError(Exception):
     """Raised whenever a 3TP call fails or returns a non-2xx response."""
@@ -3060,18 +3092,32 @@ class SiteListView(generics.ListCreateAPIView):
         user = self.request.user
         branch = serializer.validated_data["branch"]
 
-        if user.role == Role.CUSTOMER and branch.customer_id != user.customer_id:
-            raise DRFValidationError({"branch": "You can only create a site under your customer."})
-        if user.role == Role.BR_ADMIN and branch.id != user.branch_id:
-            raise DRFValidationError({"branch": "You can only create a site under your branch."})
-        if user.role == Role.ENGINEER:
-            raise DRFValidationError("Engineers cannot create sites.")
-        if user.role == Role.ORG_SUPER_ADMIN:
+        if user.role == Role.CUSTOMER:
+            if branch.customer_id != user.customer_id:
+                raise DRFValidationError({
+                    "branch": "You can only create a site under your customer."
+                })
+
+        elif user.role == Role.BR_ADMIN:
+            if branch.id != user.branch_id:
+                raise DRFValidationError({
+                    "branch": "You can only create a site under your branch."
+                })
+
+        elif user.role == Role.ENGINEER:
+            raise DRFValidationError(
+                "Engineers cannot create sites."
+            )
+
+        elif user.role == Role.ORG_SUPER_ADMIN:
             if branch.customer.organization_id != user.organization_id:
-                raise DRFValidationError({"branch": "This branch is outside your organization."})
+                raise DRFValidationError({
+                    "branch": "This branch is outside your organization."
+                })
 
         serializer.save()
         site = serializer.instance
+
         try:
             customer = branch.customer
             if not getattr(customer, "tpt_customer_id", ""):
@@ -3082,8 +3128,10 @@ class SiteListView(generics.ListCreateAPIView):
                 tpt_sync_status="FAILED",
                 tpt_sync_error=str(exc),
             )
-
-
+            raise ThreeTPAPIError(
+                f"Site created locally but 3TP site creation failed: {_one_line(exc)}"
+            )
+    
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def site_assignment(request, pk):
@@ -3566,3 +3614,487 @@ def dashboard_preference_detail(request, pk):
         status=status.HTTP_200_OK,
     )
 
+
+class DeviceCreateView(generics.CreateAPIView):
+    serializer_class = ACDeviceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        site = serializer.validated_data.get("site")
+
+        if site is None:
+            raise DRFValidationError({
+                "site": "Site is required to create and sync the device."
+            })
+
+        if user.role == Role.ENGINEER:
+            raise DRFValidationError(
+                "Engineers cannot create devices."
+            )
+
+        if user.role == Role.CUSTOMER:
+            if site.branch.customer_id != user.customer_id:
+                raise DRFValidationError({
+                    "site": "This site does not belong to your customer."
+                })
+
+        elif user.role == Role.BR_ADMIN:
+            if site.branch_id != user.branch_id:
+                raise DRFValidationError({
+                    "site": "This site does not belong to your branch."
+                })
+
+        elif user.role == Role.ORG_SUPER_ADMIN:
+            if site.branch.customer.organization_id != user.organization_id:
+                raise DRFValidationError({
+                    "site": "This site is outside your organization."
+                })
+
+        serializer.save(
+            assigned_by=user
+        )
+
+        device = serializer.instance
+
+        customer = site.branch.customer
+
+        try:
+            if not getattr(customer, "tpt_customer_id", ""):
+                sync_customer(customer)
+
+            if not getattr(site, "tpt_site_id", ""):
+                sync_site(site)
+
+            sync_device(device)
+
+        except ThreeTPError as exc:
+
+            ACDevice.objects.filter(pk=device.pk).update(
+                tpt_sync_status="FAILED",
+                tpt_sync_error=str(exc),
+            )
+
+            raise ThreeTPAPIError(
+                f"Device created locally but 3TP synchronization failed: "
+                f"{_one_line(exc)}"
+            )
+
+@csrf_exempt
+@api_view(["POST"])
+def create_site(request):
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JsonResponse(
+                {"error": "Valid Bearer token required"},
+                status=401
+            )
+
+        token = auth_header.split(" ")[1]
+
+        body = json.loads(request.body)
+
+        name = body.get("name")
+        customer_id = body.get("customer_id")
+        latitude = body.get("latitude")
+        longitude = body.get("longitude")
+        address = body.get("address")
+
+        if not name:
+            return JsonResponse(
+                {"error": "name is required"},
+                status=400
+            )
+
+        # ---------------- 3TP CREATE SITE ----------------
+
+        response = requests.post(
+            f"{CLOUD_URL}/api/asset",
+            json={
+                "name": name,
+                "type": "default"
+            },
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Authorization": f"Bearer {token}"
+            }
+        )
+
+        data = response.json()
+
+        if response.status_code not in [200, 201]:
+            return JsonResponse(data, status=response.status_code)
+
+        asset_id = data["id"]["id"]
+
+        # ---------------- CUSTOMER -> SITE ----------------
+
+        if customer_id:
+
+            response = requests.post(
+                f"{CLOUD_URL}/api/customer/{customer_id}/asset/{asset_id}",
+                headers={
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                    "X-Authorization": f"Bearer {token}"
+                }
+            )
+
+            if response.status_code not in [200, 201]:
+                return JsonResponse(
+                    {"error": "Failed to map site to customer",
+                     "details": response.json()},
+                    status=response.status_code
+                )
+
+        # ---------------- SAVE LOCAL ----------------
+
+        site = Site.objects.create(
+            name=name,
+            asset_id=asset_id,
+            customer_id=customer_id,
+            latitude=latitude,
+            longitude=longitude,
+            address=address
+        )
+
+        return JsonResponse({
+            "message": "Site created successfully",
+            "site_id": str(site.id),
+            "asset_id": asset_id,
+            "customer_id": customer_id
+        }, status=201)
+
+    except Exception as e:
+
+        return JsonResponse(
+            {"error": str(e)},
+            status=500
+        )
+
+@csrf_exempt
+@api_view(["POST"])
+def create_device(request):
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JsonResponse(
+                {"error": "Valid Bearer token required"},
+                status=401
+            )
+
+        token = auth_header.split(" ")[1]
+
+        body = json.loads(request.body)
+
+        ac_id = body.get("ac_id")
+        device_name = body.get("device_name")
+
+        if not ac_id:
+            return JsonResponse(
+                {"error": "ac_id is required"},
+                status=400
+            )
+
+        # ---------------- CREATE DEVICE IN 3TP ----------------
+
+        payload = {
+            "device": {
+                "name": device_name or ac_id,
+                "label": device_name or ac_id,
+                "deviceProfileId": {
+                    "id": body.get("device_profile_id"),
+                    "entityType": "DEVICE_PROFILE"
+                }
+            },
+            "credentials": {
+                "credentialsType": "MQTT_BASIC",
+                "credentialsValue": json.dumps({
+                    "clientId": ac_id,
+                    "userName": body.get("username", ac_id),
+                    "password": body.get("password", "")
+                })
+            }
+        }
+
+        response = requests.post(
+            f"{CLOUD_URL}/api/device-with-credentials",
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Authorization": f"Bearer {token}"
+            }
+        )
+
+        data = response.json()
+
+        if response.status_code not in [200, 201]:
+            return JsonResponse(
+                data,
+                status=response.status_code
+            )
+
+        device_id = data["device"]["id"]["id"]
+
+        # ---------------- SAVE LOCAL ----------------
+
+        device = ACDevice.objects.create(
+            ac_id=ac_id,
+            device_name=device_name or ac_id,
+            tpt_device_id=device_id
+        )
+
+        return JsonResponse({
+            "message": "Device created successfully",
+            "device_id": str(device.id),
+            "tpt_device_id": device_id
+        }, status=201)
+
+    except Exception as e:
+
+        return JsonResponse(
+            {"error": str(e)},
+            status=500
+        )
+
+@csrf_exempt
+@api_view(["POST"])
+def create_device(request):
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JsonResponse(
+                {"error": "Valid Bearer token required"},
+                status=401
+            )
+
+        token = auth_header.split(" ")[1]
+
+        body = json.loads(request.body)
+
+        ac_id = body.get("ac_id")
+        device_name = body.get("device_name")
+
+        if not ac_id:
+            return JsonResponse(
+                {"error": "ac_id is required"},
+                status=400
+            )
+
+        # ---------------- CREATE DEVICE IN 3TP ----------------
+
+        payload = {
+            "device": {
+                "name": device_name or ac_id,
+                "label": device_name or ac_id,
+                "deviceProfileId": {
+                    "id": body.get("device_profile_id"),
+                    "entityType": "DEVICE_PROFILE"
+                }
+            },
+            "credentials": {
+                "credentialsType": "MQTT_BASIC",
+                "credentialsValue": json.dumps({
+                    "clientId": ac_id,
+                    "userName": body.get("username", ac_id),
+                    "password": body.get("password", "")
+                })
+            }
+        }
+
+        response = requests.post(
+            f"{CLOUD_URL}/api/device-with-credentials",
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Authorization": f"Bearer {token}"
+            }
+        )
+
+        data = response.json()
+
+        if response.status_code not in [200, 201]:
+            return JsonResponse(
+                data,
+                status=response.status_code
+            )
+
+        device_id = data["device"]["id"]["id"]
+
+        # ---------------- SAVE LOCAL ----------------
+
+        device = ACDevice.objects.create(
+            ac_id=ac_id,
+            device_name=device_name or ac_id,
+            tpt_device_id=device_id
+        )
+
+        return JsonResponse({
+            "message": "Device created successfully",
+            "device_id": str(device.id),
+            "tpt_device_id": device_id
+        }, status=201)
+
+    except Exception as e:
+
+        return JsonResponse(
+            {"error": str(e)},
+            status=500
+        )
+
+@csrf_exempt
+@api_view(["POST"])
+def assign_device_to_customer(request):
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JsonResponse(
+                {"error": "Valid Bearer token required"},
+                status=401
+            )
+
+        token = auth_header.split(" ")[1]
+
+        body = json.loads(request.body)
+
+        customer_id = body.get("customer_id")
+        device_id = body.get("device_id")
+
+        if not customer_id or not device_id:
+            return JsonResponse(
+                {"error": "customer_id and device_id are required"},
+                status=400
+            )
+
+        # ---------------- 3TP MAPPING ----------------
+
+        response = requests.post(
+            f"{CLOUD_URL}/api/customer/{customer_id}/device/{device_id}",
+            headers={
+                "Accept": "application/json",
+                "X-Authorization": f"Bearer {token}"
+            }
+        )
+
+        if response.status_code not in [200, 201]:
+            return JsonResponse(
+                {
+                    "error": "Failed to map device to customer",
+                    "details": response.json()
+                },
+                status=response.status_code
+            )
+
+        return JsonResponse({
+            "message": "Device mapped to customer successfully",
+            "customer_id": customer_id,
+            "device_id": device_id
+        })
+
+    except Exception as e:
+
+        return JsonResponse(
+            {"error": str(e)},
+            status=500
+        )
+
+@csrf_exempt
+@api_view(["POST"])
+def assign_device_to_site(request):
+
+    try:
+        auth_header = request.headers.get("Authorization")
+
+        if not auth_header or not auth_header.startswith("Bearer "):
+            return JsonResponse(
+                {"error": "Valid Bearer token required"},
+                status=401
+            )
+
+        token = auth_header.split(" ")[1]
+
+        body = json.loads(request.body)
+
+        asset_id = body.get("asset_id")
+        device_id = body.get("device_id")
+
+        if not asset_id or not device_id:
+            return JsonResponse(
+                {"error": "asset_id and device_id are required"},
+                status=400
+            )
+
+        # ---------------- SITE -> DEVICE ----------------
+
+        payload = {
+            "from": {
+                "entityType": "ASSET",
+                "id": asset_id
+            },
+            "to": {
+                "entityType": "DEVICE",
+                "id": device_id
+            },
+            "type": "Contains",
+            "typeGroup": "COMMON"
+        }
+
+        response = requests.post(
+            f"{CLOUD_URL}/api/relation",
+            json=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "X-Authorization": f"Bearer {token}"
+            }
+        )
+
+        if response.status_code not in [200, 201]:
+            return JsonResponse(
+                {
+                    "error": "Failed to map device to site",
+                    "details": response.json()
+                },
+                status=response.status_code
+            )
+
+        # ---------------- LOCAL UPDATE ----------------
+
+        site = Site.objects.filter(
+            asset_id=asset_id,
+            is_deleted=False
+        ).first()
+
+        device = ACDevice.objects.filter(
+            tpt_device_id=device_id
+        ).first()
+
+        if site and device:
+            device.site = site
+            device.save(update_fields=["site"])
+
+        return JsonResponse({
+            "message": "Device mapped to site successfully",
+            "asset_id": asset_id,
+            "device_id": device_id
+        })
+
+    except Exception as e:
+
+        return JsonResponse(
+            {"error": str(e)},
+            status=500
+        )
