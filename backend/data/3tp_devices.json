@@ -3,5 +3,11 @@
     "device_id": "2e6f6850-a6c4-11f1-8880-6fd8cb50dc0b",
     "ac_id": "AC-AP-B01-01",
     "device_name": "AC-01"
+  },
+  {
+    "device_id": "56dc0530-c16a-11f1-b471-ab46d4f80734",
+    "ac_id": "AC-AP-B01-02",
+    "device_name": "AC-02"
   }
 ]
+

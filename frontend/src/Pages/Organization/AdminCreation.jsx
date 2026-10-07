@@ -367,9 +367,9 @@ const Admin_Creation = () => {
                 everything below that hierarchy node.
               </p>
             </div>
-            <button type="button" className="btn-primary" onClick={openCreate}>
+            {/* <button type="button" className="btn-primary" onClick={openCreate}>
               <FiUserPlus /> Add Admin
-            </button>
+            </button> */}
           </div>
 
           <div className="admins-toolbar">

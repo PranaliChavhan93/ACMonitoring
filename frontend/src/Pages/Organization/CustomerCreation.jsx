@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FiTrash2,
@@ -24,12 +25,12 @@ const getToken = () =>
 
 const authHeaders = () => {
   const token = getToken();
-
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Token ${token}` } : {}),
   };
 };
+
 
 const HIERARCHY_OPTIONS = [
   {
@@ -49,6 +50,11 @@ const HIERARCHY_LABEL = {
   ZONAL: "Zonal",
 };
 
+const CUSTOMER_TYPES = [
+  "Public Sector Bank",
+  "Private Sector Bank",
+];
+
 const emptyForm = {
   id: null,
   company: "",
@@ -57,10 +63,28 @@ const emptyForm = {
   contact_person: "",
   contact_person_email: "",
   phone: "",
+  password: "",
+  confirm_password: "",
   hierarchy_type: "",
-  password: "",          // login password for the customer (main user)
   is_active: true,
+
+  bank_short_name: "",
+  bank_type: "",
+  website: "",
+
+  address_line_1: "",
+  state: "",
+  district: "",
+  city: "",
+  pincode: "",
+
+  designation: "",
+  admin_mobile: "",
 };
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function normalizeList(result) {
   if (Array.isArray(result)) return result;
@@ -69,43 +93,39 @@ function normalizeList(result) {
   return [];
 }
 
-const companyOf = (customer) => customer?.company ?? customer?.name ?? "";
+const customerNameOf = (customer) =>
+  customer?.company ?? customer?.bank_name ?? customer?.name ?? "";
 
-const emailOf = (customer) => customer?.company_email ?? customer?.email ?? "";
+const customerEmailOf = (customer) =>
+  customer?.company_email ?? customer?.email ?? "";
 
-const CUSTOMER_ROLE_VALUES = new Set(["CUSTOMER", "customer", "Customer"]);
+/* =========================================================
+   COMPONENT
+========================================================= */
 
-const isCustomerRole = (row) => {
-  if (!row) return false;
-
-  if (typeof row.role === "string" && row.role.trim() !== "") {
-    return CUSTOMER_ROLE_VALUES.has(row.role.trim());
-  }
-
-  return Boolean(row.login_email);
-};
-
-function Customer_Creation() {
+function CustomerCreation() {
   const [view, setView] = useState("list");
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-
   const [form, setForm] = useState(emptyForm);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
-
-  const isEditing = Boolean(form.id);
-
   const [selectedHierarchy, setSelectedHierarchy] = useState("");
   const [hierarchyError, setHierarchyError] = useState("");
-
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const isEditing = Boolean(form.id);
+
+  /* =========================================================
+     FETCH CUSTOMERS
+  ========================================================= */
+
   const fetchCustomers = useCallback(async () => {
     try {
+      setLoading(true);
       setError("");
 
       const res = await fetch(CUSTOMERS_URL, {
@@ -140,23 +160,25 @@ function Customer_Creation() {
   ========================================================= */
 
   const filteredCustomers = useMemo(() => {
-    const customerRows = customers.filter(isCustomerRole);
-
     const q = search.trim().toLowerCase();
-    if (!q) return customerRows;
+    if (!q) return customers;
 
-    return customerRows.filter((customer) =>
-      [
-        companyOf(customer),
+    return customers.filter((customer) => {
+      const fields = [
+        customerNameOf(customer),
         customer.code,
-        emailOf(customer),
+        customerEmailOf(customer),
         customer.contact_person,
         customer.phone,
         customer.hierarchy_type,
-      ]
+        customer.bank_short_name,
+        customer.bank_type,
+      ];
+
+      return fields
         .filter(Boolean)
-        .some((field) => String(field).toLowerCase().includes(q))
-    );
+        .some((field) => String(field).toLowerCase().includes(q));
+    });
   }, [customers, search]);
 
   /* =========================================================
@@ -164,7 +186,7 @@ function Customer_Creation() {
   ========================================================= */
 
   const goToCreate = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm });
     setSelectedHierarchy("");
     setFormError("");
     setHierarchyError("");
@@ -179,16 +201,28 @@ function Customer_Creation() {
     const hierarchy = customer.hierarchy_type || "";
 
     setForm({
+      ...emptyForm,
       id: customer.id,
-      company: companyOf(customer),
+      company: customer.company ?? customer.bank_name ?? customer.name ?? "",
       code: customer.code || "",
-      company_email: emailOf(customer),
+      company_email: customer.company_email ?? customer.email ?? "",
       contact_person: customer.contact_person || "",
       contact_person_email: customer.contact_person_email || "",
       phone: customer.phone || "",
       hierarchy_type: hierarchy,
-      password: "",
       is_active: customer.is_active ?? true,
+      bank_short_name: customer.bank_short_name || "",
+      bank_type: customer.bank_type || "",
+      website: customer.website || "",
+      address_line_1: customer.address_line_1 || "",
+      state: customer.state || "",
+      district: customer.district || "",
+      city: customer.city || "",
+      pincode: customer.pincode || "",
+      designation: customer.designation || "",
+      admin_mobile: customer.admin_mobile || customer.phone || "",
+      password: "",
+      confirm_password: "",
     });
 
     setSelectedHierarchy(hierarchy);
@@ -198,12 +232,12 @@ function Customer_Creation() {
   };
 
   /* =========================================================
-     BACK TO LIST
+     BACK
   ========================================================= */
 
   const backToList = () => {
     setView("list");
-    setForm(emptyForm);
+    setForm({ ...emptyForm });
     setSelectedHierarchy("");
     setFormError("");
     setHierarchyError("");
@@ -214,10 +248,7 @@ function Customer_Creation() {
   ========================================================= */
 
   const handleFieldChange = (field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setForm((prev) => ({ ...prev, [field]: value }));
   };
 
   /* =========================================================
@@ -226,61 +257,75 @@ function Customer_Creation() {
 
   const handleHierarchyChange = (value) => {
     setSelectedHierarchy(value);
-
-    setForm((prev) => ({
-      ...prev,
-      hierarchy_type: value,
-    }));
-
+    setForm((prev) => ({ ...prev, hierarchy_type: value }));
     setHierarchyError("");
   };
 
   /* =========================================================
-     CREATE / UPDATE CUSTOMER
+     VALIDATION
+  ========================================================= */
+
+  const validateForm = () => {
+    if (!form.company.trim()) return "Customer name is required.";
+    if (!form.code.trim()) return "Customer code is required.";
+    if (!form.bank_short_name.trim()) return "Short name is required.";
+    if (!form.bank_type) return "Customer type is required.";
+    if (!form.company_email.trim()) return "Customer email is required.";
+    if (!form.phone.trim()) return "Customer phone number is required.";
+    if (!form.contact_person.trim()) return "Contact person name is required.";
+    if (!form.contact_person_email.trim())
+      return "Contact person email is required.";
+    // if (!form.designation.trim()) return "Designation is required.";
+    if (!form.admin_mobile.trim()) return "Contact person mobile is required.";
+
+    if (!isEditing) {
+      if (!form.password.trim()) return "Password is required.";
+      if (!form.confirm_password.trim()) return "Confirm password is required.";
+      if (form.password !== form.confirm_password) {
+        return "Password and confirm password do not match.";
+      }
+    }
+
+    if (form.password.trim() && form.password !== form.confirm_password) {
+      return "Password and confirm password do not match.";
+    }
+
+    if (!selectedHierarchy) return "Please select a location hierarchy.";
+
+    if (form.pincode && !/^\d{6}$/.test(form.pincode.trim())) {
+      return "PIN code must contain exactly 6 digits.";
+    }
+
+    if (
+      form.company_email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.company_email.trim())
+    ) {
+      return "Please enter a valid customer email.";
+    }
+
+    if (
+      form.contact_person_email &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contact_person_email.trim())
+    ) {
+      return "Please enter a valid contact person email.";
+    }
+
+    return "";
+  };
+
+  /* =========================================================
+     CREATE / UPDATE
   ========================================================= */
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFormError("");
 
-    /* ---------------- Validation ---------------- */
-
-    if (!form.company.trim()) {
-      setFormError("Company name is required.");
+    const validationError = validateForm();
+    if (validationError) {
+      setFormError(validationError);
       return;
     }
-
-    if (!form.code.trim()) {
-      setFormError("Customer code is required.");
-      return;
-    }
-
-    if (!isEditing && !selectedHierarchy) {
-      setFormError(
-        "Please select a hierarchy: Geographical or Zonal."
-      );
-      return;
-    }
-
-    // The customer is the main user of the product, so the login is created
-    // together with the customer (contact person email, else company email).
-    if (
-      !isEditing &&
-      !form.contact_person_email.trim() &&
-      !form.company_email.trim()
-    ) {
-      setFormError(
-        "Enter a Contact Person Email (or Company Email) — it is the customer's login."
-      );
-      return;
-    }
-
-    if (!isEditing && !form.password.trim()) {
-      setFormError("Password is required for the customer's login.");
-      return;
-    }
-
-    /* ---------------- Payload ---------------- */
 
     const payload = {
       company: form.company.trim(),
@@ -288,20 +333,19 @@ function Customer_Creation() {
       company_email: form.company_email.trim(),
       contact_person: form.contact_person.trim(),
       contact_person_email: form.contact_person_email.trim(),
-      phone: form.phone.trim(),
+      phone: form.admin_mobile.trim() || form.phone.trim(),
       hierarchy_type: selectedHierarchy || form.hierarchy_type,
       is_active: form.is_active,
     };
 
-    if (form.password.trim()) payload.password = form.password;
+    if (form.password.trim()) {
+      payload.password = form.password.trim();
+    }
 
     setSaving(true);
 
     try {
-      const url = isEditing
-        ? `${CUSTOMERS_URL}${form.id}/`
-        : CUSTOMERS_URL;
-
+      const url = isEditing ? `${CUSTOMERS_URL}${form.id}/` : CUSTOMERS_URL;
       const method = isEditing ? "PATCH" : "POST";
 
       const res = await fetch(url, {
@@ -318,9 +362,7 @@ function Customer_Creation() {
             ? Object.entries(errBody)
                 .map(
                   ([key, value]) =>
-                    `${key}: ${
-                      Array.isArray(value) ? value.join(", ") : value
-                    }`
+                    `${key}: ${Array.isArray(value) ? value.join(", ") : value}`
                 )
                 .join(" | ")
             : `HTTP ${res.status}`;
@@ -332,18 +374,12 @@ function Customer_Creation() {
 
       await fetchCustomers();
 
-      /* Editing does not need to go through hierarchy creation again. */
       if (isEditing) {
         backToList();
         return;
       }
 
-      /* Customer created — move to hierarchy step. */
-      setForm((prev) => ({
-        ...prev,
-        id: saved.id,
-      }));
-
+      setForm((prev) => ({ ...prev, id: saved.id }));
       setFormError("");
       setView("hierarchy");
     } catch (err) {
@@ -351,20 +387,6 @@ function Customer_Creation() {
     } finally {
       setSaving(false);
     }
-  };
-
-  /* =========================================================
-     CONTINUE TO HIERARCHY
-  ========================================================= */
-
-  const continueHierarchy = () => {
-    if (!selectedHierarchy) {
-      setHierarchyError("Please select a hierarchy.");
-      return;
-    }
-
-    setHierarchyError("");
-    setView("hierarchy");
   };
 
   /* =========================================================
@@ -377,24 +399,18 @@ function Customer_Creation() {
     setDeleting(true);
 
     try {
-      const res = await fetch(
-        `${CUSTOMERS_URL}${confirmDelete.id}/`,
-        {
-          method: "DELETE",
-          headers: authHeaders(),
-        }
-      );
+      const res = await fetch(`${CUSTOMERS_URL}${confirmDelete.id}/`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
 
       if (!res.ok && res.status !== 204) {
         throw new Error(`HTTP ${res.status}`);
       }
 
       setCustomers((prev) =>
-        prev.filter(
-          (customer) => customer.id !== confirmDelete.id
-        )
+        prev.filter((customer) => customer.id !== confirmDelete.id)
       );
-
       setConfirmDelete(null);
     } catch (err) {
       setError(err.message || "Could not delete customer.");
@@ -408,8 +424,7 @@ function Customer_Creation() {
      HIERARCHY NAME
   ========================================================= */
 
-  const hierarchyName =
-    HIERARCHY_LABEL[selectedHierarchy] || "-";
+  const hierarchyName = HIERARCHY_LABEL[selectedHierarchy] || "-";
 
   /* =========================================================
      RENDER
@@ -417,50 +432,41 @@ function Customer_Creation() {
 
   return (
     <div className="admins-page">
+      {/* STEPPER */}
       <ol className="admins-stepper">
         <li className={view === "list" ? "active" : "done"}>
-          <button
-            type="button"
-            className="step-btn"
-            onClick={backToList}
-          >
+          <button type="button" className="step-btn" onClick={backToList}>
             <span className="step-num">1</span>
             Customers
           </button>
         </li>
+
         <li
           className={
-            view === "form"
-              ? "active"
-              : view === "hierarchy"
-              ? "done"
-              : ""
+            view === "form" ? "active" : view === "hierarchy" ? "done" : ""
           }
         >
-          <button
-            type="button"
-            className="step-btn"
-            onClick={goToCreate}
-          >
+          <button type="button" className="step-btn" onClick={goToCreate}>
             <span className="step-num">2</span>
             {isEditing ? "Edit" : "Create"}
           </button>
         </li>
-        {/* <li className={view === "hierarchy" ? "active" : ""}>
+
+        <li className={view === "hierarchy" ? "active" : ""}>
           <button
             type="button"
             className="step-btn"
+            disabled={!selectedHierarchy}
             onClick={() => {
               if (selectedHierarchy) {
                 setView("hierarchy");
               }
             }}
-            disabled={!selectedHierarchy}
           >
             <span className="step-num">3</span>
             Hierarchy
           </button>
-        </li> */}
+        </li>
       </ol>
 
       {view === "list" && (
@@ -468,64 +474,49 @@ function Customer_Creation() {
           <div className="admins-header">
             <div>
               <h1>Customers</h1>
-              <p>Manage the customers under your organization</p>
+              <p>Register and manage customers under your organization.</p>
             </div>
 
-            {/* <button
-              className="btn-primary"
-              onClick={goToCreate}
-            >
+            {/* <button className="btn-primary" onClick={goToCreate}>
               <FiPlus />
-              Add Customer
+              Create Customer
             </button> */}
           </div>
-
-          {/* SEARCH */}
 
           <div className="admins-toolbar">
             <input
               type="text"
               className="admins-search"
-              placeholder="Search by company, code, email, phone or hierarchy..."
+              placeholder="Search by customer name, code, email, phone or hierarchy..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
 
             <span className="admins-count">
-              {filteredCustomers.length} of{" "}
-              {customers.filter(isCustomerRole).length} customers
+              {filteredCustomers.length} of {customers.length} customers
             </span>
           </div>
 
-          {/* ERROR */}
-
-          {error && (
-            <div className="admins-error">
-              {error}
-            </div>
-          )}
-
-          {/* TABLE */}
+          {error && <div className="admins-error">{error}</div>}
 
           <div className="admins-table-card">
             {loading ? (
-              <div className="admins-loading">
-                Loading customers...
-              </div>
+              <div className="admins-loading">Loading Customers...</div>
             ) : filteredCustomers.length === 0 ? (
               <div className="admins-empty">
                 {customers.length === 0
-                  ? "No customers yet. Click “Add Customer” to create one."
+                  ? "No customers registered yet. Click “Create Customer” to create one."
                   : "No customers match your search."}
               </div>
             ) : (
               <table className="admins-table">
                 <thead>
                   <tr>
-                    <th>Company</th>
+                    <th>Customer</th>
                     <th>Code</th>
+                    <th>Type</th>
                     <th>Email</th>
-                    <th>Contact Person</th>
+                    <th>Contact</th>
                     <th>Phone</th>
                     <th>Hierarchy</th>
                     <th>Status</th>
@@ -537,12 +528,26 @@ function Customer_Creation() {
                   {filteredCustomers.map((customer) => (
                     <tr key={customer.id}>
                       <td>
-                        <strong>{companyOf(customer)}</strong>
+                        <strong>{customerNameOf(customer)}</strong>
+                        {customer.bank_short_name && (
+                          <small
+                            style={{
+                              display: "block",
+                              color: "#6b7280",
+                              marginTop: "3px",
+                            }}
+                          >
+                            {customer.bank_short_name}
+                          </small>
+                        )}
                       </td>
-                      <td>{customer.code}</td>
-                      <td>{emailOf(customer) || "-"}</td>
+
+                      <td>{customer.code || "-"}</td>
+                      <td>{customer.bank_type || "-"}</td>
+                      <td>{customerEmailOf(customer) || "-"}</td>
                       <td>{customer.contact_person || "-"}</td>
                       <td>{customer.phone || "-"}</td>
+
                       <td>
                         {customer.hierarchy_type
                           ? HIERARCHY_LABEL[customer.hierarchy_type]
@@ -592,186 +597,283 @@ function Customer_Creation() {
       {view === "form" && (
         <div className="admins-panel">
           <div className="admins-panel-header">
-            {isEditing ? (
-              <FiEdit3 size={22} />
-            ) : (
-              <FiUserPlus size={22} />
-            )}
+            {isEditing ? <FiEdit3 size={22} /> : <FiUserPlus size={22} />}
 
             <div>
-              <h2>
-                {isEditing ? "Edit Customer" : "Create Customer"}
-              </h2>
+              <h2>{isEditing ? "Edit Customer" : "Register New Customer"}</h2>
 
               <p>
                 {isEditing
-                  ? `Update details for ${
-                      form.company || form.code
-                    }.`
-                  : "Add a new customer and select the hierarchy it will follow."}
+                  ? `Update details for ${form.company || form.code}.`
+                  : "Register a new customer and configure their portal access and location hierarchy."}
               </p>
             </div>
           </div>
 
-          {/* FORM */}
+          <form onSubmit={handleSubmit} className="admins-form">
+            <div className="assign-card">
+              <div className="assign-row">
+                <span className="assign-label">Customer Information</span>
+              </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="admins-form"
-          >
-            <div className="form-grid">
+              <div className="form-grid" style={{ marginTop: "16px" }}>
+                <label>
+                  Name *
+                  <input
+                    type="text"
+                    value={form.company}
+                    onChange={(e) => handleFieldChange("company", e.target.value)}
+                    placeholder="HDFC Bank"
+                    required
+                  />
+                </label>
 
-              {/* COMPANY */}
+                <label>
+                  Code *
+                  <input
+                    type="text"
+                    value={form.code}
+                    onChange={(e) =>
+                      handleFieldChange("code", e.target.value.toUpperCase())
+                    }
+                    placeholder="HDFC001"
+                    required
+                  />
+                </label>
 
-              <label>
-                Company *
+                <label>
+                  Short Name *
+                  <input
+                    type="text"
+                    value={form.bank_short_name}
+                    onChange={(e) =>
+                      handleFieldChange(
+                        "bank_short_name",
+                        e.target.value.toUpperCase()
+                      )
+                    }
+                    placeholder="HDFC"
+                    required
+                  />
+                </label>
 
-                <input
-                  type="text"
-                  value={form.company}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "company",
-                      e.target.value
-                    )
-                  }
-                  placeholder="Acme Corporation"
-                  required
-                />
-              </label>
+                <label>
+                  Type *
+                  <select
+                    value={form.bank_type}
+                    onChange={(e) =>
+                      handleFieldChange("bank_type", e.target.value)
+                    }
+                    required
+                  >
+                    <option value="">Select Customer Type</option>
 
-              {/* CODE */}
+                    {CUSTOMER_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <label>
-                Code *
+                <label>
+                  Email *
+                  <input
+                    type="email"
+                    value={form.company_email}
+                    onChange={(e) =>
+                      handleFieldChange("company_email", e.target.value)
+                    }
+                    placeholder="admin@bank.com"
+                    required
+                  />
+                </label>
 
-                <input
-                  type="text"
-                  value={form.code}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "code",
-                      e.target.value
-                    )
-                  }
-                  placeholder="ACME01"
-                  required
-                />
-              </label>
+                <label>
+                  Phone *
+                  <input
+                    type="tel"
+                    value={form.phone}
+                    onChange={(e) => handleFieldChange("phone", e.target.value)}
+                    placeholder="+91 22 XXXXXXXX"
+                    required
+                  />
+                </label>
 
-              {/* COMPANY EMAIL */}
-
-              <label>
-                Company Email
-
-                <input
-                  type="email"
-                  value={form.company_email}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "company_email",
-                      e.target.value
-                    )
-                  }
-                  placeholder="contact@acme.com"
-                />
-              </label>
-
-              {/* CONTACT PERSON */}
-
-              <label>
-                Contact Person
-
-                <input
-                  type="text"
-                  value={form.contact_person}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "contact_person",
-                      e.target.value
-                    )
-                  }
-                  placeholder="John Doe"
-                />
-              </label>
-
-              {/* CONTACT EMAIL */}
-
-              <label>
-                Contact Person Email
-
-                <input
-                  type="email"
-                  value={form.contact_person_email}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "contact_person_email",
-                      e.target.value
-                    )
-                  }
-                  placeholder="john@acme.com"
-                />
-              </label>
-
-              {/* PHONE */}
-
-              <label>
-                Phone
-
-                <input
-                  type="text"
-                  value={form.phone}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "phone",
-                      e.target.value
-                    )
-                  }
-                  placeholder="+91 98765 43210"
-                />
-              </label>
-
-              {/* LOGIN PASSWORD — the customer is the main user */}
-
-              <label>
-                {isEditing
-                  ? "Login Password (leave blank to keep current)"
-                  : "Login Password *"}
-
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) =>
-                    handleFieldChange(
-                      "password",
-                      e.target.value
-                    )
-                  }
-                  placeholder={isEditing ? "••••••••" : "Set a password"}
-                  required={!isEditing}
-                  autoComplete="new-password"
-                />
-
-                <small className="field-hint">
-                  The customer logs in with the Contact Person Email
-                  (or Company Email if that is empty).
-                </small>
-              </label>
-
+                <label>
+                  Website
+                  <input
+                    type="url"
+                    value={form.website}
+                    onChange={(e) => handleFieldChange("website", e.target.value)}
+                    placeholder="https://www.bank.com"
+                  />
+                </label>
+              </div>
             </div>
 
-            {/* =================================================
-                HIERARCHY SELECTION
-            ================================================= */}
-
-            <div
-              className="assign-card"
-              style={{ marginTop: "24px" }}
-            >
+            <div className="assign-card" style={{ marginTop: "20px" }}>
               <div className="assign-row">
-                <span className="assign-label">
-                  Location Hierarchy *
-                </span>
+                <span className="assign-label">Head Office Details</span>
+              </div>
+
+              <div className="form-grid" style={{ marginTop: "16px" }}>
+                <label style={{ gridColumn: "1 / -1" }}>
+                  Address Line 1 *
+                  <input
+                    type="text"
+                    value={form.address_line_1}
+                    onChange={(e) =>
+                      handleFieldChange("address_line_1", e.target.value)
+                    }
+                    placeholder="Building / Street / Area"
+                  />
+                </label>
+
+                <label>
+                  State
+                  <input
+                    type="text"
+                    value={form.state}
+                    onChange={(e) => handleFieldChange("state", e.target.value)}
+                    placeholder="Maharashtra"
+                  />
+                </label>
+
+                <label>
+                  District
+                  <input
+                    type="text"
+                    value={form.district}
+                    onChange={(e) => handleFieldChange("district", e.target.value)}
+                    placeholder="Pune"
+                  />
+                </label>
+
+                <label>
+                  City
+                  <input
+                    type="text"
+                    value={form.city}
+                    onChange={(e) => handleFieldChange("city", e.target.value)}
+                    placeholder="Pune"
+                  />
+                </label>
+
+                <label>
+                  PIN Code
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={form.pincode}
+                    onChange={(e) =>
+                      handleFieldChange(
+                        "pincode",
+                        e.target.value.replace(/\D/g, "")
+                      )
+                    }
+                    placeholder="411001"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="assign-card" style={{ marginTop: "20px" }}>
+              <div className="assign-row">
+                <span className="assign-label">Contact Person Details</span>
+              </div>
+
+              <div className="form-grid" style={{ marginTop: "16px" }}>
+                <label>
+                  Name *
+                  <input
+                    type="text"
+                    value={form.contact_person}
+                    onChange={(e) =>
+                      handleFieldChange("contact_person", e.target.value)
+                    }
+                    placeholder="Rahul Sharma"
+                    required
+                  />
+                </label>
+
+                {/* <label>
+                  Designation *
+                  <input
+                    type="text"
+                    value={form.designation}
+                    onChange={(e) =>
+                      handleFieldChange("designation", e.target.value)
+                    }
+                    placeholder="IT Manager"
+                    required
+                  />
+                </label> */}
+
+                <label>
+                  Email *
+                  <input
+                    type="email"
+                    value={form.contact_person_email}
+                    onChange={(e) =>
+                      handleFieldChange("contact_person_email", e.target.value)
+                    }
+                    placeholder="admin@bank.com"
+                    required
+                  />
+                  <small className="field-hint">
+                    This email will be used for portal login.
+                  </small>
+                </label>
+
+                <label>
+                  Mobile *
+                  <input
+                    type="tel"
+                    value={form.admin_mobile}
+                    onChange={(e) =>
+                      handleFieldChange("admin_mobile", e.target.value)
+                    }
+                    placeholder="+91 98765 43210"
+                    required
+                  />
+                </label>
+
+                <label>
+                  {isEditing
+                    ? "Login Password (leave blank to keep current)"
+                    : "Login Password *"}
+                  <input
+                    type="password"
+                    value={form.password}
+                    onChange={(e) =>
+                      handleFieldChange("password", e.target.value)
+                    }
+                    placeholder={isEditing ? "••••••••" : "Set a password"}
+                    required={!isEditing}
+                    autoComplete="new-password"
+                  />
+                </label>
+
+                <label>
+                  {isEditing ? "Confirm New Password" : "Confirm Password *"}
+                  <input
+                    type="password"
+                    value={form.confirm_password}
+                    onChange={(e) =>
+                      handleFieldChange("confirm_password", e.target.value)
+                    }
+                    placeholder="Confirm password"
+                    required={!isEditing || Boolean(form.password)}
+                    autoComplete="new-password"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="assign-card" style={{ marginTop: "20px" }}>
+              <div className="assign-row">
+                <span className="assign-label">Location Hierarchy *</span>
               </div>
 
               <div
@@ -783,8 +885,7 @@ function Customer_Creation() {
                 }}
               >
                 {HIERARCHY_OPTIONS.map((option) => {
-                  const selected =
-                    selectedHierarchy === option.value;
+                  const selected = selectedHierarchy === option.value;
 
                   return (
                     <label
@@ -795,12 +896,8 @@ function Customer_Creation() {
                           : "1px solid #d1d5db",
                         borderRadius: "10px",
                         padding: "18px",
-                        cursor: isEditing
-                          ? "default"
-                          : "pointer",
-                        background: selected
-                          ? "#eff6ff"
-                          : "#ffffff",
+                        cursor: isEditing ? "default" : "pointer",
+                        background: selected ? "#eff6ff" : "#ffffff",
                         display: "block",
                       }}
                     >
@@ -817,11 +914,7 @@ function Customer_Creation() {
                           value={option.value}
                           checked={selected}
                           disabled={isEditing}
-                          onChange={(e) =>
-                            handleHierarchyChange(
-                              e.target.value
-                            )
-                          }
+                          onChange={(e) => handleHierarchyChange(e.target.value)}
                         />
 
                         <div>
@@ -851,19 +944,6 @@ function Customer_Creation() {
                 })}
               </div>
 
-              {!isEditing && (
-                <p
-                  style={{
-                    marginTop: "12px",
-                    fontSize: "13px",
-                    color: "#6b7280",
-                  }}
-                >
-                  Select the hierarchy that this customer will
-                  use for its locations.
-                </p>
-              )}
-
               {isEditing && form.hierarchy_type && (
                 <p
                   style={{
@@ -872,17 +952,10 @@ function Customer_Creation() {
                     color: "#6b7280",
                   }}
                 >
-                  Hierarchy Cannot Change !!
-                  {/* :{" "}
-                  <strong>
-                    {HIERARCHY_LABEL[form.hierarchy_type]}
-                  </strong>{" "}
-                  cannot be changed from this screen. */}
+                  Hierarchy cannot be changed from the edit screen.
                 </p>
               )}
             </div>
-
-            {/* ACTIVE */}
 
             <div style={{ marginTop: "20px" }}>
               <label className="checkbox-row">
@@ -890,25 +963,14 @@ function Customer_Creation() {
                   type="checkbox"
                   checked={form.is_active}
                   onChange={(e) =>
-                    handleFieldChange(
-                      "is_active",
-                      e.target.checked
-                    )
+                    handleFieldChange("is_active", e.target.checked)
                   }
                 />
                 Active
               </label>
             </div>
 
-            {/* ERROR */}
-
-            {formError && (
-              <div className="form-error">
-                {formError}
-              </div>
-            )}
-
-            {/* ACTIONS */}
+            {formError && <div className="form-error">{formError}</div>}
 
             <div className="panel-actions">
               <button
@@ -923,39 +985,27 @@ function Customer_Creation() {
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={
-                  saving ||
-                  (!isEditing && !selectedHierarchy)
-                }
+                disabled={saving || !selectedHierarchy}
               >
                 {saving
                   ? "Saving..."
                   : isEditing
                   ? "Save Changes"
-                  : "Create & Continue"}
+                  : "Register & Continue"}
               </button>
             </div>
           </form>
         </div>
       )}
 
-
       {view === "hierarchy" && (
         <div className="admins-panel">
-
-          {/* BACK */}
-
-          <button
-            className="btn-back"
-            onClick={() => setView("form")}
-          >
+          <button className="btn-back" onClick={() => setView("form")}>
             <FiArrowLeft />
             Back to customer
           </button>
 
-          {/* HEADER */}
-
-          <div className="admins-panel-header">
+          <div className="admins-panel-header" style={{ marginTop: "20px" }}>
             <FiMapPin size={22} />
 
             <div>
@@ -968,52 +1018,31 @@ function Customer_Creation() {
             </div>
           </div>
 
-          {/* CUSTOMER SUMMARY */}
-
           <div className="assign-card">
             <div className="assign-row">
-              <span className="assign-label">
-                Customer
-              </span>
-
-              <span className="assign-value">
-                {form.company || "-"}
-              </span>
+              <span className="assign-label">Customer</span>
+              <span className="assign-value">{form.company || "-"}</span>
             </div>
 
             <div className="assign-row">
-              <span className="assign-label">
-                Code
-              </span>
-
-              <span className="assign-value">
-                {form.code || "-"}
-              </span>
+              <span className="assign-label">Code</span>
+              <span className="assign-value">{form.code || "-"}</span>
             </div>
 
             <div className="assign-row">
-              <span className="assign-label">
-                Hierarchy
-              </span>
+              <span className="assign-label">Type</span>
+              <span className="assign-value">{form.bank_type || "-"}</span>
+            </div>
 
-              <span className="assign-value">
-                {hierarchyName}
-              </span>
+            <div className="assign-row">
+              <span className="assign-label">Hierarchy</span>
+              <span className="assign-value">{hierarchyName}</span>
             </div>
           </div>
 
-          {/* =================================================
-              GEOGRAPHICAL
-          ================================================= */}
-
           {selectedHierarchy === "GEOGRAPHICAL" && (
-            <div
-              className="assign-card"
-              style={{ marginTop: "20px" }}
-            >
-              <h3 style={{ marginTop: 0 }}>
-                Geographical Hierarchy
-              </h3>
+            <div className="assign-card" style={{ marginTop: "20px" }}>
+              <h3 style={{ marginTop: 0 }}>Geographical Hierarchy</h3>
 
               <div
                 style={{
@@ -1024,21 +1053,11 @@ function Customer_Creation() {
                   background: "#f9fafb",
                 }}
               >
-                <div
-                  style={{
-                    fontWeight: "600",
-                    marginBottom: "12px",
-                  }}
-                >
+                <div style={{ fontWeight: "600", marginBottom: "12px" }}>
                   India
                 </div>
 
-                <div
-                  style={{
-                    color: "#6b7280",
-                    lineHeight: "2",
-                  }}
-                >
+                <div style={{ color: "#6b7280", lineHeight: "2" }}>
                   India → State → District → Taluka → City → Branch
                 </div>
 
@@ -1049,16 +1068,9 @@ function Customer_Creation() {
                     borderTop: "1px solid #e5e7eb",
                   }}
                 >
-                  <strong>
-                    Branch can contain:
-                  </strong>
+                  <strong>Branch can contain:</strong>
 
-                  <ul
-                    style={{
-                      marginTop: "8px",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <ul style={{ marginTop: "8px", color: "#6b7280" }}>
                     <li>Multiple Floors</li>
                     <li>Direct AC units</li>
                     <li>Both Floors and Direct AC units</li>
@@ -1068,18 +1080,9 @@ function Customer_Creation() {
             </div>
           )}
 
-          {/* =================================================
-              ZONAL
-          ================================================= */}
-
           {selectedHierarchy === "ZONAL" && (
-            <div
-              className="assign-card"
-              style={{ marginTop: "20px" }}
-            >
-              <h3 style={{ marginTop: 0 }}>
-                Zonal Hierarchy
-              </h3>
+            <div className="assign-card" style={{ marginTop: "20px" }}>
+              <h3 style={{ marginTop: 0 }}>Zonal Hierarchy</h3>
 
               <div
                 style={{
@@ -1090,21 +1093,11 @@ function Customer_Creation() {
                   background: "#f9fafb",
                 }}
               >
-                <div
-                  style={{
-                    fontWeight: "600",
-                    marginBottom: "12px",
-                  }}
-                >
+                <div style={{ fontWeight: "600", marginBottom: "12px" }}>
                   India
                 </div>
 
-                <div
-                  style={{
-                    color: "#6b7280",
-                    lineHeight: "2",
-                  }}
-                >
+                <div style={{ color: "#6b7280", lineHeight: "2" }}>
                   India → Zone → Circle → Region → Division → Branch
                 </div>
 
@@ -1115,16 +1108,9 @@ function Customer_Creation() {
                     borderTop: "1px solid #e5e7eb",
                   }}
                 >
-                  <strong>
-                    Branch can contain:
-                  </strong>
+                  <strong>Branch can contain:</strong>
 
-                  <ul
-                    style={{
-                      marginTop: "8px",
-                      color: "#6b7280",
-                    }}
-                  >
+                  <ul style={{ marginTop: "8px", color: "#6b7280" }}>
                     <li>Multiple Floors</li>
                     <li>Direct AC units</li>
                     <li>Both Floors and Direct AC units</li>
@@ -1134,30 +1120,14 @@ function Customer_Creation() {
             </div>
           )}
 
-          {/* ERROR */}
-
-          {hierarchyError && (
-            <div className="form-error">
-              {hierarchyError}
-            </div>
-          )}
-
-          {/* ACTIONS */}
+          {hierarchyError && <div className="form-error">{hierarchyError}</div>}
 
           <div className="panel-actions">
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={backToList}
-            >
+            <button type="button" className="btn-secondary" onClick={backToList}>
               Return to Customers
             </button>
 
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={backToList}
-            >
+            <button type="button" className="btn-primary" onClick={backToList}>
               <FiCheckCircle />
               Finish
             </button>
@@ -1168,9 +1138,7 @@ function Customer_Creation() {
       {confirmDelete && (
         <div
           className="admins-modal-overlay"
-          onClick={() =>
-            !deleting && setConfirmDelete(null)
-          }
+          onClick={() => !deleting && setConfirmDelete(null)}
         >
           <div
             className="admins-modal admins-modal-small"
@@ -1180,10 +1148,9 @@ function Customer_Creation() {
 
             <p>
               Are you sure you want to delete{" "}
-              <strong>
-                {companyOf(confirmDelete)}
-              </strong>
-              ? This cannot be undone.
+              <strong>{customerNameOf(confirmDelete)}</strong>?
+              <br />
+              This cannot be undone.
             </p>
 
             <div className="panel-actions">
@@ -1206,9 +1173,8 @@ function Customer_Creation() {
           </div>
         </div>
       )}
-
     </div>
   );
 }
 
-export default Customer_Creation;
+export default CustomerCreation;

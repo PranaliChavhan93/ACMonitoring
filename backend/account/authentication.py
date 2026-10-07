@@ -8,24 +8,9 @@ from .models import User
 
 
 class ThreeTPAuthentication(BaseAuthentication):
-    """
-    Authenticate Django API requests using the 3TP JWT returned
-    by /api/auth/login/.
-
-    The login endpoint stores a mapping:
-
-        3TP token -> local Django User
-
-    Subsequent requests use:
-
-        Authorization: Bearer <3TP token>
-
-    For compatibility with the existing React code, "Token <token>"
-    is also accepted temporarily.
-    """
 
     CACHE_PREFIX = "3tp_auth:"
-    CACHE_TIMEOUT = 3600
+    CACHE_TIMEOUT = None  # Use default cache timeout
 
     def authenticate(self, request):
 
@@ -53,7 +38,7 @@ class ThreeTPAuthentication(BaseAuthentication):
 
         if not token:
             raise AuthenticationFailed(
-                "3TP token is missing."
+                "Token is missing."
             )
 
         token_hash = hashlib.sha256(
@@ -66,7 +51,7 @@ class ThreeTPAuthentication(BaseAuthentication):
 
         if not user_id:
             raise AuthenticationFailed(
-                "3TP session expired or is invalid. Please login again."
+                "Session expired or is invalid. Please login again."
             )
 
         try:
@@ -78,6 +63,14 @@ class ThreeTPAuthentication(BaseAuthentication):
             raise AuthenticationFailed(
                 "Local user account was not found."
             )
+
+        print("===== 3TP AUTH DEBUG =====")
+        print("USER ID:", user.id)
+        print("USER EMAIL:", user.email)
+        print("USER ROLE:", user.role)
+        print("USER ORGANIZATION:", user.organization_id)
+        print("USER ORGANIZATION OBJECT:", user.organization)
+        print("==========================")
 
         return user, token
 

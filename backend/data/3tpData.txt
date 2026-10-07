@@ -38,3 +38,10 @@ Body -
     "username":"shrutika.kanade@tapasyatech.in",
     "password":"Shrutika@343"
 }
+
+
+For fetching the temparature and humidity -
+https://api.open-meteo.com/v1/forecast?latitude=28.6139&longitude=77.2090&current=temperature_2m,relative_humidity_2m
+with par - 
+latitude -
+longitude -

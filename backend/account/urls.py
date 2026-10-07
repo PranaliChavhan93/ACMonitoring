@@ -1,5 +1,7 @@
 from django.urls import path
 
+from .cloud_views import CloudCustomerListView, CloudUserListView
+
 from .views import (
     AdminDetailView,
     AdminListView,
@@ -90,5 +92,8 @@ urlpatterns = [
     # path( "engineers/"),
     # path( "reports/"),
     # path( "settings/"),
-# /org/dashboard/trends
+    
+    path("cloud/customers/", CloudCustomerListView.as_view()),
+    path("cloud/users/", CloudUserListView.as_view()),
+
 ]

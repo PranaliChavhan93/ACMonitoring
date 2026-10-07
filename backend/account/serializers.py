@@ -1,3 +1,5 @@
+import re
+
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from django.db import transaction
@@ -28,108 +30,603 @@ class OrganizationSerializer(serializers.ModelSerializer):
         model = Organization
         fields = "__all__"
 
+# class CustomerSerializer(serializers.ModelSerializer):
+#     password = serializers.CharField(
+#         write_only=True, required=False, allow_blank=True, min_length=6,
+#     )
+#     login_email = serializers.SerializerMethodField()
+
+#     class Meta:
+#         model = Customer
+#         fields = "__all__"
+#         read_only_fields = ["organization"]
+#         validators = []
+
+#     def get_login_email(self, obj):
+#         return (
+#             User.objects.filter(customer=obj, role=Role.CUSTOMER)
+#             .values_list("email", flat=True)
+#             .first()
+#         )
+
+#     @staticmethod
+#     def _login_email_for(customer):
+#         return (customer.contact_person_email or customer.company_email or "").strip().lower()
+
+#     def _ensure_login(self, customer, password):
+#         login = User.objects.filter(customer=customer, role=Role.CUSTOMER).first()
+#         if login:
+#             login.set_password(password)
+#             login.save()
+#             return login
+
+#         email = self._login_email_for(customer)
+#         if not email:
+#             raise serializers.ValidationError(
+#                 {"contact_person_email": "An email is required to create the customer's login."}
+#             )
+#         if User.objects.filter(email__iexact=email).exists():
+#             raise serializers.ValidationError(
+#                 {"contact_person_email": "A user with this email already exists."}
+#             )
+
+#         login = User(
+#             email=email,
+#             name=customer.contact_person or customer.company,
+#             phone=customer.phone,
+#             role=Role.CUSTOMER,
+#             organization=customer.organization,
+#             customer=customer,
+#             is_active=customer.is_active,
+#         )
+#         login.set_password(password)
+#         login.save()
+#         return login
+
+#     def create(self, validated_data):
+#         password = validated_data.pop("password", "")
+#         with transaction.atomic():
+#             customer = super().create(validated_data)
+#             if password:
+#                 self._ensure_login(customer, password)
+#         return customer
+
+#     def update(self, instance, validated_data):
+#         password = validated_data.pop("password", "")
+#         with transaction.atomic():
+#             customer = super().update(instance, validated_data)
+#             if password:
+#                 self._ensure_login(customer, password)
+#         return customer
+
+#     def validate(self, attrs):
+#         request = self.context.get("request")
+#         org_id = (
+#             self.instance.organization_id
+#             if self.instance is not None
+#             else getattr(getattr(request, "user", None), "organization_id", None)
+#         )
+#         code = attrs.get("code") or getattr(self.instance, "code", None)
+#         if org_id and code:
+#             dupes = Customer.objects.filter(organization_id=org_id, code=code)
+#             if self.instance is not None:
+#                 dupes = dupes.exclude(pk=self.instance.pk)
+#             if dupes.exists():
+#                 raise serializers.ValidationError(
+#                     {"code": "A customer with this code already exists in your organization."}
+#                 )
+
+#         if self.instance is None:
+#             if not attrs.get("hierarchy_type"):
+#                 raise serializers.ValidationError(
+#                     {"hierarchy_type": "Select Geographical or Zonal before creating the customer."}
+#                 )
+#         else:
+#             new_value = attrs.get("hierarchy_type")
+#             if (
+#                 new_value
+#                 and new_value != self.instance.hierarchy_type
+#                 and self.instance.branches.exists()
+#             ):
+#                 raise serializers.ValidationError(
+#                     {"hierarchy_type": "This customer already has branches; the hierarchy type is locked."}
+#                 )
+#         return attrs
+
 class CustomerSerializer(serializers.ModelSerializer):
+
     password = serializers.CharField(
-        write_only=True, required=False, allow_blank=True, min_length=6,
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        min_length=6,
     )
+
     login_email = serializers.SerializerMethodField()
 
     class Meta:
         model = Customer
         fields = "__all__"
-        read_only_fields = ["organization"]
+
+        read_only_fields = [
+            "organization",
+            "tpt_customer_id",
+            "created_at",
+            "updated_at",
+        ]
+
         validators = []
+
+    # ============================================================
+    # LOGIN EMAIL
+    # ============================================================
 
     def get_login_email(self, obj):
         return (
-            User.objects.filter(customer=obj, role=Role.CUSTOMER)
-            .values_list("email", flat=True)
+            User.objects
+            .filter(
+                customer=obj,
+                role=Role.CUSTOMER,
+            )
+            .values_list(
+                "email",
+                flat=True,
+            )
             .first()
         )
 
     @staticmethod
     def _login_email_for(customer):
-        return (customer.contact_person_email or customer.company_email or "").strip().lower()
 
-    def _ensure_login(self, customer, password):
-        login = User.objects.filter(customer=customer, role=Role.CUSTOMER).first()
+        return (
+            customer.contact_person_email
+            or customer.company_email
+            or ""
+        ).strip().lower()
+
+    # ============================================================
+    # CREATE CUSTOMER LOGIN
+    # ============================================================
+
+    def _ensure_login(
+        self,
+        customer,
+        password,
+    ):
+        """
+        Create or update the Bank Customer login.
+        """
+
+        login = (
+            User.objects
+            .filter(
+                customer=customer,
+                role=Role.CUSTOMER,
+            )
+            .first()
+        )
+
+        # Existing login
         if login:
-            login.set_password(password)
+
+            if password:
+                login.set_password(
+                    password
+                )
+
+            login.email = (
+                self._login_email_for(
+                    customer
+                )
+            )
+
+            login.name = (
+                customer.contact_person
+                or customer.company
+            )
+
+            login.phone = (
+                customer.admin_mobile
+                or customer.phone
+            )
+
+            login.is_active = (
+                customer.is_active
+            )
+
             login.save()
+
             return login
 
-        email = self._login_email_for(customer)
+        # New login
+        email = self._login_email_for(
+            customer
+        )
+
         if not email:
             raise serializers.ValidationError(
-                {"contact_person_email": "An email is required to create the customer's login."}
+                {
+                    "contact_person_email": (
+                        "An email is required "
+                        "to create the bank login."
+                    )
+                }
             )
-        if User.objects.filter(email__iexact=email).exists():
+
+        if User.objects.filter(
+            email__iexact=email
+        ).exists():
+
             raise serializers.ValidationError(
-                {"contact_person_email": "A user with this email already exists."}
+                {
+                    "contact_person_email": (
+                        "A user with this "
+                        "email already exists."
+                    )
+                }
             )
 
         login = User(
             email=email,
-            name=customer.contact_person or customer.company,
-            phone=customer.phone,
+
+            name=(
+                customer.contact_person
+                or customer.company
+            ),
+
+            phone=(
+                customer.admin_mobile
+                or customer.phone
+            ),
+
             role=Role.CUSTOMER,
-            organization=customer.organization,
+
+            organization=(
+                customer.organization
+            ),
+
             customer=customer,
-            is_active=customer.is_active,
+
+            is_active=(
+                customer.is_active
+            ),
         )
-        login.set_password(password)
+
+        login.set_password(
+            password
+        )
+
         login.save()
+
         return login
 
-    def create(self, validated_data):
-        password = validated_data.pop("password", "")
-        with transaction.atomic():
-            customer = super().create(validated_data)
-            if password:
-                self._ensure_login(customer, password)
-        return customer
+    # ============================================================
+    # VALIDATION
+    # ============================================================
 
-    def update(self, instance, validated_data):
-        password = validated_data.pop("password", "")
-        with transaction.atomic():
-            customer = super().update(instance, validated_data)
-            if password:
-                self._ensure_login(customer, password)
-        return customer
+    def validate_company(
+        self,
+        value,
+    ):
+        value = value.strip()
 
-    def validate(self, attrs):
-        request = self.context.get("request")
-        org_id = (
-            self.instance.organization_id
-            if self.instance is not None
-            else getattr(getattr(request, "user", None), "organization_id", None)
+        if not value:
+            raise serializers.ValidationError(
+                "Bank name is required."
+            )
+
+        return value
+
+    def validate_code(
+        self,
+        value,
+    ):
+        value = value.strip().upper()
+
+        if not value:
+            raise serializers.ValidationError(
+                "Bank code is required."
+            )
+
+        return value
+
+    def validate_bank_short_name(
+        self,
+        value,
+    ):
+        return value.strip().upper()
+
+    def validate_company_email(
+        self,
+        value,
+    ):
+        return value.strip().lower()
+
+    def validate_contact_person_email(
+        self,
+        value,
+    ):
+        return value.strip().lower()
+
+    def validate_pan(
+        self,
+        value,
+    ):
+        value = value.strip().upper()
+
+        if value and not re.match(
+            r"^[A-Z]{5}[0-9]{4}[A-Z]$",
+            value,
+        ):
+            raise serializers.ValidationError(
+                "Enter a valid PAN number."
+            )
+
+        return value
+
+    def validate_gstin(
+        self,
+        value,
+    ):
+        value = value.strip().upper()
+
+        if value and len(value) != 15:
+            raise serializers.ValidationError(
+                "GSTIN must contain 15 characters."
+            )
+
+        return value
+
+    def validate_pincode(
+        self,
+        value,
+    ):
+        value = value.strip()
+
+        if value and not re.match(
+            r"^\d{6}$",
+            value,
+        ):
+            raise serializers.ValidationError(
+                "PIN code must contain exactly 6 digits."
+            )
+
+        return value
+
+    # ============================================================
+    # OBJECT VALIDATION
+    # ============================================================
+
+    def validate(
+        self,
+        attrs,
+    ):
+
+        request = self.context.get(
+            "request"
         )
-        code = attrs.get("code") or getattr(self.instance, "code", None)
-        if org_id and code:
-            dupes = Customer.objects.filter(organization_id=org_id, code=code)
-            if self.instance is not None:
-                dupes = dupes.exclude(pk=self.instance.pk)
-            if dupes.exists():
-                raise serializers.ValidationError(
-                    {"code": "A customer with this code already exists in your organization."}
+
+        user = getattr(
+            request,
+            "user",
+            None,
+        )
+
+        # Organization
+        if self.instance:
+
+            organization = (
+                self.instance.organization
+            )
+
+        else:
+
+            organization = getattr(
+                user,
+                "organization",
+                None,
+            )
+
+        if not organization:
+
+            raise serializers.ValidationError(
+                {
+                    "organization": (
+                        "Could not determine "
+                        "organization."
+                    )
+                }
+            )
+
+        # --------------------------------------------------------
+        # BANK CODE UNIQUE
+        # --------------------------------------------------------
+
+        code = (
+            attrs.get("code")
+            or getattr(
+                self.instance,
+                "code",
+                None,
+            )
+        )
+
+        if code:
+
+            duplicates = (
+                Customer.objects
+                .filter(
+                    organization=organization,
+                    code=code,
                 )
+            )
+
+            if self.instance:
+
+                duplicates = (
+                    duplicates.exclude(
+                        pk=self.instance.pk
+                    )
+                )
+
+            if duplicates.exists():
+
+                raise serializers.ValidationError(
+                    {
+                        "code": (
+                            "A bank with this "
+                            "code already exists "
+                            "in your organization."
+                        )
+                    }
+                )
+
+        # --------------------------------------------------------
+        # HIERARCHY
+        # --------------------------------------------------------
 
         if self.instance is None:
-            if not attrs.get("hierarchy_type"):
-                raise serializers.ValidationError(
-                    {"hierarchy_type": "Select Geographical or Zonal before creating the customer."}
-                )
-        else:
-            new_value = attrs.get("hierarchy_type")
-            if (
-                new_value
-                and new_value != self.instance.hierarchy_type
-                and self.instance.branches.exists()
+
+            if not attrs.get(
+                "hierarchy_type"
             ):
+
                 raise serializers.ValidationError(
-                    {"hierarchy_type": "This customer already has branches; the hierarchy type is locked."}
+                    {
+                        "hierarchy_type": (
+                            "Select Geographical "
+                            "or Zonal."
+                        )
+                    }
                 )
+
+        else:
+
+            new_hierarchy = (
+                attrs.get(
+                    "hierarchy_type"
+                )
+            )
+
+            if (
+                new_hierarchy
+                and
+                new_hierarchy
+                != self.instance.hierarchy_type
+                and
+                self.instance.branches.exists()
+            ):
+
+                raise serializers.ValidationError(
+                    {
+                        "hierarchy_type": (
+                            "This bank already "
+                            "has branches. "
+                            "Hierarchy type "
+                            "cannot be changed."
+                        )
+                    }
+                )
+
         return attrs
+
+    # ============================================================
+    # CREATE
+    # ============================================================
+
+    def create(
+        self,
+        validated_data,
+    ):
+
+        password = validated_data.pop(
+            "password",
+            "",
+        )
+
+        with transaction.atomic():
+
+            customer = super().create(
+                validated_data
+            )
+
+            if password:
+                self._ensure_login(
+                    customer,
+                    password,
+                )
+
+        return customer
+
+    # ============================================================
+    # UPDATE
+    # ============================================================
+
+    def update(
+        self,
+        instance,
+        validated_data,
+    ):
+
+        password = validated_data.pop(
+            "password",
+            "",
+        )
+
+        with transaction.atomic():
+
+            customer = super().update(
+                instance,
+                validated_data,
+            )
+
+            login = (
+                User.objects
+                .filter(
+                    customer=customer,
+                    role=Role.CUSTOMER,
+                )
+                .first()
+            )
+
+            if login:
+
+                login.email = (
+                    customer.contact_person_email
+                    or customer.company_email
+                ).strip().lower()
+
+                login.name = (
+                    customer.contact_person
+                    or customer.company
+                )
+
+                login.phone = (
+                    customer.admin_mobile
+                    or customer.phone
+                )
+
+                login.is_active = (
+                    customer.is_active
+                )
+
+                if password:
+                    login.set_password(
+                        password
+                    )
+
+                login.save()
+
+            elif password:
+
+                self._ensure_login(
+                    customer,
+                    password,
+                )
+
+        return customer
+
+
 
 class ZoneSerializer(serializers.ModelSerializer):
     class Meta:

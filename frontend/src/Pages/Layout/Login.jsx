@@ -781,14 +781,6 @@ export const tpAuthHeaders = () => {
   };
 };
 
-/* =========================================================
-   SILENT 3TP REFRESH
-   ---------------------------------------------------------
-   Call this whenever a 3TP-proxied endpoint returns 401.
-   On success the new tokens are written to localStorage and
-   the caller can retry the original request once.
-========================================================= */
-
 export async function refreshTpToken() {
   const refresh = localStorage.getItem("tp_refresh_token");
   if (!refresh) return false;

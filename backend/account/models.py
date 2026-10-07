@@ -33,15 +33,64 @@ class Role(models.TextChoices):
     ENGINEER        = "ENGINEER", "Engineer"
 
 
+# class Organization(models.Model):
+#     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+#     name = models.CharField(max_length=255, unique=True)
+#     code = models.CharField(max_length=50, unique=True)
+#     email = models.EmailField(blank=True)
+#     phone = models.CharField(max_length=20, blank=True)
+#     address = models.TextField(blank=True)
+#     is_active = models.BooleanField(default=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     class Meta:
+#         db_table = "organizations"
+#         ordering = ["name"]
+
+#     def __str__(self):
+#         return self.name
+
+
 class Organization(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    name = models.CharField(max_length=255, unique=True)
-    code = models.CharField(max_length=50, unique=True)
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+
+    name = models.CharField(
+        max_length=255,
+        unique=True
+    )
+
+    code = models.CharField(
+        max_length=50,
+        unique=True
+    )
+
     email = models.EmailField(blank=True)
-    phone = models.CharField(max_length=20, blank=True)
+
+    phone = models.CharField(
+        max_length=20,
+        blank=True
+    )
+
     address = models.TextField(blank=True)
+
+    # 3TP tenant mapping
+    tpt_tenant_id = models.CharField(
+        max_length=100,
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True
+    )
+
     is_active = models.BooleanField(default=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
+
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -51,53 +100,258 @@ class Organization(models.Model):
     def __str__(self):
         return self.name
 
-
 class HierarchyType(models.TextChoices):
     GEOGRAPHICAL = "GEOGRAPHICAL", "Geographical (State → District → Taluka → City → Branch)"
     ZONAL = "ZONAL", "Zonal (Zone → Circle → Region → Division → Branch)"
 
 
+# class Customer(models.Model):
+#     organization = ForeignKey(Organization, on_delete=models.CASCADE, related_name="customers")
+#     company = CharField(max_length=255)
+#     code = CharField(max_length=50)
+#     company_email = EmailField(blank=True)
+#     contact_person = CharField(max_length=255, blank=True)
+#     contact_person_email= EmailField(blank=True)
+#     phone = CharField(max_length=30, blank=True)
+
+#     hierarchy_type = models.CharField(
+#         max_length=20,
+#         choices=HierarchyType.choices,
+#         blank=True,
+#         null=True,
+#         help_text="Locked in at creation: Geographical or Zonal. Cannot be changed once branches exist.",
+#     )
+
+#     is_active = BooleanField(default=True)
+#     created_at = DateTimeField(auto_now_add=True)
+#     updated_at = DateTimeField(auto_now=True)
+
+#     # 3TP synchronization fields
+#     tpt_customer_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
+#     tpt_sync_status = models.CharField(max_length=20, default="PENDING")
+#     tpt_sync_error = models.TextField(null=True, blank=True)
+
+#     class Meta:
+#         unique_together = ("organization", "code")
+#         ordering = ["company"]
+
+#     def __str__(self):
+#         return f"{self.company} ({self.code})"
+
+#     def clean(self):
+#         # Once any branch exists under this customer, the hierarchy choice is final.
+#         if self.pk and self.hierarchy_type:
+#             original = Customer.objects.filter(pk=self.pk).values_list("hierarchy_type", flat=True).first()
+#             if original and original != self.hierarchy_type and Branch.objects.filter(customer_id=self.pk).exists():
+#                 from django.core.exceptions import ValidationError
+#                 raise ValidationError(
+#                     "hierarchy_type cannot be changed once branches have been created for this customer."
+#                 )
+
 class Customer(models.Model):
-    organization = ForeignKey(Organization, on_delete=models.CASCADE, related_name="customers")
-    company = CharField(max_length=255)
-    code = CharField(max_length=50)
-    company_email = EmailField(blank=True)
-    contact_person = CharField(max_length=255, blank=True)
-    contact_person_email= EmailField(blank=True)
-    phone = CharField(max_length=30, blank=True)
+    organization = ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="customers",
+    )
+
+    tpt_customer_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
+    # tpt_customer_id = models.CharField(max_length=64, blank=True, default="", db_index=True)
+   
+    company = CharField(
+        max_length=255,
+        help_text="Bank name",
+    )
+
+    code = CharField(
+        max_length=50,
+        help_text="Unique bank code within the organization",
+    )
+
+    bank_short_name = CharField(
+        max_length=50,
+        blank=True,
+        default="",
+    )
+
+    BANK_TYPE_CHOICES = [
+        ("PUBLIC_SECTOR", "Public Sector Bank"),
+        ("PRIVATE_SECTOR", "Private Sector Bank"),
+    ]
+
+    bank_type = CharField(
+        max_length=30,
+        choices=BANK_TYPE_CHOICES,
+        blank=True,
+        default="",
+    )
+
+    company_email = EmailField(
+        blank=True,
+    )
+
+    phone = CharField(
+        max_length=30,
+        blank=True,
+    )
+
+    website = CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    gstin = CharField(
+        max_length=15,
+        blank=True,
+        default="",
+    )
+
+    pan = CharField(
+        max_length=10,
+        blank=True,
+        default="",
+    )
+
+    registration_number = CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+
+    # ============================================================
+    # HEAD OFFICE
+    # ============================================================
+
+    address_line_1 = CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    address_line_2 = CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    state = CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+
+    district = CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+
+    city = CharField(
+        max_length=100,
+        blank=True,
+        default="",
+    )
+
+    pincode = CharField(
+        max_length=6,
+        blank=True,
+        default="",
+    )
+
+    # ============================================================
+    # PRIMARY BANK ADMIN
+    # ============================================================
+
+    contact_person = CharField(
+        max_length=255,
+        blank=True,
+    )
+
+    contact_person_email = EmailField(
+        blank=True,
+    )
+
+    admin_designation = CharField(
+        max_length=150,
+        blank=True,
+        default="",
+    )
+
+    admin_mobile = CharField(
+        max_length=30,
+        blank=True,
+        default="",
+    )
+
+    # ============================================================
+    # HIERARCHY
+    # ============================================================
 
     hierarchy_type = models.CharField(
         max_length=20,
         choices=HierarchyType.choices,
         blank=True,
         null=True,
-        help_text="Locked in at creation: Geographical or Zonal. Cannot be changed once branches exist.",
+        help_text=(
+            "Locked in at creation: "
+            "Geographical or Zonal. "
+            "Cannot be changed once branches exist."
+        ),
     )
 
-    is_active = BooleanField(default=True)
-    created_at = DateTimeField(auto_now_add=True)
-    updated_at = DateTimeField(auto_now=True)
+    # ============================================================
+    # STATUS
+    # ============================================================
 
-    # 3TP synchronization fields
-    tpt_customer_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
-    tpt_sync_status = models.CharField(max_length=20, default="PENDING")
-    tpt_sync_error = models.TextField(null=True, blank=True)
+    is_active = BooleanField(
+        default=True,
+    )
+
+    created_at = DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = DateTimeField(
+        auto_now=True,
+    )
 
     class Meta:
-        unique_together = ("organization", "code")
+        unique_together = (
+            "organization",
+            "code",
+        )
         ordering = ["company"]
 
     def __str__(self):
         return f"{self.company} ({self.code})"
 
     def clean(self):
-        # Once any branch exists under this customer, the hierarchy choice is final.
+        # Once branches exist, hierarchy type cannot be changed.
         if self.pk and self.hierarchy_type:
-            original = Customer.objects.filter(pk=self.pk).values_list("hierarchy_type", flat=True).first()
-            if original and original != self.hierarchy_type and Branch.objects.filter(customer_id=self.pk).exists():
+            original = (
+                Customer.objects
+                .filter(pk=self.pk)
+                .values_list(
+                    "hierarchy_type",
+                    flat=True,
+                )
+                .first()
+            )
+
+            if (
+                original
+                and original != self.hierarchy_type
+                and Branch.objects.filter(
+                    customer_id=self.pk
+                ).exists()
+            ):
                 from django.core.exceptions import ValidationError
+
                 raise ValidationError(
-                    "hierarchy_type cannot be changed once branches have been created for this customer."
+                    "hierarchy_type cannot be changed "
+                    "once branches have been created "
+                    "for this bank."
                 )
 
 
@@ -670,10 +924,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
         return ""
 
-    # -------------------------
-    # 3TP synchronization
-    # -------------------------
-
     tpt_user_id = models.CharField(
         max_length=100,
         null=True,
@@ -706,6 +956,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.name} <{self.email}> [{self.role}]"
+
 
 class LoginAudit(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
