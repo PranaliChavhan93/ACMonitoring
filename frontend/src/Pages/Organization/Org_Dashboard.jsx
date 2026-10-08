@@ -11,7 +11,7 @@ import FilterDashboard from "./FilterDashboard";
 import ACDashboard from "../../Second_Person/Forntend/ACDashboard";
 import { useAuth } from "../Layout/AuthContext";
 
-const API_BASE = "http://192.168.1.12:8000/api";
+const API_BASE = "http://192.168.1.14:8000/api";
 const API_URL = `${API_BASE}/ac-data/`;
 const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 

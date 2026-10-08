@@ -1,104 +1,3 @@
-# import json
-# import os
-# from groq import Groq
-
-# SYSTEM_PROMPT = """
-# You are an expert AI analyst for an enterprise AC Energy Monitoring Dashboard.
-
-# Your task is to analyze the CURRENT DASHBOARD STATE provided as JSON.
-# This is dashboard-level analysis, not screenshot analysis.
-
-# Analyze only information present in the input. Never invent readings, causes,
-# trends, percentages, locations, or device conditions that are not supported by
-# the data.
-
-# Important rules:
-# - Treat null, empty, or missing fields as unavailable.
-# - Distinguish measured facts from interpretations.
-# - If a conclusion is uncertain, say that it is an indication, not a confirmed fault.
-# - Compare current values with previous values when the input provides them.
-# - Identify unusually high/low energy, power, temperature, current, or other metrics.
-# - Look for concentration of consumption by zone, state, city, branch, floor, or AC.
-# - Use percentages supplied by the dashboard when available; otherwise calculate
-#   simple percentages from supplied numeric values.
-# - Do not repeatedly restate every KPI. Focus on useful findings.
-# - Give practical recommendations.
-# - Do not claim to have visually seen a dashboard or screenshot.
-
-# Return a professional dashboard analysis with these sections:
-
-# ## Executive Summary
-# 2-5 concise sentences.
-
-# ## Energy & Power Analysis
-# Important consumption and power findings.
-
-# ## AC Health & Operations
-# Active/inactive/health/operational findings.
-
-# ## Trend & Comparison Analysis
-# Relevant increases, decreases, peaks, and comparisons.
-
-# ## Anomalies / Risk Areas
-# List only meaningful anomalies supported by the data.
-# If none are present, say so.
-
-# ## Location / Branch Analysis
-# Identify important high/low consuming areas and concentration.
-
-# ## Recommendations
-# Prioritized actions.
-
-# ## Priority
-# Use:
-# - CRITICAL
-# - HIGH
-# - MEDIUM
-# - LOW
-# when appropriate.
-
-# Keep the response concise but analytical. Use actual values and units from the
-# input.
-# """
-
-
-# def analyze_dashboard(dashboard: dict) -> str:
-#     api_key = os.getenv("GROQ_API_KEY")
-#     if not api_key or api_key == "YOUR_GROQ_API_KEY":
-#         raise RuntimeError(
-#             "GROQ_API_KEY is not configured. Add your Groq API key to backend/.env"
-#         )
-
-#     model = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-#     client = Groq(api_key=api_key)
-
-#     # Compact JSON keeps the model focused on the actual dashboard state.
-#     dashboard_json = json.dumps(dashboard, ensure_ascii=False, separators=(",", ":"))
-
-#     user_prompt = f"""
-# Analyze this current AC dashboard state.
-
-# DASHBOARD DATA:
-# {dashboard_json}
-
-# Produce the requested dashboard-level analysis.
-# """
-
-#     response = client.chat.completions.create(
-#         model=model,
-#         messages=[
-#             {"role": "system", "content": SYSTEM_PROMPT},
-#             {"role": "user", "content": user_prompt}
-#         ],
-#         temperature=0.15,
-#         max_tokens=5000,
-#         reasoning_effort="high"
-#     )
-
-#     return response.choices[0].message.content
-
-
-
 import json
 import os
 from typing import Any
@@ -115,13 +14,11 @@ SYSTEM_PROMPT = """
 You are an expert AI analyst for an enterprise
 AC Energy Monitoring Dashboard.
 
-You are NOT analyzing a screenshot.
+You are analyzing LIVE DATA currently displayed
+by the dashboard.
 
-You are analyzing the LIVE DATA currently displayed
-by a dashboard.
-
-Your job is to understand the complete dashboard state
-and provide useful operational insights.
+Your job is to provide ONE SHORT and MEANINGFUL
+insight for EACH important dashboard graph or section.
 
 ============================================================
 IMPORTANT RULES
@@ -138,153 +35,137 @@ IMPORTANT RULES
    - trends
    - causes
 
-3. Clearly distinguish:
-   - measured facts
-   - calculated values
-   - possible explanations
+3. Use actual values from the dashboard whenever available.
 
-4. If data is unavailable, say:
-   "Insufficient data to determine this."
+4. Do NOT repeat every dashboard value.
 
-5. Focus on dashboard-level analysis.
+5. Focus on the most important information.
 
-6. Do not analyze every AC individually unless the data
-   clearly indicates an important problem.
+6. Each section must contain ONLY ONE short sentence.
 
-7. Identify:
+7. Keep every sentence meaningful and useful.
+
+8. Identify:
    - high energy consumption
+   - low energy consumption
+   - energy increase
+   - energy decrease
    - high power consumption
-   - sudden increases
-   - sudden decreases
-   - abnormal temperature
-   - abnormal humidity
-   - AC health issues
-   - alerts
-   - high consuming branches
-   - high consuming zones
-   - unusual trends
-   - important changes
+   - power increase/decrease
+   - important trends
+   - highest-consuming zones
+   - highest-consuming states
+   - highest-consuming cities
+   - highest-consuming branches
+   - highest-consuming floors
+   - AC health problems
+   - important alerts
 
-8. Compare current values with trend/history values
-   whenever available.
+9. Compare current values with historical/trend values
+   ONLY when the data is actually available.
 
-9. Prioritize important problems instead of repeating
-   every dashboard value.
+10. If useful information is not available for a section,
+    say:
+    "No significant change detected."
 
-10. Give practical recommendations.
+11. Do NOT explain your reasoning.
+
+12. Do NOT provide long explanations.
+
+13. Do NOT provide detailed recommendations.
+
+14. Do NOT create information that does not exist
+    in the provided dashboard data.
 
 ============================================================
-OUTPUT FORMAT
+REQUIRED OUTPUT
 ============================================================
 
-Return the following structure.
+Return EXACTLY these sections:
 
-## Executive Summary
+KPI:
+One short sentence about the most important KPI condition.
 
-Give a concise overall description of the current
-dashboard condition.
+Energy:
+One short sentence about the important energy condition
+or change.
 
-## KPI Analysis
+Power:
+One short sentence about the important power condition
+or change.
 
-Analyze:
+Trend:
+One short sentence about the most important trend.
 
-- Total ACs
-- Active ACs
-- Energy
-- Power
-- Temperature
-- Humidity
-- Alerts
+Zone:
+One short sentence about the important zone comparison
+or highest-consuming zone.
 
-Mention important changes or abnormal values.
+State:
+One short sentence about the important state comparison
+or highest-consuming state.
 
-## Energy Analysis
+City:
+One short sentence about the important city comparison
+or highest-consuming city.
 
-Identify:
+Branch:
+One short sentence about the important branch comparison
+or highest-consuming branch.
 
-- high consumption
-- low consumption
-- increasing consumption
-- decreasing consumption
-- important energy trends
+Floor:
+One short sentence about the important floor comparison
+when data is available.
 
-## Power Analysis
+AC Health:
+One short sentence about the overall AC health condition.
 
-Analyze:
+Alerts:
+One short sentence about the important alerts.
 
-- current power
-- average power
-- sudden power increases
-- unusual power consumption
+============================================================
+OUTPUT STYLE
+============================================================
 
-## AC Health
+Keep every section SHORT.
 
-Analyze:
+Prefer 8-15 words per sentence.
 
-- healthy ACs
-- warning ACs
-- critical ACs
-- active/inactive conditions
-- important health problems
+Do not use bullet points.
 
-## Location Analysis
+Do not use markdown tables.
 
-Identify important locations:
+Do not create additional sections.
 
-- state
-- city
-- zone
-- branch
-- floor
+Do not write long paragraphs.
 
-Mention the highest consuming areas when the data
-supports it.
+Do not repeat the complete dashboard data.
 
-## Trend Analysis
+Do not provide detailed recommendations.
 
-Analyze the supplied historical/rolling trend.
+Example:
 
-Identify:
+KPI: Energy consumption is currently above the previous period.
 
-- increasing trends
-- decreasing trends
-- peaks
-- drops
-- unusual changes
+Energy: West zone records the highest energy consumption.
 
-## Anomalies / Risk Areas
+Power: Power usage increased during the latest period.
 
-Only mention meaningful anomalies supported by data.
+Trend: Energy consumption shows an increasing trend.
 
-For each important anomaly include:
+Zone: West zone is currently the highest-consuming zone.
 
-- Issue
-- Evidence
-- Severity
+State: Maharashtra has the highest energy consumption.
 
-Severity:
+City: Pune records the highest city-level consumption.
 
-CRITICAL
-HIGH
-MEDIUM
-LOW
+Branch: Branch A is the highest-consuming branch.
 
-## Recommendations
+Floor: Floor 3 has the highest recorded consumption.
 
-Give practical actions.
+AC Health: Most ACs are healthy with few units requiring attention.
 
-Prioritize the most important actions first.
-
-## Final Dashboard Status
-
-Give one of:
-
-NORMAL
-ATTENTION REQUIRED
-HIGH ENERGY RISK
-CRITICAL
-
-Then explain why in one or two sentences.
+Alerts: No critical alerts are currently detected.
 
 """
 
@@ -881,6 +762,10 @@ def analyze_dashboard(dashboard):
         api_key=api_key
     )
 
+    # --------------------------------------------------------
+    # Prepare dashboard context
+    # --------------------------------------------------------
+
     context = prepare_dashboard_context(
         dashboard
     )
@@ -891,12 +776,17 @@ def analyze_dashboard(dashboard):
         separators=(",", ":")
     )
 
+    # --------------------------------------------------------
+    # USER PROMPT
+    # --------------------------------------------------------
+
     user_prompt = f"""
 
 Analyze the following CURRENT LIVE AC DASHBOARD DATA.
 
-This data comes directly from the dashboard's runtime
-state. Do NOT assume this is a screenshot.
+The dashboard contains multiple graphs, charts and sections.
+
+Give ONE SHORT insight for EACH section.
 
 ============================================================
 CURRENT DASHBOARD DATA
@@ -905,16 +795,88 @@ CURRENT DASHBOARD DATA
 {dashboard_json}
 
 ============================================================
+SECTIONS TO ANALYZE
+============================================================
 
-Provide the complete dashboard analysis according to
-the required output format.
+1. KPI
+2. Energy
+3. Power
+4. Trend
+5. Zone
+6. State
+7. City
+8. Branch
+9. Floor
+10. AC Health
+11. Alerts
 
-Focus on the most important findings.
+============================================================
+ANALYSIS RULES
+============================================================
 
-Use actual numbers and units wherever available.
+For each section:
 
-Do not invent missing information.
+- Give exactly ONE sentence.
+- Use actual dashboard values when available.
+- Identify the highest value when meaningful.
+- Identify the lowest value when meaningful.
+- Identify increases or decreases when available.
+- Identify abnormal conditions when supported.
+- Do not repeat unnecessary values.
+- Do not invent missing information.
+
+If there is no useful information for a section,
+write:
+
+No significant change detected.
+
+============================================================
+REQUIRED OUTPUT
+============================================================
+
+KPI: <one short sentence>
+
+Energy: <one short sentence>
+
+Power: <one short sentence>
+
+Trend: <one short sentence>
+
+Zone: <one short sentence>
+
+State: <one short sentence>
+
+City: <one short sentence>
+
+Branch: <one short sentence>
+
+Floor: <one short sentence>
+
+AC Health: <one short sentence>
+
+Alerts: <one short sentence>
+
+============================================================
+IMPORTANT
+============================================================
+
+Keep the complete response concise.
+
+Maximum approximately 150 words.
+
+Do not provide:
+- detailed explanations
+- recommendations
+- tables
+- bullet points
+- additional sections
+- reasoning
+
 """
+
+    # --------------------------------------------------------
+    # GROQ REQUEST
+    # --------------------------------------------------------
 
     response = client.chat.completions.create(
 
@@ -933,9 +895,112 @@ Do not invent missing information.
 
         temperature=0.15,
 
-        max_tokens=5000,
+        # Previously 5000.
+        # Reduced because we want short graph insights.
+        max_tokens=300,
 
         reasoning_effort="high",
     )
 
-    return response.choices[0].message.content
+    # --------------------------------------------------------
+    # GET RESPONSE
+    # --------------------------------------------------------
+
+    analysis = response.choices[0].message.content.strip()
+
+    # --------------------------------------------------------
+    # CLEAN RESPONSE
+    # --------------------------------------------------------
+
+    analysis = analysis.replace(
+        "**",
+        ""
+    )
+
+    analysis = analysis.replace(
+        "###",
+        ""
+    )
+
+    # Remove possible markdown bullets
+    cleaned_lines = []
+
+    for line in analysis.splitlines():
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        line = line.lstrip("-• ")
+
+        cleaned_lines.append(
+            line
+        )
+
+    analysis = "\n\n".join(
+        cleaned_lines
+    ).strip()
+
+    # --------------------------------------------------------
+    # EXPECTED SECTION LABELS
+    # --------------------------------------------------------
+
+    section_labels = [
+        "KPI:",
+        "Energy:",
+        "Power:",
+        "Trend:",
+        "Zone:",
+        "State:",
+        "City:",
+        "Branch:",
+        "Floor:",
+        "AC Health:",
+        "Alerts:",
+    ]
+
+    # --------------------------------------------------------
+    # KEEP ONLY EXPECTED SECTIONS
+    # --------------------------------------------------------
+
+    section_lines = []
+
+    for line in analysis.splitlines():
+
+        line = line.strip()
+
+        if not line:
+            continue
+
+        if any(
+            line.startswith(label)
+            for label in section_labels
+        ):
+            section_lines.append(
+                line
+            )
+
+    # --------------------------------------------------------
+    # If Groq returned properly formatted sections,
+    # use them.
+    # Otherwise keep the AI response.
+    # --------------------------------------------------------
+
+    if section_lines:
+
+        analysis = "\n\n".join(
+            section_lines
+        )
+
+    # --------------------------------------------------------
+    # FALLBACK
+    # --------------------------------------------------------
+
+    if not analysis:
+
+        analysis = (
+            "KPI: No significant change detected."
+        )
+
+    return analysis

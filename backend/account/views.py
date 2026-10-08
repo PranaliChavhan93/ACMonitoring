@@ -7,6 +7,8 @@ import threading
 import traceback
 import hashlib
 
+from django.db.models import Q
+
 from django.views.decorators.csrf import csrf_exempt
 
 import requests
@@ -97,6 +99,7 @@ from django.db.models import Q
 
 from . import ownership
 from . import telemetry
+# from backend.account import serializers
 
 class ReadOnlyOrAuthenticated(BasePermission):
     def has_permission(self, request, view):
@@ -181,6 +184,8 @@ def find_3tp_user_id(request, tpt_customer_id, email):
         if (u.get("email") or "").lower() == email:
             return _id_of(u)
     return ""
+
+
 
 class ThreeTPUserMixin:
     """List (3TP ∩ local), create (3TP then local), update/delete (kept in sync)."""
@@ -376,6 +381,1105 @@ def fetch_3tp_customers(request):
         page += 1
     return out
 
+# def fetch_3tp_sites(request=None):
+#     """
+#     Fetch sites/assets directly from 3TP.
+
+#     3TP is the source of truth for site inventory.
+#     """
+
+#     sites = []
+
+#     page = 0
+#     total_pages = 1
+
+#     while page < total_pages:
+
+#         response, data = _tpt_request(
+#             "GET",
+#             "site",
+#             payload=None,
+#         )
+
+#         if response is None:
+#             raise ThreeTPError(
+#                 "Unable to fetch sites from 3TP."
+#             )
+
+#         if not isinstance(data, dict):
+#             raise ThreeTPError(
+#                 "Invalid site response received from 3TP.",
+#                 payload=data,
+#             )
+
+#         rows = data.get("data", [])
+
+#         if isinstance(rows, list):
+#             sites.extend(rows)
+
+#         total_pages = data.get(
+#             "totalPages",
+#             1
+#         )
+
+#         page += 1
+
+#     return sites
+
+
+def fetch_3tp_sites(request=None):
+
+    sites = []
+
+    page = 0
+    total_pages = 1
+
+    while page < total_pages:
+
+        response, data = _tpt_request(
+            "GET",
+            "site",
+            params={
+                "pageSize": 1000,
+                "page": page,
+                "sortProperty": "createdTime",
+                "sortOrder": "DESC",
+            },
+        )
+
+        if not isinstance(data, dict):
+
+            raise ThreeTPError(
+                "Invalid sites response from 3TP.",
+                payload=data,
+            )
+
+        rows = data.get(
+            "data",
+            []
+        )
+
+        if isinstance(rows, list):
+            sites.extend(rows)
+
+        total_pages = data.get(
+            "totalPages",
+            1
+        )
+
+        page += 1
+
+    return sites
+
+# =====================================================================
+# CREATE BRANCH / FLOOR FROM FULL HIERARCHY
+# =====================================================================
+
+@api_view(["POST"])
+def create_branch_or_floor(request):
+    user = request.user
+
+    # ---------------------------------------------------------------
+    # PERMISSION
+    # ---------------------------------------------------------------
+    if user.role not in (Role.ORG_SUPER_ADMIN, Role.CUSTOMER):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "You are not allowed to create locations."
+            },
+            status=403,
+        )
+
+    try:
+        body = request.data
+    except Exception:
+        body = {}
+
+    hierarchy = str(
+        body.get("hierarchy_type", "")
+    ).strip().upper()
+
+    location_type = str(
+        body.get("location_type", "")
+    ).strip().upper()
+
+    if hierarchy not in ("GEOGRAPHICAL", "ZONAL"):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "hierarchy_type must be GEOGRAPHICAL or ZONAL."
+            },
+            status=400,
+        )
+
+    if location_type not in ("BRANCH", "FLOOR"):
+        return JsonResponse(
+            {
+                "success": False,
+                "message": "location_type must be BRANCH or FLOOR."
+            },
+            status=400,
+        )
+
+    # ---------------------------------------------------------------
+    # CUSTOMER HIERARCHY VALIDATION
+    # ---------------------------------------------------------------
+
+    if user.role == Role.CUSTOMER:
+
+        if not user.customer_id:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": "Your account has no customer."
+                },
+                status=403,
+            )
+
+        customer_hierarchy = getattr(
+            user.customer,
+            "hierarchy_type",
+            None
+        )
+
+        if (
+            customer_hierarchy
+            and customer_hierarchy != hierarchy
+        ):
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        f"Your account uses the "
+                        f"{customer_hierarchy.title()} hierarchy."
+                    ),
+                },
+                status=403,
+            )
+
+    # ---------------------------------------------------------------
+    # LOAD TREE
+    # ---------------------------------------------------------------
+
+    location_file = (
+        ZONAL_LOCATION_FILE
+        if hierarchy == "ZONAL"
+        else GEOGRAPHICAL_LOCATION_FILE
+    )
+
+    try:
+        tree = load_location_tree(location_file)
+    except Exception as exc:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": f"Unable to load location tree: {exc}"
+            },
+            status=500,
+        )
+
+    # ===============================================================
+    # ZONAL
+    # ===============================================================
+
+    if hierarchy == "ZONAL":
+
+        zone_name = str(
+            body.get("zone_name", "")
+        ).strip()
+
+        circle_name = str(
+            body.get("circle_name", "")
+        ).strip()
+
+        region_name = str(
+            body.get("region_name", "")
+        ).strip()
+
+        division_name = str(
+            body.get("division_name", "")
+        ).strip()
+
+        branch_name = str(
+            body.get("branch_name", "")
+        ).strip()
+
+        floor_name = str(
+            body.get("floor_name", "")
+        ).strip()
+
+        # -----------------------------------------------------------
+        # VALIDATE PARENT HIERARCHY
+        # -----------------------------------------------------------
+
+        required = {
+            "zone_name": zone_name,
+            "circle_name": circle_name,
+            "region_name": region_name,
+            "division_name": division_name,
+        }
+
+        missing = [
+            key
+            for key, value in required.items()
+            if not value
+        ]
+
+        if location_type in ("BRANCH", "FLOOR"):
+
+            if not branch_name:
+                missing.append("branch_name")
+
+        if location_type == "FLOOR" and not floor_name:
+            missing.append("floor_name")
+
+        if missing:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        "Missing required field(s): "
+                        + ", ".join(missing)
+                    ),
+                },
+                status=400,
+            )
+
+        # -----------------------------------------------------------
+        # ZONE
+        # -----------------------------------------------------------
+
+        zone = next(
+            (
+                z for z in tree
+                if z.get("zone_name", "").strip().lower()
+                == zone_name.lower()
+            ),
+            None,
+        )
+
+        if zone is None:
+
+            zone_ids = {
+                z.get("zone_id", "")
+                for z in tree
+            }
+
+            zone = {
+                "zone_id": make_code_id(
+                    zone_ids,
+                    zone_name,
+                    prefix="ZN-",
+                ),
+                "zone_name": zone_name,
+                "circles": [],
+            }
+
+            tree.append(zone)
+
+        # -----------------------------------------------------------
+        # CIRCLE
+        # -----------------------------------------------------------
+
+        circle = next(
+            (
+                c
+                for c in zone.get("circles", [])
+                if c.get("circle_name", "").strip().lower()
+                == circle_name.lower()
+            ),
+            None,
+        )
+
+        if circle is None:
+
+            circle_ids = {
+                c.get("circle_id", "")
+                for z in tree
+                for c in z.get("circles", [])
+            }
+
+            circle = {
+                "circle_id": make_code_id(
+                    circle_ids,
+                    circle_name,
+                    prefix=f"{zone['zone_id']}-C",
+                ),
+                "circle_name": circle_name,
+                "regions": [],
+            }
+
+            zone.setdefault(
+                "circles",
+                []
+            ).append(circle)
+
+        # -----------------------------------------------------------
+        # REGION
+        # -----------------------------------------------------------
+
+        region = next(
+            (
+                r
+                for r in circle.get("regions", [])
+                if r.get("region_name", "").strip().lower()
+                == region_name.lower()
+            ),
+            None,
+        )
+
+        if region is None:
+
+            region_ids = {
+                r.get("region_id", "")
+                for z in tree
+                for c in z.get("circles", [])
+                for r in c.get("regions", [])
+            }
+
+            region = {
+                "region_id": make_code_id(
+                    region_ids,
+                    region_name,
+                    prefix=f"{circle['circle_id']}-R",
+                ),
+                "region_name": region_name,
+                "divisions": [],
+            }
+
+            circle.setdefault(
+                "regions",
+                []
+            ).append(region)
+
+        # -----------------------------------------------------------
+        # DIVISION
+        # -----------------------------------------------------------
+
+        division = next(
+            (
+                d
+                for d in region.get("divisions", [])
+                if d.get("division_name", "").strip().lower()
+                == division_name.lower()
+            ),
+            None,
+        )
+
+        if division is None:
+
+            division_ids = {
+                d.get("division_id", "")
+                for z in tree
+                for c in z.get("circles", [])
+                for r in c.get("regions", [])
+                for d in r.get("divisions", [])
+            }
+
+            division = {
+                "division_id": make_code_id(
+                    division_ids,
+                    division_name,
+                    prefix=f"{region['region_id']}-D",
+                ),
+                "division_name": division_name,
+                "branches": [],
+            }
+
+            region.setdefault(
+                "divisions",
+                []
+            ).append(division)
+
+        # -----------------------------------------------------------
+        # BRANCH
+        # -----------------------------------------------------------
+
+        branch = next(
+            (
+                b
+                for b in division.get("branches", [])
+                if b.get("branch_name", "").strip().lower()
+                == branch_name.lower()
+            ),
+            None,
+        )
+
+        if location_type == "BRANCH":
+
+            if branch is not None:
+                return JsonResponse(
+                    {
+                        "success": False,
+                        "message": (
+                            f"Branch '{branch_name}' "
+                            "already exists in this hierarchy."
+                        ),
+                    },
+                    status=409,
+                )
+
+            branch_index = len(
+                division.get("branches", [])
+            ) + 1
+
+            branch = {
+                "branch_id": (
+                    f"{division['division_id']}"
+                    f"-B{branch_index:02d}"
+                ),
+                "branch_name": branch_name,
+                "floors": [],
+                "sites": [],
+            }
+
+            division.setdefault(
+                "branches",
+                []
+            ).append(branch)
+
+            save_location_tree(
+                tree,
+                location_file
+            )
+
+            return JsonResponse(
+                {
+                    "success": True,
+                    "message": "Branch created successfully.",
+                    "hierarchy_type": hierarchy,
+                    "location_type": "BRANCH",
+                    "data": {
+                        "zone_id": zone["zone_id"],
+                        "zone_name": zone["zone_name"],
+                        "circle_id": circle["circle_id"],
+                        "circle_name": circle["circle_name"],
+                        "region_id": region["region_id"],
+                        "region_name": region["region_name"],
+                        "division_id": division["division_id"],
+                        "division_name": division["division_name"],
+                        "branch_id": branch["branch_id"],
+                        "branch_name": branch["branch_name"],
+                    },
+                },
+                status=201,
+            )
+
+        # -----------------------------------------------------------
+        # FLOOR
+        # -----------------------------------------------------------
+
+        if branch is None:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        f"Branch '{branch_name}' "
+                        "does not exist."
+                    ),
+                },
+                status=404,
+            )
+
+        existing_floor = next(
+            (
+                f
+                for f in branch.get("floors", [])
+                if f.get("floor_name", "").strip().lower()
+                == floor_name.lower()
+            ),
+            None,
+        )
+
+        if existing_floor is not None:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        f"Floor '{floor_name}' "
+                        "already exists in this branch."
+                    ),
+                },
+                status=409,
+            )
+
+        floor_index = len(
+            branch.get("floors", [])
+        ) + 1
+
+        floor = {
+            "floor_id": (
+                f"{branch['branch_id']}"
+                f"-F{floor_index:02d}"
+            ),
+            "floor_name": floor_name,
+            "sites": [],
+        }
+
+        branch.setdefault(
+            "floors",
+            []
+        ).append(floor)
+
+        save_location_tree(
+            tree,
+            location_file
+        )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Floor created successfully.",
+                "hierarchy_type": hierarchy,
+                "location_type": "FLOOR",
+                "data": {
+                    "zone_id": zone["zone_id"],
+                    "zone_name": zone["zone_name"],
+                    "circle_id": circle["circle_id"],
+                    "circle_name": circle["circle_name"],
+                    "region_id": region["region_id"],
+                    "region_name": region["region_name"],
+                    "division_id": division["division_id"],
+                    "division_name": division["division_name"],
+                    "branch_id": branch["branch_id"],
+                    "branch_name": branch["branch_name"],
+                    "floor_id": floor["floor_id"],
+                    "floor_name": floor["floor_name"],
+                },
+            },
+            status=201,
+        )
+
+    # ===============================================================
+    # GEOGRAPHICAL
+    # ===============================================================
+
+    state_name = str(
+        body.get("state_name", "")
+    ).strip()
+
+    district_name = str(
+        body.get("district_name", "")
+    ).strip()
+
+    taluka_name = str(
+        body.get("taluka_name", "")
+    ).strip()
+
+    city_name = str(
+        body.get("city_name", "")
+    ).strip()
+
+    branch_name = str(
+        body.get("branch_name", "")
+    ).strip()
+
+    floor_name = str(
+        body.get("floor_name", "")
+    ).strip()
+
+    required = {
+        "state_name": state_name,
+        "district_name": district_name,
+        "taluka_name": taluka_name,
+        "city_name": city_name,
+        "branch_name": branch_name,
+    }
+
+    missing = [
+        key
+        for key, value in required.items()
+        if not value
+    ]
+
+    if location_type == "FLOOR" and not floor_name:
+        missing.append("floor_name")
+
+    if missing:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": (
+                    "Missing required field(s): "
+                    + ", ".join(missing)
+                ),
+            },
+            status=400,
+        )
+
+    # ---------------------------------------------------------------
+    # STATE
+    # ---------------------------------------------------------------
+
+    state = next(
+        (
+            s
+            for s in tree
+            if s.get("state_name", "").strip().lower()
+            == state_name.lower()
+        ),
+        None,
+    )
+
+    if state is None:
+
+        state_ids = {
+            s.get("state_id", "")
+            for s in tree
+        }
+
+        state = {
+            "state_id": make_code_id(
+                state_ids,
+                state_name,
+            ),
+            "state_name": state_name,
+            "districts": [],
+        }
+
+        tree.append(state)
+
+    # ---------------------------------------------------------------
+    # DISTRICT
+    # ---------------------------------------------------------------
+
+    district = next(
+        (
+            d
+            for d in state.get("districts", [])
+            if d.get("district_name", "").strip().lower()
+            == district_name.lower()
+        ),
+        None,
+    )
+
+    if district is None:
+
+        district_index = len(
+            state.get("districts", [])
+        ) + 1
+
+        district = {
+            "district_id": (
+                f"{state['state_id']}"
+                f"-D{district_index:02d}"
+            ),
+            "district_name": district_name,
+            "talukas": [],
+        }
+
+        state.setdefault(
+            "districts",
+            []
+        ).append(district)
+
+    # ---------------------------------------------------------------
+    # TALUKA
+    # ---------------------------------------------------------------
+
+    taluka = next(
+        (
+            t
+            for t in district.get("talukas", [])
+            if t.get("taluka_name", "").strip().lower()
+            == taluka_name.lower()
+        ),
+        None,
+    )
+
+    if taluka is None:
+
+        taluka_index = len(
+            district.get("talukas", [])
+        ) + 1
+
+        taluka = {
+            "taluka_id": (
+                f"{district['district_id']}"
+                f"-T{taluka_index:02d}"
+            ),
+            "taluka_name": taluka_name,
+            "cities": [],
+        }
+
+        district.setdefault(
+            "talukas",
+            []
+        ).append(taluka)
+
+    # ---------------------------------------------------------------
+    # CITY
+    # ---------------------------------------------------------------
+
+    city = next(
+        (
+            c
+            for c in taluka.get("cities", [])
+            if c.get("city_name", "").strip().lower()
+            == city_name.lower()
+        ),
+        None,
+    )
+
+    if city is None:
+
+        city_index = len(
+            taluka.get("cities", [])
+        ) + 1
+
+        city = {
+            "city_id": (
+                f"{taluka['taluka_id']}"
+                f"-C{city_index:02d}"
+            ),
+            "city_name": city_name,
+            "branches": [],
+        }
+
+        taluka.setdefault(
+            "cities",
+            []
+        ).append(city)
+
+    # ---------------------------------------------------------------
+    # BRANCH
+    # ---------------------------------------------------------------
+
+    branch = next(
+        (
+            b
+            for b in city.get("branches", [])
+            if b.get("branch_name", "").strip().lower()
+            == branch_name.lower()
+        ),
+        None,
+    )
+
+    if location_type == "BRANCH":
+
+        if branch is not None:
+            return JsonResponse(
+                {
+                    "success": False,
+                    "message": (
+                        f"Branch '{branch_name}' "
+                        "already exists in this hierarchy."
+                    ),
+                },
+                status=409,
+            )
+
+        branch_index = len(
+            city.get("branches", [])
+        ) + 1
+
+        branch = {
+            "branch_id": (
+                f"{city['city_id']}"
+                f"-B{branch_index:02d}"
+            ),
+            "branch_name": branch_name,
+            "floors": [],
+            "sites": [],
+        }
+
+        city.setdefault(
+            "branches",
+            []
+        ).append(branch)
+
+        save_location_tree(
+            tree,
+            location_file
+        )
+
+        return JsonResponse(
+            {
+                "success": True,
+                "message": "Branch created successfully.",
+                "hierarchy_type": hierarchy,
+                "location_type": "BRANCH",
+                "data": {
+                    "state_id": state["state_id"],
+                    "state_name": state["state_name"],
+                    "district_id": district["district_id"],
+                    "district_name": district["district_name"],
+                    "taluka_id": taluka["taluka_id"],
+                    "taluka_name": taluka["taluka_name"],
+                    "city_id": city["city_id"],
+                    "city_name": city["city_name"],
+                    "branch_id": branch["branch_id"],
+                    "branch_name": branch["branch_name"],
+                },
+            },
+            status=201,
+        )
+
+    # ---------------------------------------------------------------
+    # FLOOR
+    # ---------------------------------------------------------------
+
+    if branch is None:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": (
+                    f"Branch '{branch_name}' "
+                    "does not exist."
+                ),
+            },
+            status=404,
+        )
+
+    existing_floor = next(
+        (
+            f
+            for f in branch.get("floors", [])
+            if f.get("floor_name", "").strip().lower()
+            == floor_name.lower()
+        ),
+        None,
+    )
+
+    if existing_floor is not None:
+        return JsonResponse(
+            {
+                "success": False,
+                "message": (
+                    f"Floor '{floor_name}' "
+                    "already exists in this branch."
+                ),
+            },
+            status=409,
+        )
+
+    floor_index = len(
+        branch.get("floors", [])
+    ) + 1
+
+    floor = {
+        "floor_id": (
+            f"{branch['branch_id']}"
+            f"-F{floor_index:02d}"
+        ),
+        "floor_name": floor_name,
+        "sites": [],
+    }
+
+    branch.setdefault(
+        "floors",
+        []
+    ).append(floor)
+
+    save_location_tree(
+        tree,
+        location_file
+    )
+
+    return JsonResponse(
+        {
+            "success": True,
+            "message": "Floor created successfully.",
+            "hierarchy_type": hierarchy,
+            "location_type": "FLOOR",
+            "data": {
+                "state_id": state["state_id"],
+                "state_name": state["state_name"],
+                "district_id": district["district_id"],
+                "district_name": district["district_name"],
+                "taluka_id": taluka["taluka_id"],
+                "taluka_name": taluka["taluka_name"],
+                "city_id": city["city_id"],
+                "city_name": city["city_name"],
+                "branch_id": branch["branch_id"],
+                "branch_name": branch["branch_name"],
+                "floor_id": floor["floor_id"],
+                "floor_name": floor["floor_name"],
+            },
+        },
+        status=201,
+    )
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def three_tp_sites(request):
+    """
+    Fetch Sites directly from 3TP.
+
+    Local Django Site table is NOT used.
+    """
+
+    try:
+        page_size = int(
+            request.query_params.get(
+                "pageSize",
+                1000
+            )
+        )
+
+        page = int(
+            request.query_params.get(
+                "page",
+                0
+            )
+        )
+
+        response = requests.get(
+            f"{CLOUD_URL}/api/tenant/assets",
+            params={
+                "pageSize": page_size,
+                "page": page,
+                "sortProperty": "createdTime",
+                "sortOrder": "DESC",
+            },
+            headers=_tpt_user_headers(request),
+            timeout=20,
+        )
+
+        if response.status_code != 200:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Unable to fetch Sites from 3TP.",
+                    "details": response.text,
+                },
+                status=response.status_code,
+            )
+
+        data = response.json()
+
+        assets = data.get(
+            "data",
+            []
+        )
+
+        sites = []
+
+        for asset in assets:
+
+            asset_id = (
+                asset.get("id", {}).get("id")
+                if isinstance(
+                    asset.get("id"),
+                    dict
+                )
+                else asset.get("id")
+            )
+
+            asset_name = (
+                asset.get("name")
+                or asset.get("title")
+                or ""
+            )
+
+            asset_type = (
+                asset.get("assetType")
+                or asset.get("type")
+                or ""
+            )
+
+            # -------------------------------------------------
+            # ONLY SITE ASSETS
+            # -------------------------------------------------
+
+            if str(asset_type).upper() not in {
+                "SITE",
+                "SITE_ASSET",
+                "DEFAULT",
+            }:
+                continue
+
+            sites.append(
+                {
+                    "id": asset_id,
+
+                    "tpt_site_id": asset_id,
+
+                    "name": asset_name,
+
+                    "code": (
+                        asset.get("code")
+                        or asset.get("label")
+                        or ""
+                    ),
+
+                    "asset_type": asset_type,
+
+                    "address": (
+                        asset.get("address")
+                        or ""
+                    ),
+
+                    "created_time": (
+                        asset.get("createdTime")
+                    ),
+
+                    "updated_time": (
+                        asset.get("updatedTime")
+                    ),
+
+                    # These may be populated later
+                    # from 3TP attributes.
+                    "state_name": "",
+                    "district_name": "",
+                    "taluka_name": "",
+                    "city_name": "",
+
+                    "zone_name": "",
+                    "circle_name": "",
+                    "region_name": "",
+                    "division_name": "",
+
+                    "branch_name": "",
+                    "floor_name": "",
+
+                    "acs": [],
+                }
+            )
+
+        return Response(
+            {
+                "status": "success",
+
+                "count": len(sites),
+
+                "total_pages": data.get(
+                    "totalPages",
+                    1
+                ),
+
+                "total_elements": data.get(
+                    "totalElements",
+                    len(sites)
+                ),
+
+                "sites": sites,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    except requests.RequestException as exc:
+
+        return Response(
+            {
+                "status": "error",
+                "message": "3TP server connection failed.",
+                "details": str(exc),
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    except Exception as exc:
+
+        return Response(
+            {
+                "status": "error",
+                "message": "Unable to fetch Sites from 3TP.",
+                "details": str(exc),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
 def map_3tp_customer_to_device(request, tpt_customer_id, tpt_device_id):
     r = requests.post(
@@ -478,36 +1582,111 @@ def _tpt_service_login():
         return token
 
 
-def _tpt_request(method, endpoint_key, payload=None,
-                 extra_headers=None, raise_on_error=True):
+# def _tpt_request(method, endpoint_key, payload=None,
+#                  extra_headers=None, raise_on_error=True):
+#     if not _tpt_enabled():
+#         return None, None
+
+#     base_url = _tpt_base_url()
+#     if not base_url:
+#         if raise_on_error:
+#             raise ThreeTPError("TPT_BASE_URL is not configured.")
+#         return None, None
+
+#     token = _tpt_service_login()
+#     url   = f"{base_url}{TPT_ENDPOINTS.get(endpoint_key, endpoint_key)}"
+
+#     headers = {
+#         "Content-Type":  "application/json",
+#         "Accept":        "application/json",
+#         "Authorization": f"Bearer {token}",
+#     }
+#     if extra_headers:
+#         headers.update(extra_headers)
+
+#     try:
+#         response = requests.request(
+#             method.upper(), url,
+#             json=payload, headers=headers, timeout=_tpt_timeout(),
+#         )
+#     except requests.RequestException as exc:
+#         if raise_on_error:
+#             raise ThreeTPError(f"3TP network error ({endpoint_key}): {exc}")
+#         return None, None
+
+#     try:
+#         data = response.json()
+#     except ValueError:
+#         data = None
+
+#     if raise_on_error and response.status_code not in (200, 201, 202, 204):
+#         detail = ""
+#         if isinstance(data, dict):
+#             detail = data.get("message") or data.get("detail") or ""
+#         raise ThreeTPError(
+#             f"3TP {endpoint_key} failed ({response.status_code}) {detail}".strip(),
+#             status=response.status_code,
+#             payload=data,
+#         )
+
+#     return response.status_code, data
+
+
+def _tpt_request(
+    method,
+    endpoint_key,
+    payload=None,
+    params=None,
+    extra_headers=None,
+    raise_on_error=True,
+):
     if not _tpt_enabled():
         return None, None
 
     base_url = _tpt_base_url()
+
     if not base_url:
         if raise_on_error:
-            raise ThreeTPError("TPT_BASE_URL is not configured.")
+            raise ThreeTPError(
+                "TPT_BASE_URL is not configured."
+            )
+
         return None, None
 
     token = _tpt_service_login()
-    url   = f"{base_url}{TPT_ENDPOINTS.get(endpoint_key, endpoint_key)}"
+
+    url = (
+        f"{base_url}"
+        f"{TPT_ENDPOINTS.get(endpoint_key, endpoint_key)}"
+    )
 
     headers = {
-        "Content-Type":  "application/json",
-        "Accept":        "application/json",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
         "Authorization": f"Bearer {token}",
     }
+
     if extra_headers:
         headers.update(extra_headers)
 
     try:
+
         response = requests.request(
-            method.upper(), url,
-            json=payload, headers=headers, timeout=_tpt_timeout(),
+            method.upper(),
+            url,
+            json=payload,
+            params=params,
+            headers=headers,
+            timeout=_tpt_timeout(),
         )
+
     except requests.RequestException as exc:
+
         if raise_on_error:
-            raise ThreeTPError(f"3TP network error ({endpoint_key}): {exc}")
+            raise ThreeTPError(
+                f"3TP network error ({endpoint_key}): {exc}"
+            )
+
         return None, None
 
     try:
@@ -515,18 +1694,34 @@ def _tpt_request(method, endpoint_key, payload=None,
     except ValueError:
         data = None
 
-    if raise_on_error and response.status_code not in (200, 201, 202, 204):
+    if raise_on_error and response.status_code not in (
+        200,
+        201,
+        202,
+        204,
+    ):
+
         detail = ""
+
         if isinstance(data, dict):
-            detail = data.get("message") or data.get("detail") or ""
+            detail = (
+                data.get("message")
+                or data.get("detail")
+                or ""
+            )
+
         raise ThreeTPError(
-            f"3TP {endpoint_key} failed ({response.status_code}) {detail}".strip(),
+            (
+                f"3TP {endpoint_key} failed "
+                f"({response.status_code}) "
+                f"{detail}"
+            ).strip(),
+
             status=response.status_code,
             payload=data,
         )
 
-    return response.status_code, data
-
+    return response, data
 
 def _tpt_extract_id(data):
     """Extract a 3TP record id, handling both flat and nested shapes."""
@@ -1165,20 +2360,184 @@ def scope_ac_records(records, user):
 @api_view(["GET", "POST"])
 def devices(request):
     try:
+        if request.method == "GET":
+            return get_3tp_devices(request)
         return _devices_impl(request)
+    except ThreeTPError as exc:
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": str(exc),
+                "details": getattr(
+                    exc,
+                    "payload",
+                    None
+                ),
+            },
+            status=getattr(
+                exc,
+                "status",
+                None
+            ) or 502,
+        )
     except Exception as exc:
         return JsonResponse(
             {
-                "status":    "error",
-                "message":   f"{type(exc).__name__}: {exc}",
-                "traceback": traceback.format_exc().splitlines(),
+                "status": "error",
+                "message": (
+                    f"{type(exc).__name__}: {exc}"
+                ),
+                "traceback":
+                    traceback.format_exc().splitlines(),
             },
             status=500,
         )
 
+def fetch_3tp_devices(request):
+    devices = []
+    page = 0
+    total_pages = 1
 
+    while page < total_pages:
+
+        response = requests.get(
+            f"{CLOUD_URL}/api/tenant/devices",
+            params={
+                "pageSize": 1000,
+                "page": page,
+                "sortProperty": "createdTime",
+                "sortOrder": "DESC",
+            },
+            headers=_tpt_user_headers(request),
+            timeout=15,
+        )
+
+        if response.status_code != 200:
+            raise ThreeTPError(
+                "Failed to fetch devices from 3TP.",
+                status=response.status_code,
+                payload=response.text,
+            )
+
+        data = response.json()
+
+        devices.extend(
+            data.get("data", [])
+        )
+
+        total_pages = data.get(
+            "totalPages",
+            1
+        )
+
+        page += 1
+
+    return devices
+
+    
+def get_3tp_devices(request):
+    cloud_devices = fetch_3tp_devices(request)
+    result = []
+    for item in cloud_devices:
+        device_id = _id_of(item)
+        if not device_id:
+            continue
+        name = (
+            item.get("name")
+            or item.get("label")
+            or ""
+        )
+        label = item.get("label") or ""
+        device_profile = item.get("deviceProfileId") or {}
+
+        local_device = (
+            ACDevice.objects
+            .select_related(
+                "site",
+                "site__branch",
+                "site__branch__customer",
+                "site__floor",
+            )
+            .filter(tpt_device_id=device_id)
+            .first()
+        )
+
+        row = {
+            "id": device_id,
+            "tpt_device_id": device_id,
+
+            "ac_id": name,
+            "device_name": name,
+            "label": label,
+
+            "device_profile_id": (
+                device_profile.get("id")
+                if isinstance(device_profile, dict)
+                    else ""
+                ),
+
+            "site_id": "",
+            "site_name": "",
+            "site_code": "",
+
+            "branch_id": "",
+            "branch_name": "",
+
+            "customer_id": "",
+            "customer_name": "",
+
+            "floor_id": "",
+            "floor_name": "",
+
+            "status": "UNASSIGNED",
+        }
+
+        if local_device and local_device.site_id:
+            site = local_device.site
+            branch = site.branch
+
+            row["site_id"] = str(site.id)
+            row["site_name"] = site.name
+            row["site_code"] = getattr(site, "code", "") or ""
+
+            if branch:
+                row["branch_id"] = str(branch.id)
+                row["branch_name"] = branch.name
+
+                if branch.customer_id:
+                    customer = branch.customer
+
+                    row["customer_id"] = str(branch.customer_id)
+                    row["customer_name"] = (
+                        customer.company
+                        if customer
+                        else ""
+                    )
+
+            if site.floor_id:
+                row["floor_id"] = str(site.floor_id)
+                row["floor_name"] = (
+                    site.floor.name
+                    if site.floor
+                    else ""
+                )
+
+            row["status"] = "ASSIGNED"
+
+        result.append(row)
+
+    return JsonResponse(
+        {
+            "status": "success",
+            "count": len(result),
+            "data": result,
+        },
+        status=200,
+    )
+    
 def _devices_impl(request):
     device_map = build_device_location_map()
+
     if request.method == "GET":
         user = request.user
         idx = ownership.build_branch_index()
@@ -1674,6 +3033,52 @@ def _devices_impl(request):
         {"status": "success", "message": f"{ac_id} assigned successfully", "data": response_data},
         status=201,
     )
+
+    def fetch_3tp_devices(request):
+        """
+        Fetch devices directly from 3TP.
+
+        IMPORTANT:
+        This does NOT read:
+            data/ac_data.json
+            DeviceLocationMap.json
+            telemetry cache
+
+        3TP is the source of truth for device inventory.
+        """
+
+        devices = []
+        page = 0
+        total_pages = 1
+
+        while page < total_pages:
+            response = requests.get(
+                f"{CLOUD_URL}/api/tenant/devices",
+                params={
+                    "pageSize": 1000,
+                    "page": page,
+                    "sortProperty": "createdTime",
+                    "sortOrder": "DESC",
+                },
+                headers=_tpt_user_headers(request),
+                timeout=15,
+            )
+
+            if response.status_code != 200:
+                raise ThreeTPError(
+                    "Failed to fetch devices from 3TP.",
+                    status=response.status_code,
+                    payload=response.text,
+                )
+
+            data = response.json()
+
+            devices.extend(data.get("data", []))
+
+            total_pages = data.get("totalPages", 1)
+            page += 1
+
+        return devices
 
 
 # =====================================================================
@@ -2989,49 +4394,389 @@ class DistrictListView(generics.ListAPIView):
         return qs
 
 
-class BranchListView(generics.ListAPIView):
+# class BranchListView(generics.ListAPIView):
+#     serializer_class = BranchSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def get_queryset(self):
+#         user = self.request.user
+
+#         qs = Branch.objects.select_related(
+#             "customer",
+
+#             # Geographical
+#             "city",
+#             "city__taluka",
+#             "city__taluka__district",
+#             "city__taluka__district__state",
+
+#             # Zonal
+#             "division",
+#             "division__region",
+#             "division__region__circle",
+#             "division__region__circle__zone",
+#         )
+
+#         # =====================================================
+#         # USER ACCESS
+#         # =====================================================
+
+#         if user.role == Role.ORG_SUPER_ADMIN:
+
+#             qs = qs.filter(
+#                 customer__organization_id=user.organization_id
+#             )
+
+#         elif user.role == Role.CUSTOMER:
+
+#             qs = qs.filter(
+#                 customer_id=user.customer_id
+#             )
+
+#         elif user.role == Role.BR_ADMIN:
+
+#             hierarchy = (
+#                 getattr(user.customer, "hierarchy_type", None)
+#                 if user.customer_id
+#                 else None
+#             )
+
+#             if hierarchy == "GEOGRAPHICAL" and user.state_id:
+
+#                 qs = qs.filter(
+#                     customer_id=user.customer_id,
+#                     city__taluka__district__state_id=user.state_id,
+#                 )
+
+#             elif hierarchy == "ZONAL" and user.zone_id:
+
+#                 qs = qs.filter(
+#                     customer_id=user.customer_id,
+#                     division__region__circle__zone_id=user.zone_id,
+#                 )
+
+#             elif user.branch_id:
+
+#                 qs = qs.filter(
+#                     pk=user.branch_id
+#                 )
+
+#             else:
+
+#                 return Branch.objects.none()
+
+#         elif user.role == Role.ENGINEER:
+
+#             if user.branch_id:
+#                 qs = qs.filter(
+#                     pk=user.branch_id
+#                 )
+#             else:
+#                 return Branch.objects.none()
+
+#         else:
+
+#             return Branch.objects.none()
+
+#         # =====================================================
+#         # HIERARCHY FILTER
+#         # =====================================================
+
+#         hierarchy = (
+#             self.request.query_params
+#             .get("hierarchy", "")
+#             .strip()
+#             .upper()
+#         )
+
+#         if hierarchy == "GEOGRAPHICAL":
+
+#             qs = qs.filter(
+#                 city__isnull=False,
+#                 division__isnull=True,
+#             )
+
+#         elif hierarchy == "ZONAL":
+
+#             qs = qs.filter(
+#                 division__isnull=False,
+#                 city__isnull=True,
+#             )
+
+#         # =====================================================
+#         # SEARCH
+#         # =====================================================
+
+#         search = (
+#             self.request.query_params
+#             .get("search", "")
+#             .strip()
+#         )
+
+#         if search:
+
+#             qs = qs.filter(
+#                 Q(name__icontains=search)
+#                 |
+#                 Q(code__icontains=search)
+#             )
+
+#         return qs.order_by("name")
+
+
+# class BranchListView(generics.ListAPIView):
+#     serializer_class = BranchSerializer
+#     permission_classes = [permissions.IsAuthenticated]
+
+#     def get_queryset(self):
+#         user = self.request.user
+
+#         qs = Branch.objects.select_related(
+#             "customer",
+#             "city",
+#             "city__taluka",
+#             "city__taluka__district",
+#             "city__taluka__district__state",
+#             "division",
+#             "division__region",
+#             "division__region__circle",
+#             "division__region__circle__zone",
+#         )
+
+#         # --------------------------------------------------
+#         # EXISTING ROLE-BASED ACCESS
+#         # --------------------------------------------------
+
+#         if user.role == Role.ORG_SUPER_ADMIN:
+#             qs = qs.filter(
+#                 customer__organization_id=user.organization_id
+#             )
+
+#         elif user.role == Role.CUSTOMER:
+#             qs = qs.filter(
+#                 customer_id=user.customer_id
+#             )
+
+#         elif user.role == Role.BR_ADMIN:
+
+#             hierarchy = (
+#                 getattr(user.customer, "hierarchy_type", None)
+#                 if user.customer_id
+#                 else None
+#             )
+
+#             if hierarchy == "GEOGRAPHICAL" and user.state_id:
+#                 qs = qs.filter(
+#                     customer_id=user.customer_id,
+#                     city__taluka__district__state_id=user.state_id,
+#                 )
+
+#             elif hierarchy == "ZONAL" and user.zone_id:
+#                 qs = qs.filter(
+#                     customer_id=user.customer_id,
+#                     division__region__circle__zone_id=user.zone_id,
+#                 )
+
+#             elif user.branch_id:
+#                 qs = qs.filter(
+#                     pk=user.branch_id
+#                 )
+
+#             else:
+#                 return Branch.objects.none()
+
+#         elif user.role == Role.ENGINEER:
+
+#             if user.branch_id:
+#                 qs = qs.filter(
+#                     pk=user.branch_id
+#                 )
+#             else:
+#                 return Branch.objects.none()
+
+#         else:
+#             return Branch.objects.none()
+
+#         # --------------------------------------------------
+#         # OPTIONAL CUSTOMER FILTER
+#         # --------------------------------------------------
+
+#         customer_id = self.request.query_params.get("customer")
+
+#         if customer_id:
+#             qs = qs.filter(
+#                 customer_id=customer_id
+#             )
+
+#         # --------------------------------------------------
+#         # SEARCH BRANCH
+#         # --------------------------------------------------
+
+#         search = (
+#             self.request.query_params
+#             .get("search", "")
+#             .strip()
+#         )
+
+#         if search:
+#             qs = qs.filter(
+#                 Q(name__icontains=search) |
+#                 Q(code__icontains=search)
+#             )
+
+#         return qs.order_by("name")
+
+
+class BranchListView(generics.ListCreateAPIView):
     serializer_class = BranchSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
+
         qs = Branch.objects.select_related(
             "customer",
-            "city", "city__taluka", "city__taluka__district",
+
+            # Geographical
+            "city",
+            "city__taluka",
+            "city__taluka__district",
             "city__taluka__district__state",
-            "division", "division__region",
-            "division__region__circle", "division__region__circle__zone",
+
+            # Zonal
+            "division",
+            "division__region",
+            "division__region__circle",
+            "division__region__circle__zone",
         )
 
         if user.role == Role.ORG_SUPER_ADMIN:
-            qs = qs.filter(customer__organization_id=user.organization_id)
+            qs = qs.filter(
+                customer__organization_id=user.organization_id
+            )
+
         elif user.role == Role.CUSTOMER:
-            qs = qs.filter(customer_id=user.customer_id)
+            qs = qs.filter(
+                customer_id=user.customer_id
+            )
+
         elif user.role == Role.BR_ADMIN:
-            hierarchy = getattr(user.customer, "hierarchy_type", None) if user.customer_id else None
+            hierarchy = (
+                getattr(user.customer, "hierarchy_type", None)
+                if user.customer_id
+                else None
+            )
+
             if hierarchy == "GEOGRAPHICAL" and user.state_id:
                 qs = qs.filter(
                     customer_id=user.customer_id,
                     city__taluka__district__state_id=user.state_id,
                 )
+
             elif hierarchy == "ZONAL" and user.zone_id:
                 qs = qs.filter(
                     customer_id=user.customer_id,
                     division__region__circle__zone_id=user.zone_id,
                 )
+
             elif user.branch_id:
-                qs = qs.filter(pk=user.branch_id)
+                qs = qs.filter(
+                    pk=user.branch_id
+                )
+
             else:
                 return Branch.objects.none()
+
         elif user.role == Role.ENGINEER:
-            qs = qs.filter(pk=user.branch_id)
+
+            if user.branch_id:
+                qs = qs.filter(
+                    pk=user.branch_id
+                )
+            else:
+                return Branch.objects.none()
+
         else:
             return Branch.objects.none()
 
         customer_id = self.request.query_params.get("customer")
+
         if customer_id:
-            qs = qs.filter(customer_id=customer_id)
+            qs = qs.filter(
+                customer_id=customer_id
+            )
+
         return qs.order_by("name")
 
+    def perform_create(self, serializer):
+        user = self.request.user
+
+        # --------------------------------------------------
+        # CUSTOMER
+        # --------------------------------------------------
+
+        if user.role == Role.CUSTOMER:
+
+            if not user.customer_id:
+                raise serializers.ValidationError({
+                    "customer": "Logged-in user is not linked to a customer."
+                })
+
+            serializer.save(
+                customer_id=user.customer_id
+            )
+
+            return
+
+        # --------------------------------------------------
+        # ORGANIZATION SUPER ADMIN
+        # --------------------------------------------------
+
+        if user.role == Role.ORG_SUPER_ADMIN:
+
+            customer_id = self.request.data.get("customer")
+
+            if not customer_id:
+                raise serializers.ValidationError({
+                    "customer": "Customer is required."
+                })
+
+            try:
+                customer = Customer.objects.get(
+                    pk=customer_id,
+                    organization_id=user.organization_id,
+                )
+            except Customer.DoesNotExist:
+                raise serializers.ValidationError({
+                    "customer": "Invalid customer."
+                })
+
+            serializer.save(
+                customer=customer
+            )
+
+            return
+
+        # --------------------------------------------------
+        # BRANCH ADMIN
+        # --------------------------------------------------
+
+        if user.role == Role.BR_ADMIN:
+
+            if not user.customer_id:
+                raise serializers.ValidationError({
+                    "customer": "Branch Admin is not linked to a customer."
+                })
+
+            serializer.save(
+                customer_id=user.customer_id
+            )
+
+            return
+
+        raise permissions.PermissionDenied(
+            "You do not have permission to create a branch."
+        )
 
 class SiteListView(generics.ListCreateAPIView):
     serializer_class = SiteSerializer
@@ -3131,7 +4876,590 @@ class SiteListView(generics.ListCreateAPIView):
             raise ThreeTPAPIError(
                 f"Site created locally but 3TP site creation failed: {_one_line(exc)}"
             )
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def search_site_branches(request):
+    """
+    Search branches for Site creation.
+
+    Query:
+        ?hierarchy=GEOGRAPHICAL&q=pune
+        ?hierarchy=ZONAL&q=mumbai
+    """
+
+    hierarchy = (
+        request.query_params.get("hierarchy", "")
+        .strip()
+        .upper()
+    )
+
+    query = request.query_params.get("q", "").strip()
+
+    if hierarchy not in ["GEOGRAPHICAL", "ZONAL"]:
+        return Response(
+            {
+                "status": "error",
+                "message": "hierarchy must be GEOGRAPHICAL or ZONAL."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    branches = Branch.objects.all()
+
+    # ---------------------------------------------------------
+    # USER SCOPE
+    # ---------------------------------------------------------
+
+    user = request.user
+
+    if user.role == Role.CUSTOMER:
+        branches = branches.filter(
+            customer_id=user.customer_id
+        )
+
+    elif user.role == Role.BR_ADMIN:
+        branches = branches.filter(
+            id=user.branch_id
+        )
+
+    elif user.role == Role.ENGINEER:
+        return Response({
+            "status": "success",
+            "count": 0,
+            "data": []
+        })
+
+    elif user.role == Role.ORG_SUPER_ADMIN:
+        # Only apply this when organization exists.
+        if getattr(user, "organization_id", None):
+            branches = branches.filter(
+                customer__organization_id=user.organization_id
+            )
+
+    # ---------------------------------------------------------
+    # HIERARCHY FILTER
+    # ---------------------------------------------------------
+
+    if hierarchy == "GEOGRAPHICAL":
+        branches = branches.filter(
+            city__isnull=False
+        ).select_related(
+            "customer",
+            "city",
+            "city__taluka",
+            "city__taluka__district",
+            "city__taluka__district__state",
+        )
+
+    else:
+        branches = branches.filter(
+            division__isnull=False
+        ).select_related(
+            "customer",
+            "division",
+            "division__region",
+            "division__region__circle",
+            "division__region__circle__zone",
+        )
+
+    # ---------------------------------------------------------
+    # SEARCH
+    # ---------------------------------------------------------
+
+    if query:
+        branches = branches.filter(
+            Q(name__icontains=query) |
+            Q(code__icontains=query)
+        )
+
+    branches = branches.order_by("name")[:50]
+
+    # ---------------------------------------------------------
+    # RESPONSE
+    # ---------------------------------------------------------
+
+    result = []
+
+    for branch in branches:
+
+        row = {
+            "id": str(branch.id),
+            "name": branch.name,
+            "code": branch.code or "",
+            "hierarchy_type": hierarchy,
+            "latitude": (
+                str(branch.latitude)
+                if branch.latitude is not None
+                else ""
+            ),
+            "longitude": (
+                str(branch.longitude)
+                if branch.longitude is not None
+                else ""
+            ),
+
+            "state_id": "",
+            "state_name": "",
+            "district_id": "",
+            "district_name": "",
+            "taluka_id": "",
+            "taluka_name": "",
+            "city_id": "",
+            "city_name": "",
+
+            "zone_id": "",
+            "zone_name": "",
+            "circle_id": "",
+            "circle_name": "",
+            "region_id": "",
+            "region_name": "",
+            "division_id": "",
+            "division_name": "",
+        }
+
+        # -----------------------------------------------------
+        # GEOGRAPHICAL
+        # -----------------------------------------------------
+
+        if hierarchy == "GEOGRAPHICAL":
+
+            city = branch.city
+
+            if city:
+                row["city_id"] = str(city.id)
+                row["city_name"] = city.name
+
+                taluka = getattr(city, "taluka", None)
+
+                if taluka:
+                    row["taluka_id"] = str(taluka.id)
+                    row["taluka_name"] = taluka.name
+
+                    district = getattr(taluka, "district", None)
+
+                    if district:
+                        row["district_id"] = str(district.id)
+                        row["district_name"] = district.name
+
+                        state_obj = getattr(district, "state", None)
+
+                        if state_obj:
+                            row["state_id"] = str(state_obj.id)
+                            row["state_name"] = state_obj.name
+
+        # -----------------------------------------------------
+        # ZONAL
+        # -----------------------------------------------------
+
+        else:
+
+            division = branch.division
+
+            if division:
+                row["division_id"] = str(division.id)
+                row["division_name"] = division.name
+
+                region = getattr(division, "region", None)
+
+                if region:
+                    row["region_id"] = str(region.id)
+                    row["region_name"] = region.name
+
+                    circle = getattr(region, "circle", None)
+
+                    if circle:
+                        row["circle_id"] = str(circle.id)
+                        row["circle_name"] = circle.name
+
+                        zone = getattr(circle, "zone", None)
+
+                        if zone:
+                            row["zone_id"] = str(zone.id)
+                            row["zone_name"] = zone.name
+
+        result.append(row)
+
+    return Response({
+        "status": "success",
+        "count": len(result),
+        "data": result,
+    })
+
+import requests
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def pincode_lookup(request, pincode):
+
+    pincode = str(pincode).strip()
+
+    # Validate pincode
+    if not pincode.isdigit() or len(pincode) != 6:
+        return Response(
+            {
+                "status": "error",
+                "message": "Enter a valid 6-digit pincode."
+            },
+            status=400
+        )
+
+    try:
+        url = f"https://api.postalpincode.in/pincode/{pincode}"
+
+        response = requests.get(
+            url,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        if not result:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "No pincode information found."
+                },
+                status=404
+            )
+
+        api_result = result[0]
+
+        if api_result.get("Status") != "Success":
+            return Response(
+                {
+                    "status": "error",
+                    "message": api_result.get(
+                        "Message",
+                        "Pincode not found."
+                    )
+                },
+                status=404
+            )
+
+        post_offices = api_result.get("PostOffice") or []
+
+        if not post_offices:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "No post office found for this pincode."
+                },
+                status=404
+            )
+
+        # Convert API response into frontend-friendly format
+        locations = []
+
+        for office in post_offices:
+            locations.append({
+                "name": office.get("Name"),
+                "branch_type": office.get("BranchType"),
+                "delivery_status": office.get("DeliveryStatus"),
+                "circle": office.get("Circle"),
+                "district": office.get("District"),
+                "division": office.get("Division"),
+                "region": office.get("Region"),
+                "block": office.get("Block"),
+                "state": office.get("State"),
+                "country": office.get("Country"),
+                "pincode": office.get("Pincode"),
+            })
+
+        return Response({
+            "status": "success",
+            "pincode": pincode,
+            "count": len(locations),
+            "data": locations
+        })
+
+    except requests.RequestException as e:
+
+        return Response(
+            {
+                "status": "error",
+                "message": "Unable to fetch pincode information.",
+                "details": str(e)
+            },
+            status=502
+        )
+
+    except Exception as e:
+
+        return Response(
+            {
+                "status": "error",
+                "message": "Unexpected error.",
+                "details": str(e)
+            },
+            status=500
+        )
     
+@api_view(["POST"])
+@permission_classes([permissions.IsAuthenticated])
+def create_site(request):
+    try:
+        user = request.user
+
+        name = request.data.get("name")
+        code = request.data.get("code")
+        branch_id = request.data.get("branch_id")
+        floor_id = request.data.get("floor_id")
+
+        address = request.data.get("address", "")
+        pincode = request.data.get("pincode", "")
+
+        city_name = request.data.get("city", "")
+        district_name = request.data.get("district", "")
+        state_name = request.data.get("state", "")
+
+        latitude = request.data.get("latitude")
+        longitude = request.data.get("longitude")
+
+        hierarchy_type = request.data.get("hierarchy_type", "")
+
+        if not name:
+            return Response(
+                {"status": "error", "message": "Site name is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not code:
+            return Response(
+                {"status": "error", "message": "Site code is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not branch_id:
+            return Response(
+                {"status": "error", "message": "branch_id is required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            branch = Branch.objects.select_related("customer").get(
+                id=branch_id
+            )
+        except Branch.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Branch not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        hierarchy_type = hierarchy_type.strip().upper()
+
+        if hierarchy_type not in ["GEOGRAPHICAL", "ZONAL"]:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Invalid hierarchy_type."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        
+        if hierarchy_type == "GEOGRAPHICAL":
+            if not getattr(branch, "city_id", None):
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Selected branch is not geographical."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        elif hierarchy_type == "ZONAL":
+            if not getattr(branch, "division_id", None):
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Selected branch is not zonal."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # -------------------------
+        # Check user access
+        # -------------------------
+        if user.role == Role.CUSTOMER:
+            if branch.customer_id != user.customer_id:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "You can only create a site under your customer."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        elif user.role == Role.BR_ADMIN:
+            if branch.id != user.branch_id:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "You can only create a site under your branch."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        elif user.role == Role.ENGINEER:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Engineers cannot create sites."
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        elif user.role == Role.ORG_SUPER_ADMIN:
+            if branch.customer.organization_id != user.organization_id:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "This branch is outside your organization."
+                    },
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+
+        # -------------------------
+        # Optional Floor
+        # -------------------------
+        floor = None
+
+        if floor_id:
+            try:
+                floor = Floor.objects.get(
+                    id=floor_id,
+                    branch_id=branch.id
+                )
+            except Floor.DoesNotExist:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Floor does not belong to this branch."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+        # -------------------------
+        # Check duplicate site
+        # -------------------------
+        if Site.objects.filter(code=code).exists():
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Site code already exists."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if Site.objects.filter(
+            branch=branch,
+            name=name
+        ).exists():
+            return Response(
+                {
+                    "status": "error",
+                    "message": "A site with this name already exists in this branch."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # =====================================================
+        # CREATE SITE IN 3TP
+        # =====================================================
+
+        payload = {
+            "name": name,
+            "type": "default",
+        }
+
+        try:
+            _, data = _tpt_request(
+                "POST",
+                "site",
+                payload=payload
+            )
+
+            tpt_site_id = _tpt_extract_id(data)
+
+            if not tpt_site_id:
+                raise ThreeTPError(
+                    "3TP created the site but did not return a site ID."
+                )
+
+        except ThreeTPError as exc:
+            return Response(
+                {
+                    "status": "error",
+                    "message": f"3TP site creation failed: {_one_line(exc)}"
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+
+        # =====================================================
+        # CREATE LOCAL SITE
+        # =====================================================
+
+        try:
+            site = Site.objects.create(
+                name=name,
+                code=code,
+                branch=branch,
+                floor=floor,
+                address=address,
+                latitude=latitude or None,
+                longitude=longitude or None,
+                pincode=pincode,
+
+                # keep your existing 3TP fields
+                tpt_site_id=tpt_site_id,
+                tpt_sync_status="SYNCED",
+                tpt_sync_error="",
+            )
+
+        except Exception as exc:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "3TP site was created but local site creation failed.",
+                    "details": str(exc),
+                    "tpt_site_id": tpt_site_id,
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Site created successfully.",
+                "data": {
+                    "site_id": str(site.id),
+                    "tpt_site_id": site.tpt_site_id,
+                    "name": site.name,
+                    "code": site.code,
+                    "branch_id": str(site.branch_id),
+                    "floor_id": str(site.floor_id) if site.floor_id else None,
+                },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+    except Exception as exc:
+        traceback.print_exc()
+
+        return Response(
+            {
+                "status": "error",
+                "message": str(exc),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
 def site_assignment(request, pk):
@@ -3614,72 +5942,229 @@ def dashboard_preference_detail(request, pk):
         status=status.HTTP_200_OK,
     )
 
-
 class DeviceCreateView(generics.CreateAPIView):
     serializer_class = ACDeviceSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
+
         user = self.request.user
 
-        site = serializer.validated_data.get("site")
-
-        if site is None:
-            raise DRFValidationError({
-                "site": "Site is required to create and sync the device."
-            })
-
+        # Engineers cannot create devices
         if user.role == Role.ENGINEER:
             raise DRFValidationError(
                 "Engineers cannot create devices."
             )
 
-        if user.role == Role.CUSTOMER:
-            if site.branch.customer_id != user.customer_id:
-                raise DRFValidationError({
-                    "site": "This site does not belong to your customer."
-                })
-
-        elif user.role == Role.BR_ADMIN:
-            if site.branch_id != user.branch_id:
-                raise DRFValidationError({
-                    "site": "This site does not belong to your branch."
-                })
-
-        elif user.role == Role.ORG_SUPER_ADMIN:
-            if site.branch.customer.organization_id != user.organization_id:
-                raise DRFValidationError({
-                    "site": "This site is outside your organization."
-                })
+        # -----------------------------------------
+        # CREATE LOCAL DEVICE FIRST
+        # -----------------------------------------
 
         serializer.save(
-            assigned_by=user
+            assigned_by=user,
+            site=None,
+            tpt_sync_status="PENDING",
+            tpt_sync_error=""
         )
 
         device = serializer.instance
 
-        customer = site.branch.customer
+        # -----------------------------------------
+        # CREATE DEVICE IN 3TP
+        # -----------------------------------------
 
         try:
-            if not getattr(customer, "tpt_customer_id", ""):
-                sync_customer(customer)
 
-            if not getattr(site, "tpt_site_id", ""):
-                sync_site(site)
+            tpt_device_id, created_new = create_3tp_device_independent(
+                request=self.request,
+                name=device.device_name or device.ac_id,
+                label=device.device_name or device.ac_id,
+                client_id=device.ac_id,
+                username=device.ac_id,
+                password=""
+            )
 
-            sync_device(device)
+            # -----------------------------------------
+            # UPDATE LOCAL DEVICE
+            # -----------------------------------------
+
+            device.tpt_device_id = tpt_device_id
+            device.tpt_sync_status = "SYNCED"
+            device.tpt_sync_error = ""
+
+            device.save(
+                update_fields=[
+                    "tpt_device_id",
+                    "tpt_sync_status",
+                    "tpt_sync_error",
+                    "updated_at",
+                ]
+            )
 
         except ThreeTPError as exc:
 
-            ACDevice.objects.filter(pk=device.pk).update(
-                tpt_sync_status="FAILED",
-                tpt_sync_error=str(exc),
+            device.tpt_sync_status = "FAILED"
+            device.tpt_sync_error = str(exc)
+
+            device.save(
+                update_fields=[
+                    "tpt_sync_status",
+                    "tpt_sync_error",
+                    "updated_at",
+                ]
             )
 
             raise ThreeTPAPIError(
-                f"Device created locally but 3TP synchronization failed: "
-                f"{_one_line(exc)}"
+                "Device created locally but 3TP "
+                f"synchronization failed: {_one_line(exc)}"
             )
+
+def create_3tp_device_independent(
+    request,
+    *,
+    name,
+    label,
+    client_id,
+    username,
+    password
+):
+    """
+    Create a device in 3TP only.
+
+    No customer assignment.
+    No site assignment.
+
+    Returns:
+        (tpt_device_id, created_new)
+    """
+
+    headers = _tpt_user_headers(request)
+
+    created_new = True
+
+    # -----------------------------------------
+    # CREATE DEVICE + MQTT CREDENTIALS
+    # -----------------------------------------
+
+    payload = {
+        "device": {
+            "name": name,
+            "label": label or name,
+
+            "deviceProfileId": {
+                "id": get_3tp_device_profile_id(request),
+                "entityType": "DEVICE_PROFILE"
+            },
+        },
+
+        "credentials": {
+            "credentialsType": "MQTT_BASIC",
+
+            "credentialsValue": json.dumps({
+                "clientId": client_id,
+                "userName": username,
+                "password": password
+            }),
+        },
+    }
+
+    response = requests.post(
+        f"{CLOUD_URL}/api/device-with-credentials",
+
+        headers=headers,
+
+        timeout=15,
+
+        json=payload
+    )
+
+    # -----------------------------------------
+    # HANDLE RESPONSE
+    # -----------------------------------------
+
+    if response.status_code == 400:
+
+        if "already exists" in response.text.lower():
+
+            existing = find_3tp_device_by_name(
+                request,
+                name
+            )
+
+            existing_id = (
+                _id_of(existing)
+                if existing
+                else ""
+            )
+
+            if not existing_id:
+                raise ThreeTPError(
+                    f"A device named '{name}' "
+                    "already exists in 3TP."
+                )
+
+            # Make sure this device isn't already
+            # connected to another local device.
+
+            if ACDevice.objects.filter(
+                tpt_device_id=existing_id
+            ).exists():
+
+                raise ThreeTPError(
+                    f"Device '{name}' already exists "
+                    "locally."
+                )
+
+            tpt_device_id = existing_id
+            created_new = False
+
+        else:
+
+            raise ThreeTPError(
+                f"3TP device creation failed: "
+                f"{response.text}",
+                status=response.status_code
+            )
+
+    elif response.status_code not in (200, 201):
+
+        raise ThreeTPError(
+            f"3TP device creation failed: "
+            f"{response.text}",
+            status=response.status_code
+        )
+
+    else:
+
+        try:
+            data = response.json()
+
+        except ValueError:
+            raise ThreeTPError(
+                "3TP returned an invalid response."
+            )
+
+        tpt_device_id = _id_of(data)
+
+    # -----------------------------------------
+    # VALIDATE 3TP DEVICE ID
+    # -----------------------------------------
+
+    if not tpt_device_id:
+
+        raise ThreeTPError(
+            "3TP did not return a device id."
+        )
+
+    # -----------------------------------------
+    # IMPORTANT:
+    # NO CUSTOMER MAPPING HERE
+    # NO SITE MAPPING HERE
+    # -----------------------------------------
+
+    return tpt_device_id, created_new
+        
+
 
 @csrf_exempt
 @api_view(["POST"])

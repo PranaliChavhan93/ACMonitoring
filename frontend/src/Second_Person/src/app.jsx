@@ -5,7 +5,7 @@
 // import ACTable from "./compenents/ACTable";
 // import ACCharts from "./compenents/ACCharts";
 
-// const API_URL = "http://192.168.1.12:8000/api/ac-data/";
+// const API_URL = "http://192.168.1.14:8000/api/ac-data/";
 
 // function App() {
 //     const [acData, setAcData] = useState([]);

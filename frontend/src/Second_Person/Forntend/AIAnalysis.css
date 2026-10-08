@@ -166,3 +166,67 @@
 .ai-analysis-content a {
     color: #60a5fa;
 }
+
+/* ============================================================
+   AI DASHBOARD INSIGHTS
+   ============================================================ */
+
+.ai-analysis-content {
+    background: #0f172a;
+    color: #e6edf7;
+    border-radius: 12px;
+    padding: 24px 28px;
+    overflow-x: auto;
+    font-size: 0.92rem;
+    line-height: 1.6;
+}
+
+/* Each AI insight */
+.ai-analysis-content p {
+    margin: 0;
+    padding: 14px 0;
+    border-bottom: 1px solid #1e293b;
+}
+
+/* Remove border from last insight */
+.ai-analysis-content p:last-child {
+    border-bottom: none;
+}
+
+/* Section labels */
+.ai-analysis-content strong {
+    color: #ffffff;
+    font-weight: 600;
+}
+
+/* Markdown headings if AI generates any */
+.ai-analysis-content h1,
+.ai-analysis-content h2,
+.ai-analysis-content h3,
+.ai-analysis-content h4 {
+    color: #ffffff;
+    margin: 0 0 16px;
+}
+
+/* Lists */
+.ai-analysis-content ul,
+.ai-analysis-content ol {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.ai-analysis-content li {
+    margin: 6px 0;
+}
+
+/* Links */
+.ai-analysis-content a {
+    color: #60a5fa;
+}
+
+/* Code */
+.ai-analysis-content code {
+    background: #1e293b;
+    padding: 2px 6px;
+    border-radius: 4px;
+}

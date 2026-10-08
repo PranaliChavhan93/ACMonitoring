@@ -65,8 +65,11 @@ from .views import (
 
     assign_device_to_customer,
     assign_device_to_site,
+    create_branch_or_floor,
     create_device,
     create_site,
+    pincode_lookup,
+    search_site_branches,
 
     site_assignment,
     ac_data,
@@ -74,6 +77,7 @@ from .views import (
     branch_ownership,
     dashboard_preference_detail,
     dashboard_preferences,
+    three_tp_sites,
     unassigned_devices,
     dashboard_summary_view,
     device,
@@ -124,15 +128,11 @@ urlpatterns = [
 
     path( "zones/", ZoneListView.as_view()),
     path( "circles/", CircleListView.as_view()),
-    path( "sites/", SiteListView.as_view()),
+
     path( "sites/<uuid:pk>/assignment/", site_assignment),
 
-    path("sites/create/", create_site),
-    path("devices/create/", create_device),
-
-    path("devices/assign/customer/", assign_device_to_customer),
-    path("devices/assign/site/", assign_device_to_site),
-
+    # path("sites/create/", create_site),
+    
     path( "states/", StateListView.as_view()),
     path( "districts/", DistrictListView.as_view()),
     path( "talukas/", TalukaListView.as_view()),
@@ -144,6 +144,19 @@ urlpatterns = [
     path( "branches/assignments/", branch_assignments),
     path( "branches/ownership/", branch_ownership),
 
+    path( "sites/", SiteListView.as_view()),
+    path( "sites/create/", create_site),
+    path( "branches/search/", search_site_branches, name="branch-search" ),
+    path( "pincode/<str:pincode>/", pincode_lookup, name="pincode-lookup" ),
+
+    path( "devices/", devices),
+    path( "devices/create/", DeviceCreateView.as_view()),
+    path( "devices/unassigned/", unassigned_devices),
+    path( "devices/assign/customer/", assign_device_to_customer ),
+    path( "devices/assign/site/", assign_device_to_site ),
+
+    path( "locations/create/", create_branch_or_floor ),
+    path( "cloud/sites/", three_tp_sites ),
     # path( "dashboard/"),
     # path( "locations/"),
     # path( "admins/"),
@@ -153,5 +166,6 @@ urlpatterns = [
     
     path( "cloud/customers/", CloudCustomerListView.as_view()),
     path( "cloud/users/", CloudUserListView.as_view()),
+
 
 ]

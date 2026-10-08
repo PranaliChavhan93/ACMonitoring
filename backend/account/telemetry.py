@@ -18,7 +18,7 @@ DEVICES_FILE = os.path.join(DATA_DIR, "3tp_devices.json")
 CONFIG_FILE = os.path.join(DATA_DIR, "3tp_config.json")
 
 CACHE_SEC = float(os.environ.get("TPT_CACHE_SEC", "2"))
-LOOKBACK_SEC = int(os.environ.get("TPT_LOOKBACK_SEC", "86400"))   # 24 h
+LOOKBACK_SEC = int(os.environ.get("TPT_LOOKBACK_SEC", "86400"))
 STALE_SEC = int(os.environ.get("TPT_STALE_SEC", "120"))
 TIMEOUT = float(os.environ.get("TPT_TIMEOUT", "8"))
 
@@ -65,7 +65,7 @@ def _background_loop():
                 _refresh()
 
         except Exception as e:
-            log.exception("Background 3TP refresh failed")
+            log.exception("Background Refresh Failed")
             _state["last_error"] = str(e)
 
         time.sleep(CACHE_SEC)
@@ -117,7 +117,7 @@ def _get_history(cfg, device_id, start_ms, end_ms):
     try:
         return _request(url, headers={"X-Authorization": f"Bearer {_token['value']}"})
     except urllib.error.HTTPError as e:
-        if e.code == 401:                        # token expired -> log in again once
+        if e.code == 401:
             _login(cfg)
             return _request(url, headers={"X-Authorization": f"Bearer {_token['value']}"})
         raise
@@ -184,13 +184,46 @@ def to_record(device, ts_ms, p):
 
 
 # ───────────────────────── fetching ─────────────────────────
-def _fetch_device(cfg, dev, start_ms, end_ms):
-    resp = _get_history(cfg, dev["device_id"], start_ms, end_ms)
-    ts, payload = _latest_reading(resp)
-    if payload is None:
-        return None
-    return to_record(dev, ts, payload)
+# def _fetch_device(cfg, dev, start_ms, end_ms):
+#     resp = _get_history(cfg, dev["device_id"], start_ms, end_ms)
+#     ts, payload = _latest_reading(resp)
+#     if payload is None:
+#         return None
+#     return to_record(dev, ts, payload)
 
+
+def _fetch_device(cfg, dev, start_ms, end_ms):
+    print("\n========== 3TP DEVICE DEBUG ==========")
+    print("AC ID:", dev.get("ac_id"))
+    print("DEVICE ID:", dev.get("device_id"))
+
+    resp = _get_history(
+        cfg,
+        dev["device_id"],
+        start_ms,
+        end_ms
+    )
+
+    print("3TP RESPONSE TYPE:", type(resp))
+    print("3TP RESPONSE KEYS:",
+          resp.keys() if isinstance(resp, dict) else None)
+
+    ts, payload = _latest_reading(resp)
+
+    print("LATEST TS:", ts)
+    print("LATEST PAYLOAD:", payload)
+
+    if payload is None:
+        print("❌ PAYLOAD IS NONE")
+        return None
+
+    record = to_record(dev, ts, payload)
+
+    print("✅ FINAL RECORD:")
+    print(record)
+    print("======================================\n")
+
+    return record
 
 def _refresh():
     """Call 3TP for every device and update the cache. Caller holds _lock."""
