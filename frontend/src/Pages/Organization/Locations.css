@@ -1062,3 +1062,375 @@
     }
 
 }
+
+
+.hierarchy-site-modal {
+    width: min(900px, 95vw);
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.hierarchy-site-modal .site-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 20px 0;
+}
+
+.hierarchy-site-modal .form-group {
+    min-width: 0;
+}
+
+.hierarchy-site-modal .form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+.hierarchy-site-modal input,
+.hierarchy-site-modal select,
+.hierarchy-site-modal textarea {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.hierarchy-site-modal input[readonly] {
+    background: #f3f4f6;
+    cursor: default;
+}
+
+.hierarchy-site-modal .site-modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    padding-top: 14px;
+}
+
+.location-success {
+    margin: 12px 0;
+    padding: 12px;
+    border-radius: 6px;
+    color: #166534;
+    background: #f0fdf4;
+}
+
+@media (max-width: 650px) {
+    .hierarchy-site-modal .site-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .hierarchy-site-modal .form-group.full-width {
+        grid-column: auto;
+    }
+}
+
+
+/* =========================================
+   CREATE SITE FORM - ENHANCED DESIGN
+========================================= */
+
+.site-modal-overlay {
+    padding: 24px;
+    background: rgba(15, 23, 42, 0.58);
+    backdrop-filter: blur(4px);
+}
+
+.hierarchy-site-modal {
+    width: min(940px, 96vw);
+    max-width: 940px;
+    max-height: 92vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+}
+
+/* Modal heading */
+
+.hierarchy-site-modal .site-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 22px 26px;
+    background: #ffffff;
+    border-bottom: 1px solid #e8edf4;
+}
+
+.hierarchy-site-modal .site-modal-header h2 {
+    font-size: 22px;
+    font-weight: 750;
+    letter-spacing: -0.4px;
+    color: #172033;
+}
+
+.hierarchy-site-modal .site-modal-header p {
+    margin-top: 7px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #64748b;
+}
+
+.hierarchy-site-modal .modal-close-btn {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border: 1px solid #e2e8f0;
+    border-radius: 9px;
+    background: #f8fafc;
+    color: #475569;
+    transition: background 0.2s, color 0.2s;
+}
+
+.hierarchy-site-modal .modal-close-btn:hover {
+    background: #e2e8f0;
+    color: #0f172a;
+}
+
+/* Form layout */
+
+.hierarchy-site-modal .site-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding: 24px 26px;
+}
+
+.hierarchy-site-modal .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.hierarchy-site-modal .form-group.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Labels */
+
+.hierarchy-site-modal .form-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: 0.1px;
+}
+
+/* Inputs, dropdowns and textareas */
+
+.hierarchy-site-modal .form-group input,
+.hierarchy-site-modal .form-group select,
+.hierarchy-site-modal .form-group textarea {
+    width: 100%;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 11px 13px;
+    border: 1px solid #dbe2ea;
+    border-radius: 9px;
+    background-color: #ffffff;
+    color: #1e293b;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    outline: none;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        background-color 0.2s ease;
+}
+
+.hierarchy-site-modal .form-group select {
+    cursor: pointer;
+}
+
+.hierarchy-site-modal .form-group textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+
+.hierarchy-site-modal .form-group input::placeholder,
+.hierarchy-site-modal .form-group textarea::placeholder {
+    color: #94a3b8;
+}
+
+.hierarchy-site-modal .form-group input:hover,
+.hierarchy-site-modal .form-group select:hover,
+.hierarchy-site-modal .form-group textarea:hover {
+    border-color: #b8c4d4;
+}
+
+.hierarchy-site-modal .form-group input:focus,
+.hierarchy-site-modal .form-group select:focus,
+.hierarchy-site-modal .form-group textarea:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.11);
+}
+
+.hierarchy-site-modal .form-group input[readonly] {
+    background: #f1f5f9;
+    color: #475569;
+    cursor: default;
+    border-color: #e2e8f0;
+}
+
+/* Disabled dependent dropdowns */
+
+.hierarchy-site-modal .form-group select:disabled,
+.hierarchy-site-modal .form-group input:disabled {
+    background: #f1f5f9;
+    color: #94a3b8;
+    border-color: #e2e8f0;
+    cursor: not-allowed;
+}
+
+/* Floors section */
+
+.hierarchy-site-modal .floor-choice {
+    padding: 16px;
+    border: 1px solid #e2e8f0;
+    border-radius: 11px;
+    background: #f8fafc;
+}
+
+.hierarchy-site-modal .floor-choice label {
+    font-size: 13px;
+    color: #1e293b;
+}
+
+.hierarchy-site-modal .floor-choice select {
+    background-color: #ffffff;
+}
+
+/* Error and success messages */
+
+.hierarchy-site-modal .location-error {
+    margin: 0 26px 16px;
+    padding: 13px 15px;
+    border: 1px solid #fecaca;
+    border-radius: 9px;
+    background: #fef2f2;
+    color: #b91c1c;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.hierarchy-site-modal .location-success {
+    margin: 0 26px 16px;
+    padding: 13px 15px;
+    border: 1px solid #bbf7d0;
+    border-radius: 9px;
+    background: #f0fdf4;
+    color: #166534;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* Sticky footer */
+
+.hierarchy-site-modal .site-modal-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 26px;
+    background: #ffffff;
+    border-top: 1px solid #e8edf4;
+    box-shadow: 0 -5px 15px rgba(15, 23, 42, 0.035);
+}
+
+.hierarchy-site-modal .cancel-btn,
+.hierarchy-site-modal .save-site-btn {
+    min-width: 115px;
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 9px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        transform 0.2s ease;
+}
+
+.hierarchy-site-modal .cancel-btn {
+    border: 1px solid #dbe2ea;
+    background: #ffffff;
+    color: #475569;
+}
+
+.hierarchy-site-modal .cancel-btn:hover:not(:disabled) {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+
+.hierarchy-site-modal .save-site-btn {
+    border: 1px solid #1d4ed8;
+    background: #2563eb;
+    color: #ffffff;
+}
+
+.hierarchy-site-modal .save-site-btn:hover:not(:disabled) {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+}
+
+.hierarchy-site-modal .cancel-btn:disabled,
+.hierarchy-site-modal .save-site-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Responsive design */
+
+@media (max-width: 650px) {
+    .site-modal-overlay {
+        padding: 10px;
+        align-items: center;
+    }
+
+    .hierarchy-site-modal {
+        width: 100%;
+        max-width: 100%;
+        max-height: 95vh;
+        border-radius: 12px;
+    }
+
+    .hierarchy-site-modal .site-modal-header {
+        padding: 17px;
+    }
+
+    .hierarchy-site-modal .site-modal-header h2 {
+        font-size: 19px;
+    }
+
+    .hierarchy-site-modal .site-form-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+        padding: 18px 17px;
+    }
+
+    .hierarchy-site-modal .form-group.full-width {
+        grid-column: 1;
+    }
+
+    .hierarchy-site-modal .site-modal-footer {
+        padding: 13px 17px;
+        gap: 9px;
+    }
+
+    .hierarchy-site-modal .cancel-btn,
+    .hierarchy-site-modal .save-site-btn {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .hierarchy-site-modal .location-error,
+    .hierarchy-site-modal .location-success {
+        margin-right: 17px;
+        margin-left: 17px;
+    }
+}

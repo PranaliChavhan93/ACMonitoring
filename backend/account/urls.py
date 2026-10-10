@@ -1,55 +1,23 @@
 from django.urls import path
 
-from .cloud_views import CloudCustomerListView, CloudUserListView
+from .hierarchy_site_views import create_hierarchy_site
 
-# from .views import (
-#     AdminDetailView,
-#     AdminListView,
-#     BranchListView,
-#     CircleListView,
-#     CustomerDetailView,
-#     CustomerListView,
-#     EngDetailView,
-#     EngListView,
-#     FloorListView,
-#     OrganizationListView,
-#     SiteListView,
-#     TalukaListView,
-#     UserListView,
-#     ZoneListView, StateListView, DistrictListView,
-#     site_assignment,
-#     ac_data,
-#     branch_assignments,
-#     branch_ownership,
-#     dashboard_preference_detail,
-#     dashboard_preferences,
-#     unassigned_devices,
-#     dashboard_summary_view,
-#     device,
-#     devices,
-#     latest_ac_data,
-#     location_detail,
-#     locations,
-#     login_view,
-#     logout_view,
-#     me_view,
-#     ac_data_with_location,
-#     telemetry_status,
-#     LocationListView,
-#     treands,
-# )
+from .cloud_views import CloudCustomerListView, CloudUserListView
 
 from .views import (
     AdminDetailView,
     AdminListView,
     BranchListView,
     CircleListView,
+    CityListView,
     CustomerDetailView,
     CustomerListView,
+    DivisionListView,
     EngDetailView,
     EngListView,
     FloorListView,
     OrganizationListView,
+    RegionListView,
     SiteListView,
     TalukaListView,
     UserListView,
@@ -59,11 +27,6 @@ from .views import (
     DeviceCreateView,
     ai_dashboard_analysis,
     assign_customer_to_site,
-
-    # SiteCreateView,
-    # CustomerSiteMappingView,
-    # SiteDeviceMappingView,
-    # CustomerDeviceMappingView,
 
     assign_device_to_customer,
     assign_device_to_site,
@@ -139,6 +102,9 @@ urlpatterns = [
     path( "districts/", DistrictListView.as_view()),
     path( "talukas/", TalukaListView.as_view()),
 
+    path( "cities/", CityListView.as_view()),
+    path( "regions/", RegionListView.as_view()),
+    path( "divisions/", DivisionListView.as_view()),
     path( "branches/", BranchListView.as_view()),
     path( "floors/", FloorListView.as_view()),
     path( "users/", UserListView.as_view()),
@@ -148,6 +114,9 @@ urlpatterns = [
 
     path( "sites/", SiteListView.as_view()),
     path( "sites/create/", create_site),
+    
+    path( "hierarchy-site/create/", create_hierarchy_site ),
+
     path( "branches/search/", search_site_branches ),
     path( "pincode/<str:pincode>/", pincode_lookup ),
 

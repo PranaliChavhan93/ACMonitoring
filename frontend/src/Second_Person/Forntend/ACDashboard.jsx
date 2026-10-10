@@ -634,7 +634,7 @@ function ACDashboard({
 
     return (
         <div className="ac-dashboard">
-            <div className="ac-dashboard-header">
+            {/* <div className="ac-dashboard-header">
                 <div>
                     <h1>AC Energy Monitoring</h1>
                     <p>Real-time AC performance, energy and health monitoring</p>
@@ -654,9 +654,9 @@ function ACDashboard({
                         <span>LIVE</span>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
-            <div className="dashboard-filter-info">
+            {/* <div className="dashboard-filter-info">
                 <span className="filter-label">Current View:</span>
 
                 <span className="filter-value">{filterText}</span>
@@ -664,7 +664,7 @@ function ACDashboard({
                 <span className="record-count">
                     {filteredData.length} AC{filteredData.length !== 1 ? "s" : ""}
                 </span>
-            </div>
+            </div> */}
 
             {filteredData.length > 0 && (
                 <section className={`ai-dashboard-summary ${isSummaryOpen ? "is-open" : ""}`} aria-label="AI dashboard summary">

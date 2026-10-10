@@ -245,14 +245,14 @@ function ACCreation() {
                 }))
                 .filter((site) => site.asset_id);
 
-            console.log("3TP SITES FOR ASSIGNMENT:", normalizedSites);
+            console.log("SITES FOR ASSIGNMENT:", normalizedSites);
 
             setSites(normalizedSites);
         } catch (err) {
-            console.error("3TP SITE FETCH ERROR:", err);
+            console.error("SITE FETCH ERROR:", err);
 
             setAssignmentError(
-                err.message || "Unable to load sites from 3TP."
+                err.message || "Unable to load sites from cloud."
             );
 
             setSites([]);
@@ -413,8 +413,8 @@ function ACCreation() {
     const deviceId = selectedDevice?.tpt_device_id || selectedDevice?.id;
 
     if (!customerId)
-      return setAssignmentError("3TP customer ID is missing.");
-    if (!deviceId) return setAssignmentError("3TP device ID is missing.");
+      return setAssignmentError("Customer ID is missing.");
+    if (!deviceId) return setAssignmentError("Device ID is missing.");
 
     setAssigning(true);
     setAssignmentError("");
@@ -461,8 +461,8 @@ function ACCreation() {
     const assetId = site?.asset_id || site?.tpt_site_id;
     const deviceId = selectedDevice?.tpt_device_id || selectedDevice?.id;
 
-    if (!assetId) return setAssignmentError("3TP site asset ID is missing.");
-    if (!deviceId) return setAssignmentError("3TP device ID is missing.");
+    if (!assetId) return setAssignmentError("Site asset ID is missing.");
+    if (!deviceId) return setAssignmentError("Device ID is missing.");
 
     setAssigning(true);
     setAssignmentError("");
@@ -1208,7 +1208,7 @@ function ACCreation() {
                 <div className="site-assignment-list">
                     {sitesLoading ? (
                         <div className="admins-loading">
-                            Loading sites from 3TP...
+                            Loading sites...
                         </div>
                     ) : filteredSites.length === 0 ? (
                         <div className="admins-empty">

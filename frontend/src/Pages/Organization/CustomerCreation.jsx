@@ -169,12 +169,12 @@ function CustomerCreation() {
     }
   }, []);
   
-  
-  const openAssignSite = async () => {
+
+  const openAssignSite = async (customerId = "") => {
     setView("assignSite");
     setAssignError("");
     setAssignSuccess("");
-    setAssignCustomerId("");
+    setAssignCustomerId(String(customerId || ""));
     setAssignSiteId("");
     setAssignLoading(true);
 
@@ -193,14 +193,11 @@ function CustomerCreation() {
       ]);
 
       if (!customerResponse.ok) {
-        throw new Error(
-          `Could not load customers (${customerResponse.status}).`
-        );
+        throw new Error(`Could not load customers (${customerResponse.status}).`);
       }
 
       if (!siteResponse.ok) {
         const errorBody = await siteResponse.json().catch(() => ({}));
-
         throw new Error(
           errorBody.message ||
             `Could not load 3TP sites (${siteResponse.status}).`
@@ -210,8 +207,6 @@ function CustomerCreation() {
       const customerData = await customerResponse.json();
       const siteData = await siteResponse.json();
 
-      setAssignCustomers(normalizeList(customerData));
-
       if (siteData.status === "error") {
         throw new Error(siteData.message || "Could not load 3TP sites.");
       }
@@ -220,7 +215,18 @@ function CustomerCreation() {
         throw new Error("Invalid response: expected a sites array.");
       }
 
+      const loadedCustomers = normalizeList(customerData);
+      setAssignCustomers(loadedCustomers);
       setAssignSites(siteData.sites);
+
+      // Keep the requested customer selected only if it exists.
+      const selectedCustomerExists = loadedCustomers.some(
+        (customer) => String(customer.id) === String(customerId)
+      );
+
+      setAssignCustomerId(
+        selectedCustomerExists ? String(customerId) : ""
+      );
     } catch (err) {
       setAssignCustomers([]);
       setAssignSites([]);
@@ -230,58 +236,6 @@ function CustomerCreation() {
     }
   };
 
-  // const handleAssignSite = async (e) => {
-  //   e.preventDefault();
-  //   setAssignError("");
-  //   setAssignSuccess("");
-
-  //   if (!assignCustomerId || !assignSiteId) {
-  //     setAssignError("Please select both a customer and a site.");
-  //     return;
-  //   }
-
-  //   setAssignSaving(true);
-
-  //   try {
-  //     const response = await fetch(
-  //       `${API_BASE}/customers/assign/site/`,
-  //       {
-  //         method: "POST",
-  //         headers: authHeaders(),
-  //         body: JSON.stringify({
-  //           customer_id: assignCustomerId,
-  //           tpt_site_id: assignSiteId,
-  //         }),
-  //       }
-  //     );
-
-  //     const result = await response.json().catch(() => ({}));
-
-  //     if (!response.ok) {
-  //       const detail =
-  //         result.message ||
-  //         result.details ||
-  //         result.error ||
-  //         Object.entries(result)
-  //           .map(([key, value]) =>
-  //             `${key}: ${Array.isArray(value) ? value.join(", ") : value}`
-  //           )
-  //           .join(" | ");
-
-  //       throw new Error(detail || `Assignment failed (${response.status}).`);
-  //     }
-
-  //     setAssignSuccess(
-  //       result.message || "Customer assigned to site successfully."
-  //     );
-  //     setAssignSiteId("");
-  //   } catch (err) {
-  //     setAssignError(err.message || "Could not assign customer to site.");
-  //   } finally {
-  //     setAssignSaving(false);
-  //   }
-  // };
- 
   const handleAssignSite = async (e) => {
     e.preventDefault();
     setAssignError("");
@@ -333,8 +287,6 @@ function CustomerCreation() {
       setAssignSaving(false);
     }
   };
-
-
 
   useEffect(() => {
     fetchCustomers();
@@ -769,6 +721,17 @@ function CustomerCreation() {
                         >
                           <FiTrash2 size={16} />
                         </button>
+                        
+                        <button
+                          type="button"
+                          className="btn-icon"
+                          onClick={() => openAssignSite(customer.id)}
+                          title="Assign Site"
+                          aria-label={`Assign site to ${customerNameOf(customer)}`}
+                        >
+                          <FiMapPin size={16} />
+                        </button>
+
                       </td>
                     </tr>
                   ))}
@@ -1307,15 +1270,23 @@ function CustomerCreation() {
           )}
 
           {hierarchyError && <div className="form-error">{hierarchyError}</div>}
-
           <div className="panel-actions">
-            <button type="button" className="btn-secondary" onClick={backToList}>
-              Return to Customers
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={backToList}
+            >
+              Save and Exit
             </button>
 
-            <button type="button" className="btn-primary" onClick={backToList}>
-              <FiCheckCircle />
-              Finish
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={() => openAssignSite(form.id)}
+              disabled={!form.id}
+            >
+              <FiMapPin />
+              Continue to Assign Site
             </button>
           </div>
         </div>
@@ -1429,23 +1400,39 @@ function CustomerCreation() {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setView("list")}
+                  onClick={backToList}
                   disabled={assignSaving}
                 >
-                  Back to Customers
+                  Save and Exit
                 </button>
 
-                <button
-                  type="submit"
-                  className="btn-primary"
-                  disabled={
-                    assignSaving ||
-                    !assignCustomerId ||
-                    !assignSiteId
-                  }
-                >
-                  {assignSaving ? "Assigning..." : "Assign Site"}
-                </button>
+                {!assignSuccess && (
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    disabled={
+                      assignSaving ||
+                      !assignCustomerId ||
+                      !assignSiteId
+                    }
+                  >
+                    {assignSaving ? "Assigning..." : "Assign Site"}
+                  </button>
+                )}
+
+                {assignSuccess && (
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={async () => {
+                      await fetchCustomers();
+                      setView("list");
+                    }}
+                  >
+                    <FiCheckCircle />
+                    Finish
+                  </button>
+                )}
               </div>
             </form>
           )}

@@ -385,44 +385,6 @@ function Org_Dashboard() {
                         marginBottom: "12px",
                     }}
                 >
-                    {/* <select
-                        value={activeDashboardId || ""}
-                        onChange={(event) => {
-                            const id = event.target.value;
-                            const selectedDashboard = savedDashboards.find(
-                                (item) => String(item.id) === String(id)
-                            );
-                            if (selectedDashboard) loadDashboard(selectedDashboard);
-                        }}
-                        style={{
-                            height: "36px",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "6px",
-                            padding: "0 10px",
-                            minWidth: "190px",
-                        }}
-                    >
-                        <option value="">Select saved dashboard</option>
-                        {savedDashboards.map((dashboard) => (
-                            <option key={dashboard.id} value={dashboard.id}>
-                                {dashboard.name}
-                            </option>
-                        ))}
-                    </select> */}
-
-                    {/* <input
-                        value={dashboardName}
-                        onChange={(event) => setDashboardName(event.target.value)}
-                        placeholder="Dashboard name"
-                        style={{
-                            height: "36px",
-                            border: "1px solid #d1d5db",
-                            borderRadius: "6px",
-                            padding: "0 10px",
-                            minWidth: "180px",
-                        }}
-                    /> */}
-
                     <button
                         type="button"
                         onClick={saveDashboard}
@@ -438,7 +400,7 @@ function Org_Dashboard() {
                             fontWeight: 600,
                         }}
                     >
-                        {dashboardLoading ? "Saving..." : "Save Dashboard"}
+                        {dashboardLoading ? "Saving..." : "Save Your Preferance"}
                     </button>
 
                     {/* <button

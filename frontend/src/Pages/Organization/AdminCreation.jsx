@@ -425,7 +425,7 @@ const Admin_Creation = () => {
         <>
           <div className="admins-header">
             <div>
-              <h1>Branch Admins</h1>
+              <h1>Admins</h1>
               <p>
                 Each admin belongs to one customer State or Zone and can see
                 everything below that hierarchy node.
