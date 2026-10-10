@@ -7,6 +7,7 @@ import threading
 import traceback
 import hashlib
 
+from django.core import serializers
 from django.db.models import Q
 
 from django.views.decorators.csrf import csrf_exempt
@@ -46,6 +47,7 @@ from .cloud_sync import (
 
 
 from .models import (
+    CustomerSiteMapping,
     LocationCircle,
     LocationState,
     LocationZone,
@@ -1580,6 +1582,18 @@ def _tpt_service_login():
         _tpt_token["value"]      = token
         _tpt_token["expires_at"] = now + 300
         return token
+
+
+def _tpt_service_headers():
+    """Authenticate 3TP API calls with the configured 3TP service account."""
+    token = _tpt_service_login()
+
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
 
 
 # def _tpt_request(method, endpoint_key, payload=None,
@@ -5780,9 +5794,7 @@ def treands(request):
     return Response("Treands page")
 
 
-# =====================================================================
 # LOCATIONS API  (create + read, with ownership stamping)
-# =====================================================================
 @api_view(["GET", "POST"])
 def locations(request):
     user = request.user
@@ -5864,9 +5876,7 @@ def _stamp_new_branch(user, body, response):
     save_location_tree(tree, location_file)
 
 
-# =====================================================================
 # SAVED DASHBOARD PREFERENCES
-# =====================================================================
 @api_view(["GET", "POST"])
 @permission_classes([permissions.IsAuthenticated])
 def dashboard_preferences(request):
@@ -6163,8 +6173,6 @@ def create_3tp_device_independent(
     # -----------------------------------------
 
     return tpt_device_id, created_new
-        
-
 
 @csrf_exempt
 @api_view(["POST"])
@@ -6352,94 +6360,6 @@ def create_device(request):
 
 @csrf_exempt
 @api_view(["POST"])
-def create_device(request):
-
-    try:
-        auth_header = request.headers.get("Authorization")
-
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return JsonResponse(
-                {"error": "Valid Bearer token required"},
-                status=401
-            )
-
-        token = auth_header.split(" ")[1]
-
-        body = json.loads(request.body)
-
-        ac_id = body.get("ac_id")
-        device_name = body.get("device_name")
-
-        if not ac_id:
-            return JsonResponse(
-                {"error": "ac_id is required"},
-                status=400
-            )
-
-        # ---------------- CREATE DEVICE IN 3TP ----------------
-
-        payload = {
-            "device": {
-                "name": device_name or ac_id,
-                "label": device_name or ac_id,
-                "deviceProfileId": {
-                    "id": body.get("device_profile_id"),
-                    "entityType": "DEVICE_PROFILE"
-                }
-            },
-            "credentials": {
-                "credentialsType": "MQTT_BASIC",
-                "credentialsValue": json.dumps({
-                    "clientId": ac_id,
-                    "userName": body.get("username", ac_id),
-                    "password": body.get("password", "")
-                })
-            }
-        }
-
-        response = requests.post(
-            f"{CLOUD_URL}/api/device-with-credentials",
-            json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "X-Authorization": f"Bearer {token}"
-            }
-        )
-
-        data = response.json()
-
-        if response.status_code not in [200, 201]:
-            return JsonResponse(
-                data,
-                status=response.status_code
-            )
-
-        device_id = data["device"]["id"]["id"]
-
-        # ---------------- SAVE LOCAL ----------------
-
-        device = ACDevice.objects.create(
-            ac_id=ac_id,
-            device_name=device_name or ac_id,
-            tpt_device_id=device_id
-        )
-
-        return JsonResponse({
-            "message": "Device created successfully",
-            "device_id": str(device.id),
-            "tpt_device_id": device_id
-        }, status=201)
-
-    except Exception as e:
-
-        return JsonResponse(
-            {"error": str(e)},
-            status=500
-        )
-
-@csrf_exempt
-@api_view(["POST"])
 def assign_device_to_customer(request):
 
     try:
@@ -6495,6 +6415,7 @@ def assign_device_to_customer(request):
             {"error": str(e)},
             status=500
         )
+
 
 @csrf_exempt
 @api_view(["POST"])
@@ -6583,3 +6504,409 @@ def assign_device_to_site(request):
             {"error": str(e)},
             status=500
         )
+
+
+def get_or_create_local_site_from_3tp(request, tpt_site_id, customer, branch_id=None):
+    """Return the local Site for a 3TP asset, creating it if it doesn't exist."""
+    site = Site.objects.filter(tpt_site_id=tpt_site_id).first()
+    if site:
+        return site, False
+
+    # Read the asset from 3TP so the local row matches it
+    res = requests.get(
+        f"{CLOUD_URL}/api/asset/{tpt_site_id}",
+        headers=_tpt_user_headers(request),
+        timeout=15,
+    )
+    if res.status_code != 200:
+        raise ThreeTPError(
+            f"Site not found in 3TP: {res.text}", status=res.status_code
+        )
+    asset = res.json()
+    name = asset.get("name") or asset.get("label") or f"Site {tpt_site_id[:8]}"
+
+    # Branch: explicit one from the request, else the customer's first branch
+    branch = None
+    if branch_id:
+        branch = Branch.objects.filter(pk=branch_id, customer=customer).first()
+    if branch is None:
+        branch = Branch.objects.filter(customer=customer).order_by("name").first()
+
+    # Unique code
+    code = f"3TP-{tpt_site_id[:8].upper()}"
+
+    site = Site.objects.create(
+        name=name,
+        code=code,
+        branch=branch,                 # must be nullable if customer has no branch yet
+        tpt_site_id=tpt_site_id,
+        tpt_sync_status="SYNCED",
+        tpt_sync_error="",
+    )
+    return site, True
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def assign_customer_to_site(request):
+    try:
+        # Read the fields sent by CustomerCreation.jsx
+        customer_id = request.data.get("customer_id")
+        tpt_site_id = str(
+            request.data.get("tpt_site_id") or ""
+        ).strip()
+
+        if not customer_id or not tpt_site_id:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "customer_id and tpt_site_id are required.",
+                    "received_fields": list(request.data.keys()),
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 2. FIND LOCAL CUSTOMER
+        try:
+            customer = Customer.objects.get(pk=customer_id)
+        except (Customer.DoesNotExist, ValueError, TypeError):
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Customer not found.",
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # 3. FIND OR CREATE LOCAL SITE FROM THE 3TP ASSET
+        try:
+            site, site_created = get_or_create_local_site_from_3tp(
+                request,
+                tpt_site_id,
+                customer,
+                branch_id=request.data.get("branch_id"),
+            )
+        except ThreeTPError as exc:
+            return Response(
+                {"status": "error", "message": str(exc), "tpt_site_id": tpt_site_id},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        except Site.MultipleObjectsReturned:
+            return Response(
+                {"status": "error",
+                 "message": "Multiple local sites have the same 3TP site ID."},
+                status=status.HTTP_409_CONFLICT,
+            )
+                
+        # 4. GET 3TP IDS
+        tpt_customer_id = ensure_tpt_customer_id(request, customer)
+
+        tpt_site_id = (
+            getattr(site, "tpt_site_id", None) or ""
+        ).strip()
+
+        if not tpt_customer_id:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "This customer has no 3TP customer ID."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not tpt_site_id:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "This site has no 3TP site ID."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 5. CHECK EXISTING LOCAL MAPPING
+        existing_mapping = CustomerSiteMapping.objects.filter(
+            customer=customer,
+            site=site,
+        ).first()
+
+        if existing_mapping and existing_mapping.is_active:
+            return Response(
+                {
+                    "status": "success",
+                    "message": "Customer is already mapped to this site.",
+                    "data": {
+                        "customer_id": str(customer.id),
+                        "site_id": str(site.id),
+                        "tpt_customer_id": tpt_customer_id,
+                        "tpt_site_id": tpt_site_id,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # 6. MAP CUSTOMER TO SITE IN 3TP
+        if not _raw_token(request):
+            return Response(
+                {"status": "error", "message": "Authorization token is required."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        
+            try:
+                headers = _tpt_service_headers()
+                response = requests.post(
+                    f"{CLOUD_URL}/api/customer/{tpt_customer_id}/asset/{tpt_site_id}",
+                    headers=headers,
+                    timeout=15,
+                )
+            except ThreeTPError as exc:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "3TP service-account authentication failed.",
+                        "details": str(exc),
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            except requests.RequestException as exc:
+                return Response(
+                    {
+                        "status": "error",
+                        "message": "Unable to connect to 3TP.",
+                        "details": str(exc),
+                    },
+                    status=status.HTTP_502_BAD_GATEWAY,
+                )
+            
+        # --------------------------------------------------
+        # 7. SAVE LOCAL MAPPING AFTER 3TP SUCCESS
+        # --------------------------------------------------
+        mapping, created = CustomerSiteMapping.objects.update_or_create(
+            customer=customer,
+            site=site,
+            defaults={"is_active": True},
+        )
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Customer mapped to site successfully.",
+                "data": {
+                    "mapping_id": str(mapping.id),
+                    "customer_id": str(customer.id),
+                    "customer_name": customer.company,
+                    "site_id": str(site.id),
+                    "site_name": site.name,
+                    "tpt_customer_id": tpt_customer_id,
+                    "tpt_site_id": tpt_site_id,
+                },
+            },
+            status=status.HTTP_200_OK if not created
+            else status.HTTP_201_CREATED,
+        )
+
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).exception(
+            "Customer-to-site mapping failed"
+        )
+
+        return Response(
+            {
+                "status": "error",
+                "message": "Customer-to-site mapping failed.",
+                "details": str(exc),
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def ai_dashboard_analysis(request):
+    return Response("Ai Dashboard")
+
+
+# @api_view(["POST"])
+# @permission_classes([IsAuthenticated])
+# def ai_dashboard_analysis(request):
+#     """
+#     Generate one combined AI analysis for the AC dashboard.
+
+#     Request:
+#     {
+#         "dashboard_data": {
+#             "totalACs": 1,
+#             "activeACs": 1,
+#             "totalEnergy": 2652.0,
+#             "activeEnergy": 2652.0,
+#             "activePower": 1.5,
+#             "averageTemperature": 32.1,
+#             "averageHumidity": 43.4,
+#             "alerts": 0,
+#             "records": 1,
+#             "historyPoints": 3
+#         }
+#     }
+#     """
+
+#     dashboard_data = request.data.get("dashboard_data")
+
+#     if not isinstance(dashboard_data, dict) or not dashboard_data:
+#         return Response(
+#             {
+#                 "status": "error",
+#                 "message": "dashboard_data must be a non-empty JSON object."
+#             },
+#             status=status.HTTP_400_BAD_REQUEST
+#         )
+
+#     # Configure these environment variables for your installation.
+#     ollama_url = os.getenv(
+#         "OLLAMA_API_URL",
+#         "http://localhost:11434/api/generate"
+#     )
+#     # ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
+#     ollama_model = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+
+#     required_keys = [
+#         "totalACs",
+#         "activeACs",
+#         "totalEnergy",
+#         "activeEnergy",
+#         "activePower",
+#         "averageTemperature",
+#         "averageHumidity",
+#         "alerts",
+#         "records",
+#         "historyPoints",
+#     ]
+
+#     # Keep only the dashboard fields expected by this endpoint.
+#     data = {
+#         key: dashboard_data[key]
+#         for key in required_keys
+#         if key in dashboard_data
+#     }
+
+#     prompt = f"""
+# You are an AC energy monitoring analyst.
+
+# Analyze the dashboard data below:
+# {json.dumps(data, ensure_ascii=False)}
+
+# Return ONLY a valid JSON object with these exact keys:
+# totalEnergy, activeEnergy, totalACs, activeACs, activePower,
+# temperature, humidity, alerts, energyChart, healthChart,
+# humidityChart, powerChart, zoneChart, temperatureChart.
+
+# Requirements:
+# 1. Each value must be a concise explanation, maximum two sentences.
+# 2. Explain actual values and meaningful changes using supplied data.
+# 3. Do not invent historical trends, causes, rankings, or thresholds.
+# 4. If historical or zone-level data is missing, say that a comparison
+#    cannot be determined from the supplied data.
+# 5. Do not claim an AC is healthy unless its health status is provided.
+# 6. Distinguish missing readings from actual zero readings.
+# 7. Keep the language simple and suitable for a dashboard summary.
+# 8. Return JSON only, without Markdown or additional commentary.
+# """
+
+#     try:
+#         ollama_response = requests.post(
+#             ollama_url,
+#             json={
+#                 "model": ollama_model,
+#                 "prompt": prompt,
+#                 "stream": False,
+#                 "format": "json",
+#                 "options": {
+#                     "temperature": 0.2
+#                 }
+#             },
+#             timeout=60
+#         )
+
+#         ollama_response.raise_for_status()
+#         result = ollama_response.json()
+
+#         generated_text = result.get("response", "").strip()
+
+#         if not generated_text:
+#             return Response(
+#                 {
+#                     "status": "error",
+#                     "message": "The AI model returned an empty response."
+#                 },
+#                 status=status.HTTP_502_BAD_GATEWAY
+#             )
+
+#         insights = json.loads(generated_text)
+
+#         if not isinstance(insights, dict):
+#             raise ValueError("AI response must be a JSON object.")
+
+#         expected_keys = [
+#             "totalEnergy",
+#             "activeEnergy",
+#             "totalACs",
+#             "activeACs",
+#             "activePower",
+#             "temperature",
+#             "humidity",
+#             "alerts",
+#             "energyChart",
+#             "healthChart",
+#             "humidityChart",
+#             "powerChart",
+#             "zoneChart",
+#             "temperatureChart",
+#         ]
+
+#         # Validate and normalize the model output.
+#         clean_insights = {}
+
+#         for key in expected_keys:
+#             value = insights.get(key, "")
+
+#             clean_insights[key] = (
+#                 value.strip()
+#                 if isinstance(value, str)
+#                 else ""
+#             )
+
+#         return Response(
+#             {
+#                 "status": "success",
+#                 "insights": clean_insights
+#             },
+#             status=status.HTTP_200_OK
+#         )
+
+#     except requests.exceptions.Timeout:
+#         return Response(
+#             {
+#                 "status": "error",
+#                 "message": "The AI model timed out. Please try again."
+#             },
+#             status=status.HTTP_504_GATEWAY_TIMEOUT
+#         )
+
+#     except requests.exceptions.RequestException:
+#         return Response(
+#             {
+#                 "status": "error",
+#                 "message": (
+#                     "Unable to connect to Ollama. "
+#                     "Check that Ollama is running and the model is available."
+#                 )
+#             },
+#             status=status.HTTP_503_SERVICE_UNAVAILABLE
+#         )
+
+#     except (json.JSONDecodeError, ValueError):
+#         return Response(
+#             {
+#                 "status": "error",
+#                 "message": "The AI model returned an invalid JSON response."
+#             },
+#             status=status.HTTP_502_BAD_GATEWAY
+#         )

@@ -349,7 +349,14 @@ class Floor(models.Model):
 
 class Site(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="sites")
+    # branch = models.ForeignKey(Branch, on_delete=models.CASCADE, related_name="sites")
+    branch = models.ForeignKey(
+        "Branch",
+        on_delete=models.CASCADE,   # keep whatever you already have
+        related_name="sites",       # keep your existing related_name
+        null=True,
+        blank=True,
+    )
     floor = models.ForeignKey(Floor, on_delete=models.CASCADE, related_name="sites", null=True, blank=True)
 
     name = models.CharField(max_length=255)

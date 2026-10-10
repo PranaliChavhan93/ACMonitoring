@@ -212,9 +212,7 @@ const Locations = () => {
         });
     }, [sites, search, hierarchyFilter]);
 
-    /* ---------------------------------------------------------
-       SUMMARY
-    --------------------------------------------------------- */
+    // SUMMARY
 
     const totalACs = useMemo(
         () =>
@@ -242,9 +240,7 @@ const Locations = () => {
         [sites]
     );
 
-    /* ---------------------------------------------------------
-       CREATE SITE (modal submit)
-    --------------------------------------------------------- */
+    // CREATE SITE (modal submit)
 
     const handleCreateSite = async (event) => {
         event.preventDefault();
@@ -302,7 +298,7 @@ const Locations = () => {
             <div className="locations-header">
                 <div className="locations-title">
                     <h1>Sites</h1>
-                    <p>Sites available in the 3TP platform</p>
+                    <p>Sites available in the cloud platform</p>
                 </div>
 
                 <div className="locations-header-actions">
@@ -445,7 +441,6 @@ const Locations = () => {
                                 <th>Branch</th>
                                 <th>Floor</th>
                                 <th>ACs</th>
-                                <th>Source</th>
                             </tr>
                         </thead>
 
@@ -565,13 +560,6 @@ const Locations = () => {
                                                 {Array.isArray(site.acs)
                                                     ? site.acs.length
                                                     : 0}
-                                            </span>
-                                        </td>
-
-                                        {/* SOURCE */}
-                                        <td>
-                                            <span className="source-badge">
-                                                3TP
                                             </span>
                                         </td>
                                     </tr>

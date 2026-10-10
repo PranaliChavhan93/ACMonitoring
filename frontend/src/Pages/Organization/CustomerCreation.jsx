@@ -13,8 +13,16 @@ import {
 
 import "./CustomerCreation.css";
 
-const API_BASE = "http://localhost:8000/api";
+// const API_BASE = "http://localhost:8000/api";
+// const CUSTOMERS_URL = `${API_BASE}/customers/`;
+// const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
+
+const API_BASE = "http://192.168.1.14:8000/api";
 const CUSTOMERS_URL = `${API_BASE}/customers/`;
+const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
+
+
+
 
 const getToken = () =>
   localStorage.getItem("token") ||
@@ -117,13 +125,21 @@ function CustomerCreation() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [assignCustomers, setAssignCustomers] = useState([]);
+  const [assignSites, setAssignSites] = useState([]);
+  const [assignCustomerId, setAssignCustomerId] = useState("");
+  const [assignSiteId, setAssignSiteId] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignSaving, setAssignSaving] = useState(false);
+  const [assignError, setAssignError] = useState("");
+  const [assignSuccess, setAssignSuccess] = useState("");
+
+
   const [toast, setToast] = useState(null);
   
   const isEditing = Boolean(form.id);
 
-  /* =========================================================
-     FETCH CUSTOMERS
-  ========================================================= */
+  //  FETCH CUSTOMERS
 
   const fetchCustomers = useCallback(async () => {
     try {
@@ -152,15 +168,179 @@ function CustomerCreation() {
       setLoading(false);
     }
   }, []);
+  
+  
+  const openAssignSite = async () => {
+    setView("assignSite");
+    setAssignError("");
+    setAssignSuccess("");
+    setAssignCustomerId("");
+    setAssignSiteId("");
+    setAssignLoading(true);
+
+    try {
+      const [customerResponse, siteResponse] = await Promise.all([
+        fetch(CUSTOMERS_URL, {
+          method: "GET",
+          headers: authHeaders(),
+          cache: "no-store",
+        }),
+        fetch(SITES_URL, {
+          method: "GET",
+          headers: authHeaders(),
+          cache: "no-store",
+        }),
+      ]);
+
+      if (!customerResponse.ok) {
+        throw new Error(
+          `Could not load customers (${customerResponse.status}).`
+        );
+      }
+
+      if (!siteResponse.ok) {
+        const errorBody = await siteResponse.json().catch(() => ({}));
+
+        throw new Error(
+          errorBody.message ||
+            `Could not load 3TP sites (${siteResponse.status}).`
+        );
+      }
+
+      const customerData = await customerResponse.json();
+      const siteData = await siteResponse.json();
+
+      setAssignCustomers(normalizeList(customerData));
+
+      if (siteData.status === "error") {
+        throw new Error(siteData.message || "Could not load 3TP sites.");
+      }
+
+      if (!Array.isArray(siteData.sites)) {
+        throw new Error("Invalid response: expected a sites array.");
+      }
+
+      setAssignSites(siteData.sites);
+    } catch (err) {
+      setAssignCustomers([]);
+      setAssignSites([]);
+      setAssignError(err.message || "Could not load assignment data.");
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  // const handleAssignSite = async (e) => {
+  //   e.preventDefault();
+  //   setAssignError("");
+  //   setAssignSuccess("");
+
+  //   if (!assignCustomerId || !assignSiteId) {
+  //     setAssignError("Please select both a customer and a site.");
+  //     return;
+  //   }
+
+  //   setAssignSaving(true);
+
+  //   try {
+  //     const response = await fetch(
+  //       `${API_BASE}/customers/assign/site/`,
+  //       {
+  //         method: "POST",
+  //         headers: authHeaders(),
+  //         body: JSON.stringify({
+  //           customer_id: assignCustomerId,
+  //           tpt_site_id: assignSiteId,
+  //         }),
+  //       }
+  //     );
+
+  //     const result = await response.json().catch(() => ({}));
+
+  //     if (!response.ok) {
+  //       const detail =
+  //         result.message ||
+  //         result.details ||
+  //         result.error ||
+  //         Object.entries(result)
+  //           .map(([key, value]) =>
+  //             `${key}: ${Array.isArray(value) ? value.join(", ") : value}`
+  //           )
+  //           .join(" | ");
+
+  //       throw new Error(detail || `Assignment failed (${response.status}).`);
+  //     }
+
+  //     setAssignSuccess(
+  //       result.message || "Customer assigned to site successfully."
+  //     );
+  //     setAssignSiteId("");
+  //   } catch (err) {
+  //     setAssignError(err.message || "Could not assign customer to site.");
+  //   } finally {
+  //     setAssignSaving(false);
+  //   }
+  // };
+ 
+  const handleAssignSite = async (e) => {
+    e.preventDefault();
+    setAssignError("");
+    setAssignSuccess("");
+
+    const payload = {
+      customer_id: String(assignCustomerId || "").trim(),
+      tpt_site_id: String(assignSiteId || "").trim(),
+    };
+
+    console.log("Assign Site payload:", payload);
+
+    if (!payload.customer_id || !payload.tpt_site_id) {
+      setAssignError("Please select both a customer and a site.");
+      return;
+    }
+
+    setAssignSaving(true);
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/customers/assign/site/`,
+        {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const result = await response.json().catch(() => ({}));
+
+      console.log("Assign Site response:", response.status, result);
+
+      if (!response.ok) {
+        throw new Error(
+          result.message ||
+            result.details ||
+            `Assignment failed (${response.status}).`
+        );
+      }
+
+      setAssignSuccess(
+        result.message || "Customer assigned to site successfully."
+      );
+      setAssignSiteId("");
+    } catch (err) {
+      setAssignError(err.message || "Could not assign customer to site.");
+    } finally {
+      setAssignSaving(false);
+    }
+  };
+
+
 
   useEffect(() => {
     fetchCustomers();
   }, [fetchCustomers]);
 
-  /* =========================================================
-     SEARCH
-  ========================================================= */
-
+  //  SEARCH
   const filteredCustomers = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return customers;
@@ -183,9 +363,7 @@ function CustomerCreation() {
     });
   }, [customers, search]);
 
-  /* =========================================================
-     CREATE
-  ========================================================= */
+  //  CREATE
 
   const goToCreate = () => {
     setForm({ ...emptyForm });
@@ -195,10 +373,8 @@ function CustomerCreation() {
     setView("form");
   };
 
-  /* =========================================================
-     EDIT
-  ========================================================= */
-
+  // EDIT
+  
   const openEditPanel = (customer) => {
     const hierarchy = customer.hierarchy_type || "";
 
@@ -233,9 +409,7 @@ function CustomerCreation() {
     setView("form");
   };
 
-  /* =========================================================
-     BACK
-  ========================================================= */
+  // BACK
 
   const backToList = () => {
     setView("list");
@@ -245,27 +419,21 @@ function CustomerCreation() {
     setHierarchyError("");
   };
 
-  /* =========================================================
-     FIELD CHANGE
-  ========================================================= */
+  // FIELD CHANGE
 
   const handleFieldChange = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  /* =========================================================
-     HIERARCHY CHANGE
-  ========================================================= */
-
+  //  HIERARCHY CHANGE
+  
   const handleHierarchyChange = (value) => {
     setSelectedHierarchy(value);
     setForm((prev) => ({ ...prev, hierarchy_type: value }));
     setHierarchyError("");
   };
 
-  /* =========================================================
-     VALIDATION
-  ========================================================= */
+  //  VALIDATION
 
   const validateForm = () => {
     if (!form.company.trim()) return "Customer name is required.";
@@ -477,6 +645,18 @@ function CustomerCreation() {
             Hierarchy
           </button>
         </li>
+        
+        <li className={view === "assignSite" ? "active" : ""}>
+          <button
+            type="button"
+            className="step-btn"
+            onClick={openAssignSite}
+          >
+            <span className="step-num">4</span>
+            Assign Site
+          </button>
+        </li>
+
       </ol>
 
       {view === "list" && (
@@ -486,11 +666,6 @@ function CustomerCreation() {
               <h1>Customers</h1>
               <p>Register and manage customers under your organization.</p>
             </div>
-
-            {/* <button className="btn-primary" onClick={goToCreate}>
-              <FiPlus />
-              Create Customer
-            </button> */}
           </div>
 
           <div className="admins-toolbar">
@@ -980,30 +1155,31 @@ function CustomerCreation() {
               </label>
             </div>
 
-            {formError && <div className="form-error">{formError}</div>}
+            {formError && 
+              <div className="form-error">{formError}</div>
+            }
+              <div className="panel-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={backToList}
+                  disabled={saving}
+                >
+                  Cancel
+                </button>
 
-            <div className="panel-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={backToList}
-                disabled={saving}
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="btn-primary"
-                disabled={saving || !selectedHierarchy}
-              >
-                {saving
-                  ? "Saving..."
-                  : isEditing
-                  ? "Save Changes"
-                  : "Register & Continue"}
-              </button>
-            </div>
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={saving || !selectedHierarchy}
+                >
+                  {saving
+                    ? "Saving..."
+                    : isEditing
+                    ? "Save Changes"
+                    : "Register & Continue"}
+                </button>
+              </div>
           </form>
         </div>
       )}
@@ -1142,6 +1318,137 @@ function CustomerCreation() {
               Finish
             </button>
           </div>
+        </div>
+      )}
+      
+      {view === "assignSite" && (
+        <div className="admins-panel">
+          <div className="admins-panel-header">
+            <FiMapPin size={22} />
+            <div>
+              <h2>Assign Customer to Site</h2>
+              <p>
+                Select a customer and one of its sites to create the assignment.
+              </p>
+            </div>
+          </div>
+
+          {assignLoading ? (
+            <div className="admins-loading">Loading customers and sites...</div>
+          ) : (
+            <form onSubmit={handleAssignSite} className="admins-form">
+              <div className="assign-card">
+                <div className="form-grid">
+                  <label>
+                    Select Customer *
+                    <select
+                      value={assignCustomerId}
+                      onChange={(e) => {
+                        setAssignCustomerId(e.target.value);
+                        setAssignSiteId("");
+                        setAssignError("");
+                        setAssignSuccess("");
+                      }}
+                      required
+                    >
+                      <option value="">Choose a customer</option>
+                      {assignCustomers.map((customer) => (
+                        <option key={customer.id} value={customer.id}>
+                          {customerNameOf(customer)}
+                          {customer.code ? ` (${customer.code})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Select Site *
+                    <select
+                      value={assignSiteId}
+                      onChange={(e) => {
+                        setAssignSiteId(e.target.value);
+                        setAssignError("");
+                        setAssignSuccess("");
+                      }}
+                      required
+                      disabled={!assignCustomerId}
+                    >
+                      
+                    <option value="">Choose a site</option>
+                      {assignSites.map((site) => {
+                        const siteId = site.tpt_site_id ?? site.id;
+                        const siteName = site.name || "Unnamed site";
+
+                        return (
+                          <option key={String(siteId)} value={String(siteId)}>
+                            {siteName}
+                            {site.code ? ` (${site.code})` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                </div>
+
+                {assignCustomerId && (
+                  <div className="assign-site-summary">
+                    <h3>Assignment Summary</h3>
+                    <p>
+                      <strong>Customer:</strong>{" "}
+                      {customerNameOf(
+                        assignCustomers.find(
+                          (customer) =>
+                            String(customer.id) === String(assignCustomerId)
+                        )
+                      ) || "-"}
+                    </p>
+                    
+                    <p>
+                      <strong>Site:</strong>{" "}
+                      {assignSites.find(
+                        (site) =>
+                          String(site.tpt_site_id ?? site.id) === String(assignSiteId)
+                      )?.name || "Not selected"}
+                    </p>
+
+                  </div>
+                )}
+              </div>
+
+              {assignError && (
+                <div className="form-error">{assignError}</div>
+              )}
+
+              {assignSuccess && (
+                <div className="assign-success" role="status">
+                  {assignSuccess}
+                </div>
+              )}
+
+              <div className="panel-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setView("list")}
+                  disabled={assignSaving}
+                >
+                  Back to Customers
+                </button>
+
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={
+                    assignSaving ||
+                    !assignCustomerId ||
+                    !assignSiteId
+                  }
+                >
+                  {assignSaving ? "Assigning..." : "Assign Site"}
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       )}
 

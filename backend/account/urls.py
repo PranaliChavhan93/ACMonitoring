@@ -57,6 +57,8 @@ from .views import (
     StateListView,
     DistrictListView,
     DeviceCreateView,
+    ai_dashboard_analysis,
+    assign_customer_to_site,
 
     # SiteCreateView,
     # CustomerSiteMappingView,
@@ -146,17 +148,19 @@ urlpatterns = [
 
     path( "sites/", SiteListView.as_view()),
     path( "sites/create/", create_site),
-    path( "branches/search/", search_site_branches, name="branch-search" ),
-    path( "pincode/<str:pincode>/", pincode_lookup, name="pincode-lookup" ),
+    path( "branches/search/", search_site_branches ),
+    path( "pincode/<str:pincode>/", pincode_lookup ),
 
     path( "devices/", devices),
     path( "devices/create/", DeviceCreateView.as_view()),
     path( "devices/unassigned/", unassigned_devices),
+
     path( "devices/assign/customer/", assign_device_to_customer ),
     path( "devices/assign/site/", assign_device_to_site ),
+    path( "customers/assign/site/", assign_customer_to_site),
 
     path( "locations/create/", create_branch_or_floor ),
-    path( "cloud/sites/", three_tp_sites ),
+
     # path( "dashboard/"),
     # path( "locations/"),
     # path( "admins/"),
@@ -166,6 +170,6 @@ urlpatterns = [
     
     path( "cloud/customers/", CloudCustomerListView.as_view()),
     path( "cloud/users/", CloudUserListView.as_view()),
-
-
+    path( "cloud/sites/", three_tp_sites ),
+    path( "ai-dashboard-analysis/", ai_dashboard_analysis ),
 ]

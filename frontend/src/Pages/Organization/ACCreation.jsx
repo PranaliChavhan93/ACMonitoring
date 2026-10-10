@@ -63,6 +63,9 @@ const emptyForm = {
   capacity_ton: "",
   installation_date: "",
   last_maintenance_date: "",
+  clientid: "",
+  username: "",
+  password: "",
 };
 
 function ACCreation() {
@@ -707,7 +710,6 @@ function ACCreation() {
                     <th>Device</th>
                     <th>Customer</th>
                     <th>Site</th>
-                    <th>3TP Sync</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -753,18 +755,6 @@ function ACCreation() {
                           >
                             {device.site_id ? "Assigned" : "Not assigned"}
                           </div>
-                        </td>
-
-                        <td>
-                          <span
-                            className={
-                              device.tpt_sync_status === "SYNCED"
-                                ? "status-active"
-                                : "status-inactive"
-                            }
-                          >
-                            ● {device.tpt_sync_status || "PENDING"}
-                          </span>
                         </td>
 
                         <td>
@@ -933,12 +923,73 @@ function ACCreation() {
                 <FiCheckCircle />
                 <div>
                   {/* <h3>Independent Device</h3> */}
-                  <p> This operation only creates the device. Customer and Site
-                    are assigned separately from the device list.
-                  </p>
+                  <p> This operation only creates the device. Customer and Site are assigned separately from the device list. </p>
                 </div>
               </div>
             </div>
+
+
+            <form className="admins-form" onSubmit={handleSubmit}>
+              <div className="admins-panel-header">
+                <div>
+                  <p>MQTT Credentials</p>
+                </div>
+              </div>
+
+              <div className="form-grid">
+            
+                <label>
+                  MQTT Client ID *
+                  <input
+                    type="text"
+                    value={form.clientid}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        clientid: event.target.value,
+                      }))
+                    }
+                    placeholder="AC-MH-PUN-001"
+                    autoComplete="off"
+                    required
+                  />
+                </label>
+
+                <label>
+                  MQTT Username *
+                  <input
+                    type="text"
+                    value={form.username}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        username: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter MQTT username"
+                    autoComplete="off"
+                    required
+                  />
+                </label>
+
+                <label>
+                  MQTT Password *
+                  <input
+                    type="password"
+                    value={form.password}
+                    onChange={(event) =>
+                      setForm((previous) => ({
+                        ...previous,
+                        password: event.target.value,
+                      }))
+                    }
+                    placeholder="Enter MQTT password"
+                    autoComplete="new-password"
+                    required
+                  />
+                </label>
+              </div>
+            </form>
 
             {formError && <div className="form-error">{formError}</div>}
 
