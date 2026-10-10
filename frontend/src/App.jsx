@@ -21,6 +21,7 @@ import Treands from "./Second_Person/Forntend/Treands";
 import HierarchySiteCreation from "./Pages/Organization/HierarchySiteCreation";
 
 import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
+import SuperAdminLogin from "./Pages/Layout/SuperAdminLogin";
 
 function RootRedirect() {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/org/login" element={<SuperAdminLogin />} />
 
           <Route
             path="/org/dashboard"

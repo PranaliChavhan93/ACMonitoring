@@ -10,7 +10,7 @@ from .models import User
 class ThreeTPAuthentication(BaseAuthentication):
 
     CACHE_PREFIX = "3tp_auth:"
-    CACHE_TIMEOUT = None  # Use default cache timeout
+    CACHE_TIMEOUT = None
 
     def authenticate(self, request):
 
@@ -64,13 +64,13 @@ class ThreeTPAuthentication(BaseAuthentication):
                 "Local user account was not found."
             )
 
-        print("===== 3TP AUTH DEBUG =====")
-        print("USER ID:", user.id)
-        print("USER EMAIL:", user.email)
-        print("USER ROLE:", user.role)
-        print("USER ORGANIZATION:", user.organization_id)
-        print("USER ORGANIZATION OBJECT:", user.organization)
-        print("==========================")
+        # print("===== 3TP AUTH DEBUG =====")
+        # print("USER ID:", user.id)
+        # print("USER EMAIL:", user.email)
+        # print("USER ROLE:", user.role)
+        # print("USER ORGANIZATION:", user.organization_id)
+        # print("USER ORGANIZATION OBJECT:", user.organization)
+        # print("==========================")
 
         return user, token
 

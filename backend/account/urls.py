@@ -25,6 +25,7 @@ from .views import (
     StateListView,
     DistrictListView,
     DeviceCreateView,
+    
     ai_dashboard_analysis,
     assign_customer_to_site,
 
@@ -76,7 +77,7 @@ urlpatterns = [
     path( "devices/", devices ),
     path( "devices/unassigned/", unassigned_devices ),
 
-    path( "auth/login/", login_view, name="login" ),
+    path( "auth/login/", login_view ),
     path( "auth/logout/", logout_view),
     path( "auth/me/", me_view),
 

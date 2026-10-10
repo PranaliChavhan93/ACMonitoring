@@ -140,7 +140,7 @@ def _one_line(exc, n=300):
 
 
 def ensure_tpt_customer_id(request, customer):
-    """Customer's 3TP id; if missing (legacy row) find it in 3TP by email and save it."""
+    """Customer's id; if missing (legacy row) find it in 3TP by email and save it."""
     tid = getattr(customer, "tpt_customer_id", "") or ""
     if tid:
         return tid
@@ -237,7 +237,7 @@ class ThreeTPUserMixin:
                 tpt_customer_id=tpt_cid, raw_password=raw_password,
             )
         except (ThreeTPError, requests.RequestException) as exc:
-            raise ThreeTPAPIError(f"3TP error: {_one_line(exc)}")
+            raise ThreeTPAPIError(f"Cloud Error: {_one_line(exc)}")
 
         try:
             with transaction.atomic():
@@ -3391,10 +3391,7 @@ def _locations_impl(request):
         status=201,
     )
 
-
-# =====================================================================
 # FILTERING AND ENRICHMENT HELPERS
-# =====================================================================
 def matches(value, selected):
     if not selected:
         return True
@@ -3402,15 +3399,23 @@ def matches(value, selected):
 
 
 GEOGRAPHICAL_FIELDS = [
-    "state_id", "state_name", "district_id", "district_name",
-    "taluka_id", "taluka_name", "city_id", "city_name",
-    "branch_id", "branch_name", "floor_id", "floor_name", "site_id",
+    "state_id", "state_name",
+    "district_id", "district_name",
+    "taluka_id", "taluka_name",
+    "city_id", "city_name",
+    "branch_id", "branch_name",
+    "floor_id", "floor_name",
+    "site_id",
 ]
 
 ZONAL_FIELDS = [
-    "zone_id", "zone_name", "circle_id", "circle_name",
-    "region_id", "region_name", "division_id", "division_name",
-    "branch_id", "branch_name", "floor_id", "floor_name", "site_id",
+    "zone_id", "zone_name",
+    "circle_id", "circle_name",
+    "region_id", "region_name",
+    "division_id", "division_name",
+    "branch_id", "branch_name",
+    "floor_id", "floor_name",
+    "site_id",
 ]
 
 
@@ -3538,10 +3543,7 @@ def attach_location(record, device_map):
 
     return enriched
 
-
-# =====================================================================
 # DATA VIEWS
-# =====================================================================
 @api_view(["GET"])
 def ac_data_with_location(request):
     try:
@@ -3600,9 +3602,7 @@ def latest_ac_data(request):
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
 
-# =====================================================================
 # AUTH VIEWS
-# =====================================================================
 def get_client_ip(request):
     xff = request.META.get("HTTP_X_FORWARDED_FOR")
     if xff:
@@ -3624,7 +3624,7 @@ def _dashboard_path(role):
 def login_view(request):
     email          = (request.data.get("email") or "").strip().lower()
     password       = request.data.get("password") or ""
-    requested_role = (request.data.get("role") or "").strip()
+    # requested_role = (request.data.get("role") or "").strip()
 
     if not email or not password:
         return Response(
@@ -3678,12 +3678,12 @@ def login_view(request):
                 status=403,
             )
 
-        if requested_role and user.role != requested_role:
-            return Response(
-                {"status": "error",
-                 "message": f"This account belongs to '{user.get_role_display()}'."},
-                status=403,
-            )
+        # if requested_role and user.role != requested_role:
+        #     return Response(
+        #         {"status": "error",
+        #          "message": f"This account belongs to '{user.get_role_display()}'."},
+        #         status=403,
+        #     )
 
         # ---- 3. Save login info ----
         user.last_login    = timezone.now()
@@ -3737,10 +3737,7 @@ def logout_view(request):
 def me_view(request):
     return Response(UserSerializer(request.user).data)
 
-
-# =====================================================================
 # ORGANIZATION
-# =====================================================================
 class OrganizationListView(generics.ListAPIView):
     serializer_class = OrganizationSerializer
 
