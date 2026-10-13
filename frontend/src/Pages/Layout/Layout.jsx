@@ -59,11 +59,12 @@ function Layout({ children }) {
           <div className="profile-section">
             <div className="welcome-text">
               <p>Welcome,</p>
-              <h4>{displayName}</h4><h6>{secondaryName}</h6>
+              <h4>{displayName}</h4>
+              <h6>{secondaryName}</h6>
               {/* {secondaryName && (
                 <span className="profile-sub">{secondaryName}</span>
               )} */}
-              {role && <span className="role-badge">{roleLabel}</span>}
+              {/* {role && <span className="role-badge">{roleLabel}</span>} */}
             </div>
 
             <div className="profile-logo" title={secondaryName || displayName}>

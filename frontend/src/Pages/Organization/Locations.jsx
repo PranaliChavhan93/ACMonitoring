@@ -2,11 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Search, MapPin, Building2, Snowflake } from "lucide-react";
 import "./Locations.css";
 
-const API_BASE = "http://192.168.1.14:8000/api";
-
-/* =========================================================
-   AUTH
-========================================================= */
+const API_BASE = "http://192.168.1.8:8000/api";
+const FILTER_LOCATIONS_URL = `${API_BASE}/v1/filters/locations/`;
 
 const getToken = () =>
     localStorage.getItem("token") ||
@@ -24,28 +21,45 @@ const authHeaders = () => {
     };
 };
 
-/* =========================================================
-   FETCH HELPER
-========================================================= */
-
 const fetchJSON = async (url, options = {}) => {
     const response = await fetch(url, {
         ...options,
-        headers: { ...authHeaders(), ...(options.headers || {}) },
+        headers: {
+            ...authHeaders(),
+            ...(options.headers || {}),
+        },
     });
 
-    const result = await response.json().catch(() => ({}));
+    const rawResponse = await response.text();
+
+    let result = {};
+    try {
+        result = rawResponse ? JSON.parse(rawResponse) : {};
+    } catch {
+        result = { raw_response: rawResponse };
+    }
 
     if (!response.ok) {
+        console.error("API REQUEST FAILED:", {
+            url,
+            status: response.status,
+            requestBody: options.body
+                ? JSON.parse(options.body)
+                : null,
+            response: result,
+        });
+
         throw new Error(
-            result?.message || result?.detail || result?.error || `HTTP ${response.status}`
+            result?.message ||
+            result?.detail ||
+            result?.error ||
+            result?.raw_response ||
+            `HTTP ${response.status}`
         );
     }
 
     return result;
 };
-
-// HELPERS
 
 const normalize = (value) =>
     String(value ?? "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -104,9 +118,43 @@ const normalizeSite = (site) => {
     };
 };
 
-/* =========================================================
-   COMPONENT
-========================================================= */
+const SITE_HIERARCHY_CONFIG = {
+    GEOGRAPHICAL: [
+        { name: "state", id: "state_id", field: "state_name", children: "districts" },
+        { name: "district", id: "district_id", field: "district_name", children: "talukas" },
+        { name: "taluka", id: "taluka_id", field: "taluka_name", children: "cities" },
+        { name: "city", id: "city_id", field: "city_name", children: "branches" },
+        { name: "branch", id: "branch_id", field: "branch_name", children: "floors" },
+        { name: "floor", id: "floor_id", field: "floor_name", children: "sites" },
+    ],
+
+    ZONAL: [
+        { name: "zone", id: "zone_id", field: "zone_name", children: "circles" },
+        { name: "circle", id: "circle_id", field: "circle_name", children: "regions" },
+        { name: "region", id: "region_id", field: "region_name", children: "divisions" },
+        { name: "division", id: "division_id", field: "division_name", children: "branches" },
+        { name: "branch", id: "branch_id", field: "branch_name", children: "floors" },
+        { name: "floor", id: "floor_id", field: "floor_name", children: "sites" },
+    ],
+};
+
+const getNodeId = (node, level) =>
+    String(
+        node?.[`${level}_id`] ??
+        node?.id?.id ??
+        node?.id ??
+        node?.uuid ??
+        ""
+    );
+
+const getNodeName = (node, field) =>
+    String(
+        node?.[field] ??
+        node?.name ??
+        node?.title ??
+        ""
+    );
+
 
 const Locations = () => {
     const [sites, setSites] = useState([]);
@@ -122,7 +170,7 @@ const Locations = () => {
     const [customers, setCustomers] = useState([]);
     const [selectedCustomer, setSelectedCustomer] = useState("");
     const [customerHierarchy, setCustomerHierarchy] = useState("");
-
+    const [customerLocationTree, setCustomerLocationTree] = useState([]);
     const EMPTY_HIERARCHY_SELECTION = {
         state: "",
         district: "",
@@ -394,218 +442,231 @@ const Locations = () => {
         return Array.from(values);
     }, [sites]);
 
-    const loadHierarchyList = async (key, endpoint) => {
-        try {
-            const response = await fetchJSON(`${API_BASE}/${endpoint}`);
-            setHierarchyOptions((previous) => ({
+    // const loadHierarchyList = async (key, endpoint) => {
+    //     try {
+    //         const response = await fetchJSON(`${API_BASE}/${endpoint}`);
+    //         setHierarchyOptions((previous) => ({
+    //             ...previous,
+    //             [key]: getList(response),
+    //         }));
+    //     } catch (error) {
+    //         setSiteError(
+    //             error?.message || `Unable to load ${key}.`
+    //         );
+    //     }
+    // };
+
+    const handleHierarchyChange = (level, value) => {
+        const config = SITE_HIERARCHY_CONFIG[customerHierarchy] || [];
+        const selectedIndex = config.findIndex(
+            (item) => item.name === level
+        );
+
+        if (selectedIndex === -1) return;
+
+        setHierarchySelection((previous) => {
+            const next = {
                 ...previous,
-                [key]: getList(response),
-            }));
-        } catch (error) {
-            setSiteError(
-                error?.message || `Unable to load ${key}.`
-            );
-        }
-    };
+                [level]: value,
+            };
 
-    const handleHierarchyChange = async (level, value) => {
-        const next = {
-            ...hierarchySelection,
-            [level]: value,
-        };
+            // Clear all descendants when a parent changes.
+            for (let i = selectedIndex + 1; i < config.length; i++) {
+                next[config[i].name] = "";
+            }
 
-        const clearAfter = {
-            state: ["district", "taluka", "city"],
-            district: ["taluka", "city"],
-            taluka: ["city"],
-            zone: ["circle", "region", "division"],
-            circle: ["region", "division"],
-            region: ["division"],
-        };
-
-        (clearAfter[level] || []).forEach((dependent) => {
-            next[dependent] = "";
+            return next;
         });
 
-        setHierarchySelection(next);
         setSelectedBranch("");
-
-        const clearLists = {};
-        (clearAfter[level] || []).forEach((dependent) => {
-            const key = `${dependent}s`;
-            clearLists[key] = [];
-        });
-
-        setHierarchyOptions((previous) => ({
-            ...previous,
-            ...clearLists,
-            branches: [],
-        }));
-
-        const params = new URLSearchParams();
-
-        if (level === "state" && value) {
-            params.set("state", value);
-            await loadHierarchyList(
-                "districts",
-                `districts/?${params.toString()}`
-            );
-        }
-
-        if (level === "district" && value) {
-            params.set("district", value);
-            await loadHierarchyList(
-                "talukas",
-                `talukas/?${params.toString()}`
-            );
-        }
-
-        if (level === "taluka" && value) {
-            params.set("taluka", value);
-            await loadHierarchyList(
-                "cities",
-                `cities/?${params.toString()}`
-            );
-        }
-
-        if (level === "zone" && value) {
-            params.set("zone", value);
-            await loadHierarchyList(
-                "circles",
-                `circles/?${params.toString()}`
-            );
-        }
-
-        if (level === "circle" && value) {
-            params.set("circle", value);
-            await loadHierarchyList(
-                "regions",
-                `regions/?${params.toString()}`
-            );
-        }
-
-        if (level === "region" && value) {
-            params.set("region", value);
-            await loadHierarchyList(
-                "divisions",
-                `divisions/?${params.toString()}`
-            );
-        }
     };
     
     useEffect(() => {
-        if (!selectedCustomer || !customerHierarchy) return;
-
-        if (customerHierarchy === "GEOGRAPHICAL") {
-            loadHierarchyList(
-                "states",
-                `states/?customer=${encodeURIComponent(selectedCustomer)}`
-            );
-        } else if (customerHierarchy === "ZONAL") {
-            loadHierarchyList("zones", "zones/");
-        }
-    }, [selectedCustomer, customerHierarchy]);
-    
-    useEffect(() => {
-        if (!selectedCustomer || !customerHierarchy) return;
-
-        const parentId =
-            customerHierarchy === "GEOGRAPHICAL"
-                ? hierarchySelection.city
-                : hierarchySelection.division;
-
-        if (!parentId) {
-            setHierarchyOptions((previous) => ({
-                ...previous,
-                branches: [],
-            }));
-            setSelectedBranch("");
+        if (!selectedCustomer || !customerHierarchy) {
+            setCustomerLocationTree([]);
+            setHierarchyOptions(EMPTY_HIERARCHY_OPTIONS);
             return;
         }
 
         let cancelled = false;
 
-        const loadBranches = async () => {
+        const loadCustomerLocationTree = async () => {
+            setSiteError("");
+
             try {
-                const response = await fetchJSON(
-                    `${API_BASE}/branches/?customer=${encodeURIComponent(selectedCustomer)}`
+                const token = getToken();
+
+                const headers = {
+                    Accept: "application/json",
+                    ...(token
+                        ? {
+                            Authorization: token.startsWith("Token ")
+                                ? token
+                                : `Token ${token}`,
+                        }
+                        : {}),
+                };
+
+                const params = new URLSearchParams({
+                    hierarchy: customerHierarchy,
+                    customer_id: selectedCustomer,
+                    t: String(Date.now()),
+                });
+
+                const response = await fetch(
+                    `${FILTER_LOCATIONS_URL}?${params.toString()}`,
+                    {
+                        method: "GET",
+                        headers,
+                        cache: "no-store",
+                    }
                 );
 
-                const allBranches = getList(response);
+                const result = await response.json().catch(() => ({}));
 
-                const filtered = allBranches.filter((branch) => {
-                    const relationId =
-                        customerHierarchy === "GEOGRAPHICAL"
-                            ? branch?.city_id ?? branch?.city?.id ?? branch?.city
-                            : branch?.division_id ??
-                            branch?.division?.id ??
-                            branch?.division;
-
-                    return String(relationId ?? "") === String(parentId);
-                });
+                if (!response.ok) {
+                    throw new Error(
+                        result?.message ||
+                        result?.detail ||
+                        `HTTP ${response.status}`
+                    );
+                }
 
                 if (cancelled) return;
 
-                setHierarchyOptions((previous) => ({
-                    ...previous,
-                    branches: filtered,
-                }));
+                const locations = Array.isArray(result?.data)
+                    ? result.data
+                    : [];
+
+                setCustomerLocationTree(locations);
+
+                setHierarchySelection(EMPTY_HIERARCHY_SELECTION);
+                setSelectedBranch("");
+
+                setHierarchyOptions(EMPTY_HIERARCHY_OPTIONS);
+
+                if (!locations.length) {
+                    setSiteError(
+                        "No hierarchy locations were returned for this customer."
+                    );
+                }
             } catch (error) {
                 if (!cancelled) {
+                    console.error("CUSTOMER HIERARCHY API ERROR:", error);
+                    setCustomerLocationTree([]);
                     setSiteError(
-                        error?.message || "Unable to load branches."
+                        error?.message || "Unable to load customer hierarchy."
                     );
                 }
             }
         };
 
-        loadBranches();
+        loadCustomerLocationTree();
 
         return () => {
             cancelled = true;
         };
-    }, [
-        selectedCustomer,
-        customerHierarchy,
-        hierarchySelection.city,
-        hierarchySelection.division,
-    ]);
-
+    }, [selectedCustomer, customerHierarchy]);
     
-const handleFloorCountChange = (value) => {
-    const count = Math.min(10, Math.max(1, Number(value) || 1));
+    // useEffect(() => {
+    //     if (!selectedCustomer || !customerHierarchy) return;
 
-    setFloorCount(count);
-    setFloorNames((previous) =>
-        Array.from(
-            { length: count },
-            (_, index) => previous[index] || `Floor ${index + 1}`
-        )
-    );
-};
+    //     const parentId =
+    //         customerHierarchy === "GEOGRAPHICAL"
+    //             ? hierarchySelection.city
+    //             : hierarchySelection.division;
 
-const resetSiteCreationForm = () => {
-    setHierarchySelection(EMPTY_HIERARCHY_SELECTION);
-    setSelectedBranch("");
-    setBranchMode("existing");
-    setNewBranchName("");
-    setNewBranchCode("");
+    //     if (!parentId) {
+    //         setHierarchyOptions((previous) => ({
+    //             ...previous,
+    //             branches: [],
+    //         }));
+    //         setSelectedBranch("");
+    //         return;
+    //     }
 
-    setSiteForm({
-        name: "",
-        code: "",
-        address: "",
-        pincode: "",
-        latitude: "",
-        longitude: "",
-    });
+    //     let cancelled = false;
 
-    setCreateFloors(false);
-    setFloorCount(1);
-    setFloorNames(["Floor 1"]);
-    setSiteError("");
-    setSiteSuccess("");
-};
+    //     const loadBranches = async () => {
+    //         try {
+    //             const response = await fetchJSON(
+    //                 `${API_BASE}/branches/?customer=${encodeURIComponent(selectedCustomer)}`
+    //             );
+
+    //             const allBranches = getList(response);
+
+    //             const filtered = allBranches.filter((branch) => {
+    //                 const relationId =
+    //                     customerHierarchy === "GEOGRAPHICAL"
+    //                         ? branch?.city_id ?? branch?.city?.id ?? branch?.city
+    //                         : branch?.division_id ??
+    //                         branch?.division?.id ??
+    //                         branch?.division;
+
+    //                 return String(relationId ?? "") === String(parentId);
+    //             });
+
+    //             if (cancelled) return;
+
+    //             setHierarchyOptions((previous) => ({
+    //                 ...previous,
+    //                 branches: filtered,
+    //             }));
+    //         } catch (error) {
+    //             if (!cancelled) {
+    //                 setSiteError(
+    //                     error?.message || "Unable to load branches."
+    //                 );
+    //             }
+    //         }
+    //     };
+
+    //     loadBranches();
+
+    //     return () => {
+    //         cancelled = true;
+    //     };
+    // }, [
+    //     selectedCustomer,
+    //     customerHierarchy,
+    //     hierarchySelection.city,
+    //     hierarchySelection.division,
+    // ]);
+
+    const handleFloorCountChange = (value) => {
+        const count = Math.min(10, Math.max(1, Number(value) || 1));
+
+        setFloorCount(count);
+        setFloorNames((previous) =>
+            Array.from(
+                { length: count },
+                (_, index) => previous[index] || `Floor ${index + 1}`
+            )
+        );
+    };
+
+    const resetSiteCreationForm = () => {
+        setHierarchySelection(EMPTY_HIERARCHY_SELECTION);
+        setSelectedBranch("");
+        setBranchMode("existing");
+        setNewBranchName("");
+        setNewBranchCode("");
+
+        setSiteForm({
+            name: "",
+            code: "",
+            address: "",
+            pincode: "",
+            latitude: "",
+            longitude: "",
+        });
+
+        setCreateFloors(false);
+        setFloorCount(1);
+        setFloorNames(["Floor 1"]);
+        setSiteError("");
+        setSiteSuccess("");
+    };
 
     const handleCreateSite = async (event) => {
         event.preventDefault();
@@ -749,8 +810,8 @@ const resetSiteCreationForm = () => {
         });
     }, [sites, search, hierarchyFilter]);
 
-    // SUMMARY
 
+    // SUMMARY
     const totalACs = useMemo(
         () =>
             sites.reduce(
@@ -777,61 +838,73 @@ const resetSiteCreationForm = () => {
         [sites]
     );
 
-    // CREATE SITE (modal submit)
-
-    // const handleCreateSite = async (event) => {
-    //     event.preventDefault();
-
-    //     const form = new FormData(event.currentTarget);
-
-    //     const payload = {
-    //         hierarchy_type: form.get("hierarchy_type"),
-    //         branch_id: form.get("branch_id"),
-    //         name: form.get("name"),
-    //         code: form.get("code"),
-    //         address: form.get("address"),
-    //         pincode: form.get("pincode"),
-    //         city: form.get("city"),
-    //         district: form.get("district"),
-    //         state: form.get("state"),
-    //         latitude: form.get("latitude") ? Number(form.get("latitude")) : null,
-    //         longitude: form.get("longitude") ? Number(form.get("longitude")) : null,
-    //     };
-
-    //     try {
-    //         console.log("CREATE SITE PAYLOAD:", payload);
-
-    //         await fetchJSON(`${API_BASE}/sites/create/`, {
-    //             method: "POST",
-    //             body: JSON.stringify(payload),
-    //         });
-
-    //         setShowAddSite(false);
-    //         await loadSites(true);
-    //     } catch (err) {
-    //         console.error("CREATE SITE ERROR:", err);
-    //         alert(err?.message || "Unable to create site.");
-    //     }
-    // };
-
-
     if (loading) {
         return (
             <div className="locations-page">
                 <div className="locations-loading">
                     <div className="locations-spinner" />
-                    <span>Loading Sites from 3TP...</span>
+                    <span>Loading Sites...</span>
                 </div>
             </div>
         );
     }
 
+    const getHierarchyOptions = (targetLevel) => {
+        const config = SITE_HIERARCHY_CONFIG[customerHierarchy];
+
+        if (!config || !customerLocationTree.length) {
+            return [];
+        }
+
+        const firstChildrenKey =
+            customerHierarchy === "GEOGRAPHICAL" ? "states" : "zones";
+
+        let nodes = customerLocationTree;
+
+        // Support both a country-wrapped response and a response
+        // that starts directly with states or zones.
+        const countryNode = nodes.find(
+            (node) =>
+                String(node?.country_name ?? "")
+                    .trim()
+                    .toLowerCase() === "india"
+        );
+
+        if (countryNode?.[firstChildrenKey]) {
+            nodes = countryNode[firstChildrenKey];
+        } else if (nodes.some((node) => Array.isArray(node?.[firstChildrenKey]))) {
+            nodes =
+                nodes.find((node) => Array.isArray(node?.[firstChildrenKey]))
+                    ?.[firstChildrenKey] || [];
+        }
+
+        for (const level of config) {
+            if (level.name === targetLevel) {
+                return Array.isArray(nodes) ? nodes : [];
+            }
+
+            const selectedId = hierarchySelection[level.name];
+
+            if (!selectedId) {
+                return [];
+            }
+
+            const selectedNode = nodes.find(
+                (node) => getNodeId(node, level.name) === String(selectedId)
+            );
+
+            if (!selectedNode) {
+                return [];
+            }
+
+            nodes = selectedNode[level.children] || [];
+        }
+
+        return [];
+    };
 
     return (
         <div className="locations-page">
-            {/* =================================================
-                HEADER
-            ================================================= */}
             <div className="locations-header">
                 <div className="locations-title">
                     <h1>Sites</h1>
@@ -1157,8 +1230,12 @@ const resetSiteCreationForm = () => {
                                         <select
                                             value={selectedCustomer}
                                             onChange={(event) => {
-                                                setSelectedCustomer(event.target.value);
+                                                const customerId = event.target.value;
+
                                                 resetSiteCreationForm();
+                                                setCustomerLocationTree([]);
+                                                setCustomerHierarchy("");
+                                                setSelectedCustomer(customerId);
                                             }}
                                             required
                                         >
@@ -1201,6 +1278,7 @@ const resetSiteCreationForm = () => {
                                     <>
                                         <div className="form-group">
                                             <label>State *</label>
+
                                             <select
                                                 value={hierarchySelection.state}
                                                 onChange={(e) =>
@@ -1209,9 +1287,13 @@ const resetSiteCreationForm = () => {
                                                 required
                                             >
                                                 <option value="">Select state</option>
-                                                {hierarchyOptions.states.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+
+                                                {getHierarchyOptions("state").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "state")}
+                                                        value={getNodeId(item, "state")}
+                                                    >
+                                                        {getNodeName(item, "state_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1219,18 +1301,22 @@ const resetSiteCreationForm = () => {
 
                                         <div className="form-group">
                                             <label>District *</label>
+
                                             <select
                                                 value={hierarchySelection.district}
                                                 onChange={(e) =>
                                                     handleHierarchyChange("district", e.target.value)
                                                 }
-                                                disabled={!hierarchySelection.state}
                                                 required
                                             >
-                                                <option value="">Select district</option>
-                                                {hierarchyOptions.districts.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select District</option>
+
+                                                {getHierarchyOptions("district").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "district")}
+                                                        value={getNodeId(item, "district")}
+                                                    >
+                                                        {getNodeName(item, "district_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1243,13 +1329,16 @@ const resetSiteCreationForm = () => {
                                                 onChange={(e) =>
                                                     handleHierarchyChange("taluka", e.target.value)
                                                 }
-                                                disabled={!hierarchySelection.district}
                                                 required
                                             >
-                                                <option value="">Select taluka</option>
-                                                {hierarchyOptions.talukas.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select Taluka</option>
+
+                                                {getHierarchyOptions("taluka").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "taluka")}
+                                                        value={getNodeId(item, "taluka")}
+                                                    >
+                                                        {getNodeName(item, "taluka_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1262,13 +1351,16 @@ const resetSiteCreationForm = () => {
                                                 onChange={(e) =>
                                                     handleHierarchyChange("city", e.target.value)
                                                 }
-                                                disabled={!hierarchySelection.taluka}
                                                 required
                                             >
-                                                <option value="">Select city</option>
-                                                {hierarchyOptions.cities.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select City</option>
+
+                                                {getHierarchyOptions("city").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "city")}
+                                                        value={getNodeId(item, "city")}
+                                                    >
+                                                        {getNodeName(item, "city_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1288,10 +1380,14 @@ const resetSiteCreationForm = () => {
                                                 }
                                                 required
                                             >
-                                                <option value="">Select zone</option>
-                                                {hierarchyOptions.zones.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select Zone</option>
+
+                                                {getHierarchyOptions("zone").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "zone")}
+                                                        value={getNodeId(item, "zone")}
+                                                    >
+                                                        {getNodeName(item, "zone_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1304,13 +1400,16 @@ const resetSiteCreationForm = () => {
                                                 onChange={(e) =>
                                                     handleHierarchyChange("circle", e.target.value)
                                                 }
-                                                disabled={!hierarchySelection.zone}
                                                 required
                                             >
-                                                <option value="">Select circle</option>
-                                                {hierarchyOptions.circles.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select Circle</option>
+
+                                                {getHierarchyOptions("circle").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "circle")}
+                                                        value={getNodeId(item, "circle")}
+                                                    >
+                                                        {getNodeName(item, "circle_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1323,13 +1422,16 @@ const resetSiteCreationForm = () => {
                                                 onChange={(e) =>
                                                     handleHierarchyChange("region", e.target.value)
                                                 }
-                                                disabled={!hierarchySelection.circle}
                                                 required
                                             >
-                                                <option value="">Select region</option>
-                                                {hierarchyOptions.regions.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select Region</option>
+
+                                                {getHierarchyOptions("region").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "region")}
+                                                        value={getNodeId(item, "region")}
+                                                    >
+                                                        {getNodeName(item, "region_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1342,13 +1444,16 @@ const resetSiteCreationForm = () => {
                                                 onChange={(e) =>
                                                     handleHierarchyChange("division", e.target.value)
                                                 }
-                                                disabled={!hierarchySelection.region}
                                                 required
                                             >
-                                                <option value="">Select division</option>
-                                                {hierarchyOptions.divisions.map((item) => (
-                                                    <option key={getItemId(item)} value={getItemId(item)}>
-                                                        {getItemLabel(item)}
+                                                <option value="">Select Division</option>
+
+                                                {getHierarchyOptions("division").map((item) => (
+                                                    <option
+                                                        key={getNodeId(item, "division")}
+                                                        value={getNodeId(item, "division")}
+                                                    >
+                                                        {getNodeName(item, "division_name")}
                                                     </option>
                                                 ))}
                                             </select>
@@ -1378,6 +1483,7 @@ const resetSiteCreationForm = () => {
                                 {branchMode === "existing" && customerHierarchy && (
                                     <div className="form-group full-width">
                                         <label>Branch *</label>
+
                                         <select
                                             value={selectedBranch}
                                             onChange={(e) => setSelectedBranch(e.target.value)}
@@ -1389,12 +1495,13 @@ const resetSiteCreationForm = () => {
                                             required
                                         >
                                             <option value="">Select branch</option>
-                                            {hierarchyOptions.branches.map((branch) => (
+
+                                            {getHierarchyOptions("branch").map((branch) => (
                                                 <option
-                                                    key={getItemId(branch)}
-                                                    value={getItemId(branch)}
+                                                    key={getNodeId(branch, "branch")}
+                                                    value={getNodeId(branch, "branch")}
                                                 >
-                                                    {getItemLabel(branch)}
+                                                    {getNodeName(branch, "branch_name")}
                                                 </option>
                                             ))}
                                         </select>

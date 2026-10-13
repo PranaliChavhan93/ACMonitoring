@@ -10,6 +10,7 @@ from .views import (
     BranchListView,
     CircleListView,
     CityListView,
+    CountryListAPIView,
     CustomerDetailView,
     CustomerListView,
     DivisionListView,
@@ -92,6 +93,7 @@ urlpatterns = [
     path( "org/device/", device),
     path( "org/dashboard/trends/", treands),
 
+    path( "countries/", CountryListAPIView.as_view()),
     path( "zones/", ZoneListView.as_view()),
     path( "circles/", CircleListView.as_view()),
 
@@ -142,4 +144,5 @@ urlpatterns = [
     path( "cloud/users/", CloudUserListView.as_view()),
     path( "cloud/sites/", three_tp_sites ),
     path( "ai-dashboard-analysis/", ai_dashboard_analysis ),
+    path( "ai/analyze/", ai_dashboard_analysis),
 ]

@@ -364,6 +364,17 @@ import "./login.css";
 
 const API_BASE_URL = "http://localhost:8000/api";
 
+const LOGIN_CONTENT = {
+  superadmin: {
+    title: "Sign in as Super Admin",
+    subtitle: "Sign in to manage customers and hierarchies",
+  },
+  user: {
+    title: "Sign in",
+    subtitle: "Sign your role and continue to your dashboard",
+  },
+};
+
 export const storeTokens = ({
   token,
   tp_token,
@@ -442,6 +453,7 @@ function Login({ mode = "user" }) {
   const location = useLocation();
   const { login, isAuthenticated, user } = useAuth();
 
+  const content = LOGIN_CONTENT[mode] ?? LOGIN_CONTENT.user;
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -577,8 +589,8 @@ function Login({ mode = "user" }) {
       <div className="login-card">
         <main className="login-form-wrap">
           <header className="login-head">
-            <h2>Sign in</h2>
-            <p>Select your role and continue to your dashboard</p>
+            <h2>{content.title}</h2>
+            <p>{content.subtitle}</p>
           </header>
 
           {error && (

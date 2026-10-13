@@ -5,6 +5,7 @@ from django.contrib.auth import authenticate
 from django.db import transaction
 from .models import (
     ACData,
+    Country,
     DashboardPreference,
     User,
     Organization,
@@ -543,6 +544,12 @@ class CustomerSerializer(serializers.ModelSerializer):
         return customer
 
 
+class CountrySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Country
+        fields = ["id", "name", "code", "is_active"]
+        read_only_fields = ["id"]
+
 class ZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model = Zone
@@ -729,7 +736,6 @@ class BranchSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     "city": "Selected city does not belong to this customer."
                 })
-
         # ZONAL
         elif hierarchy == "ZONAL":
 
@@ -755,7 +761,7 @@ class BranchSerializer(serializers.ModelSerializer):
                         "Selected division does not belong to this customer."
                     )
                 })
-
+            
         else:
             raise serializers.ValidationError({
                 "customer": "Customer hierarchy is not configured."

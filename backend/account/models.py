@@ -134,7 +134,30 @@ class Customer(models.Model):
                 )
 
 
+class Country(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(max_length=3, unique=True)
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "Countries"
+
+    def __str__(self):
+        return self.name
+
+
 class Zone(models.Model):
+    country = models.ForeignKey(
+        "account.Country",
+        on_delete=models.PROTECT,
+        related_name="zones",
+        null=True,
+        blank=True,
+    )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="zones")
     name = models.CharField(max_length=255)
@@ -203,6 +226,13 @@ class Division(models.Model):
 
 
 class State(models.Model):
+    country = models.ForeignKey(
+        "account.Country",
+        on_delete=models.PROTECT,
+        related_name="states",
+        null=True,
+        blank=True,
+    )
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="states")
     name = models.CharField(max_length=255)
@@ -358,7 +388,7 @@ class Site(models.Model):
         blank=True,
     )
     floor = models.ForeignKey(Floor, on_delete=models.CASCADE, related_name="sites", null=True, blank=True)
-
+    pincode = models.CharField(max_length=6, blank=True, default="")
     name = models.CharField(max_length=255)
     code = models.CharField(max_length=50, unique=True)
     address = models.TextField(blank=True)
@@ -607,6 +637,16 @@ class CustomerSiteMapping(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    tpt_sync_status = models.CharField(
+        max_length=20,
+        default="PENDING",
+        db_index=True,
+    )
+    tpt_sync_error = models.TextField(
+        blank=True,
+        default="",
+    )
+
 
     class Meta:
         db_table = "customer_site_mappings"

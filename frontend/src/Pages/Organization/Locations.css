@@ -1134,8 +1134,8 @@
 }
 
 .hierarchy-site-modal {
-    width: min(940px, 96vw);
-    max-width: 940px;
+    width: min(700px, 96vw);
+    max-width: 700px;
     max-height: 92vh;
     overflow-x: hidden;
     overflow-y: auto;

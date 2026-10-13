@@ -1,660 +1,357 @@
 [
     {
-        "zone_id": "ZN-N",
-        "zone_name": "Northern",
-        "circles": [
+        "country_id": "IND",
+        "country_name": "India",
+        "zones": [
             {
-                "circle_id": "HR-C01",
-                "circle_name": "Gurugram Circle",
-                "regions": [
+                "zone_id": "ZN-N",
+                "zone_name": "Northern",
+                "circles": [
                     {
-                        "region_id": "HR-C01-R01",
-                        "region_name": "Gurugram Region",
-                        "divisions": [
+                        "circle_id": "HR-C01",
+                        "circle_name": "Gurugram Circle",
+                        "regions": [
                             {
-                                "division_id": "HR-C01-R01-D01",
-                                "division_name": "Gurugram Division",
-                                "branches": [
+                                "region_id": "HR-C01-R01",
+                                "region_name": "Gurugram Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "HR-ZB01",
-                                        "branch_name": "Gurugram Branch 01",
-                                        "floors": [
+                                        "division_id": "HR-C01-R01-D01",
+                                        "division_name": "Gurugram Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "HR-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "HR-ZB01",
+                                                "branch_name": "Gurugram Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-HR-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-HR-B01-01"
+                                                        "floor_id": "HR-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-HR-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-HR-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "HP-C01",
-                "circle_name": "Shimla Circle",
-                "regions": [
-                    {
-                        "region_id": "HP-C01-R01",
-                        "region_name": "Shimla Region",
-                        "divisions": [
-                            {
-                                "division_id": "HP-C01-R01-D01",
-                                "division_name": "Shimla Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "HP-ZB01",
-                                        "branch_name": "Shimla Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "HP-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-HP-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-HP-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "PB-C01",
-                "circle_name": "Ludhiana Circle",
-                "regions": [
-                    {
-                        "region_id": "PB-C01-R01",
-                        "region_name": "Ludhiana Region",
-                        "divisions": [
-                            {
-                                "division_id": "PB-C01-R01-D01",
-                                "division_name": "Ludhiana Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "PB-ZB01",
-                                        "branch_name": "Ludhiana Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "PB-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-PB-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-PB-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "RJ-C01",
-                "circle_name": "Jaipur Circle",
-                "regions": [
-                    {
-                        "region_id": "RJ-C01-R01",
-                        "region_name": "Jaipur Region",
-                        "divisions": [
-                            {
-                                "division_id": "RJ-C01-R01-D01",
-                                "division_name": "Jaipur Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "RJ-ZB01",
-                                        "branch_name": "Jaipur Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "RJ-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-RJ-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-RJ-B01-01"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "RJ-ZB01-F02",
-                                                "floor_name": "Floor-02",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-RJ-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-RJ-B01-02"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "UK-C01",
-                "circle_name": "Dehradun Circle",
-                "regions": [
-                    {
-                        "region_id": "UK-C01-R01",
-                        "region_name": "Dehradun Region",
-                        "divisions": [
-                            {
-                                "division_id": "UK-C01-R01-D01",
-                                "division_name": "Dehradun Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "UK-ZB01",
-                                        "branch_name": "Dehradun Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "UK-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-UK-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-UK-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "CH-C01",
-                "circle_name": "Chandigarh Circle",
-                "regions": [
-                    {
-                        "region_id": "CH-C01-R01",
-                        "region_name": "Chandigarh Region",
-                        "divisions": [
-                            {
-                                "division_id": "CH-C01-R01-D01",
-                                "division_name": "Chandigarh Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "CH-ZB01",
-                                        "branch_name": "Chandigarh Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "CH-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-CH-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-CH-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "DL-C01",
-                "circle_name": "New Delhi Circle",
-                "regions": [
-                    {
-                        "region_id": "DL-C01-R01",
-                        "region_name": "New Delhi Region",
-                        "divisions": [
-                            {
-                                "division_id": "DL-C01-R01-D01",
-                                "division_name": "New Delhi Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "DL-ZB01",
-                                        "branch_name": "New Delhi Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "DL-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-DL-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-DL-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": [
-                                            {
-                                                "site_id": "AC-DL-B01-02",
-                                                "device_name": "AC-02",
-                                                "status": "ON",
-                                                "ac_id": "AC-DL-B01-02"
+                                                ],
+                                                "sites": []
                                             }
                                         ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "JK-C01",
-                "circle_name": "Srinagar Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "JK-C01-R01",
-                        "region_name": "Srinagar Region",
-                        "divisions": [
+                        "circle_id": "HP-C01",
+                        "circle_name": "Shimla Circle",
+                        "regions": [
                             {
-                                "division_id": "JK-C01-R01-D01",
-                                "division_name": "Srinagar Division",
-                                "branches": [
+                                "region_id": "HP-C01-R01",
+                                "region_name": "Shimla Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "JK-ZB01",
-                                        "branch_name": "Srinagar Branch 01",
-                                        "floors": [
+                                        "division_id": "HP-C01-R01-D01",
+                                        "division_name": "Shimla Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "JK-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "HP-ZB01",
+                                                "branch_name": "Shimla Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-JK-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-JK-B01-01"
+                                                        "floor_id": "HP-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-HP-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-HP-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "LA-C01",
-                "circle_name": "Leh Circle",
-                "regions": [
-                    {
-                        "region_id": "LA-C01-R01",
-                        "region_name": "Leh Region",
-                        "divisions": [
-                            {
-                                "division_id": "LA-C01-R01-D01",
-                                "division_name": "Leh Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "LA-ZB01",
-                                        "branch_name": "Leh Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "LA-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-LA-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-LA-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "zone_id": "ZN-C",
-        "zone_name": "Central",
-        "circles": [
-            {
-                "circle_id": "CG-C01",
-                "circle_name": "Raipur Circle",
-                "regions": [
-                    {
-                        "region_id": "CG-C01-R01",
-                        "region_name": "Raipur Region",
-                        "divisions": [
-                            {
-                                "division_id": "CG-C01-R01-D01",
-                                "division_name": "Raipur Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "CG-ZB01",
-                                        "branch_name": "Raipur Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "CG-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-CG-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-CG-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "MP-C01",
-                "circle_name": "Bhopal Circle",
-                "regions": [
-                    {
-                        "region_id": "MP-C01-R01",
-                        "region_name": "Bhopal Region",
-                        "divisions": [
-                            {
-                                "division_id": "MP-C01-R01-D01",
-                                "division_name": "Bhopal Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "MP-ZB01",
-                                        "branch_name": "Bhopal Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "MP-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-MP-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-MP-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "UP-C01",
-                "circle_name": "Lucknow Circle",
-                "regions": [
-                    {
-                        "region_id": "UP-C01-R01",
-                        "region_name": "Lucknow Region",
-                        "divisions": [
-                            {
-                                "division_id": "UP-C01-R01-D01",
-                                "division_name": "Lucknow Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "UP-ZB01",
-                                        "branch_name": "Lucknow Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "UP-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-UP-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-UP-B01-01"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "UP-ZB01-F02",
-                                                "floor_name": "Floor-02",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-UP-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-UP-B01-02"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "UP-ZB01-F03",
-                                                "floor_name": "Floor-03",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-UP-B01-03",
-                                                        "device_name": "AC-03",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-UP-B01-03"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "zone_id": "ZN-W",
-        "zone_name": "Western",
-        "circles": [
-            {
-                "circle_id": "GA-C01",
-                "circle_name": "Panaji Circle",
-                "regions": [
-                    {
-                        "region_id": "GA-C01-R01",
-                        "region_name": "Panaji Region",
-                        "divisions": [
-                            {
-                                "division_id": "GA-C01-R01-D01",
-                                "division_name": "Panaji Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "GA-ZB01",
-                                        "branch_name": "Panaji Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "GA-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-GA-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-GA-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "GJ-C01",
-                "circle_name": "Ahmedabad Circle",
-                "regions": [
-                    {
-                        "region_id": "GJ-C01-R01",
-                        "region_name": "Ahmedabad Region",
-                        "divisions": [
-                            {
-                                "division_id": "GJ-C01-R01-D01",
-                                "division_name": "Ahmedabad Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "GJ-ZB01",
-                                        "branch_name": "Ahmedabad Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "GJ-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-GJ-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-GJ-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": [
-                                            {
-                                                "site_id": "AC-GJ-B01-02",
-                                                "device_name": "AC-02",
-                                                "status": "ON",
-                                                "ac_id": "AC-GJ-B01-02"
+                                                ],
+                                                "sites": []
                                             }
                                         ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "MH-C01",
-                "circle_name": "Pune Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "MH-C01-R01",
-                        "region_name": "Pune Region",
-                        "divisions": [
+                        "circle_id": "PB-C01",
+                        "circle_name": "Ludhiana Circle",
+                        "regions": [
                             {
-                                "division_id": "MH-C01-R01-D01",
-                                "division_name": "Pune Division",
-                                "branches": [
+                                "region_id": "PB-C01-R01",
+                                "region_name": "Ludhiana Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "MH-ZB01",
-                                        "branch_name": "Pune Branch 01",
-                                        "floors": [
+                                        "division_id": "PB-C01-R01-D01",
+                                        "division_name": "Ludhiana Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "MH-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "PB-ZB01",
+                                                "branch_name": "Ludhiana Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-MH-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-MH-B01-01"
+                                                        "floor_id": "PB-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-PB-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-PB-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            },
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "RJ-C01",
+                        "circle_name": "Jaipur Circle",
+                        "regions": [
+                            {
+                                "region_id": "RJ-C01-R01",
+                                "region_name": "Jaipur Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "RJ-C01-R01-D01",
+                                        "division_name": "Jaipur Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "MH-ZB01-F02",
-                                                "floor_name": "Floor-02",
-                                                "sites": [
+                                                "branch_id": "RJ-ZB01",
+                                                "branch_name": "Jaipur Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-MH-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-MH-B01-02"
+                                                        "floor_id": "RJ-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-RJ-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-RJ-B01-01"
+                                                            }
+                                                        ]
                                                     },
                                                     {
-                                                        "site_id": "AC-MH-PU-05",
-                                                        "device_name": "Pune Office AC 05",
-                                                        "status": "ON"
+                                                        "floor_id": "RJ-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-RJ-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-RJ-B01-02"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            },
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "UK-C01",
+                        "circle_name": "Dehradun Circle",
+                        "regions": [
+                            {
+                                "region_id": "UK-C01-R01",
+                                "region_name": "Dehradun Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "UK-C01-R01-D01",
+                                        "division_name": "Dehradun Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "MH-ZB01-F03",
-                                                "floor_name": "Floor-03",
+                                                "branch_id": "UK-ZB01",
+                                                "branch_name": "Dehradun Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "UK-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-UK-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-UK-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "CH-C01",
+                        "circle_name": "Chandigarh Circle",
+                        "regions": [
+                            {
+                                "region_id": "CH-C01-R01",
+                                "region_name": "Chandigarh Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "CH-C01-R01-D01",
+                                        "division_name": "Chandigarh Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "CH-ZB01",
+                                                "branch_name": "Chandigarh Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "CH-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-CH-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-CH-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "DL-C01",
+                        "circle_name": "New Delhi Circle",
+                        "regions": [
+                            {
+                                "region_id": "DL-C01-R01",
+                                "region_name": "New Delhi Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "DL-C01-R01-D01",
+                                        "division_name": "New Delhi Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "DL-ZB01",
+                                                "branch_name": "New Delhi Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "DL-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-DL-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-DL-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
                                                 "sites": [
                                                     {
-                                                        "site_id": "AC-MH-B01-03",
-                                                        "device_name": "AC-03",
+                                                        "site_id": "AC-DL-B01-02",
+                                                        "device_name": "AC-02",
                                                         "status": "ON",
-                                                        "ac_id": "AC-MH-B01-03"
+                                                        "ac_id": "AC-DL-B01-02"
                                                     }
                                                 ]
                                             }
-                                        ],
-                                        "sites": [
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "JK-C01",
+                        "circle_name": "Srinagar Circle",
+                        "regions": [
+                            {
+                                "region_id": "JK-C01-R01",
+                                "region_name": "Srinagar Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "JK-C01-R01-D01",
+                                        "division_name": "Srinagar Division",
+                                        "branches": [
                                             {
-                                                "site_id": "AC-MH-B01-04",
-                                                "device_name": "AC-04",
-                                                "status": "OFF",
-                                                "ac_id": "AC-MH-B01-04"
-                                            },
+                                                "branch_id": "JK-ZB01",
+                                                "branch_name": "Srinagar Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "JK-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-JK-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-JK-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "LA-C01",
+                        "circle_name": "Leh Circle",
+                        "regions": [
+                            {
+                                "region_id": "LA-C01-R01",
+                                "region_name": "Leh Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "LA-C01-R01-D01",
+                                        "division_name": "Leh Division",
+                                        "branches": [
                                             {
-                                                "site_id": "AC-MH-B1-10",
-                                                "device_name": "Pune Deccan Office AC 10",
-                                                "status": "ON",
-                                                "capacity_ton": 2.0,
-                                                "installation_date": "2025-10-20",
-                                                "last_maintenance_date": "2026-12-12"
+                                                "branch_id": "LA-ZB01",
+                                                "branch_name": "Leh Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "LA-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-LA-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-LA-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
                                             }
                                         ]
                                     }
@@ -665,152 +362,139 @@
                 ]
             },
             {
-                "circle_id": "DN-C01",
-                "circle_name": "Daman Circle",
-                "regions": [
+                "zone_id": "ZN-C",
+                "zone_name": "Central",
+                "circles": [
                     {
-                        "region_id": "DN-C01-R01",
-                        "region_name": "Daman Region",
-                        "divisions": [
+                        "circle_id": "CG-C01",
+                        "circle_name": "Raipur Circle",
+                        "regions": [
                             {
-                                "division_id": "DN-C01-R01-D01",
-                                "division_name": "Daman Division",
-                                "branches": [
+                                "region_id": "CG-C01-R01",
+                                "region_name": "Raipur Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "DN-ZB01",
-                                        "branch_name": "Daman Branch 01",
-                                        "floors": [
+                                        "division_id": "CG-C01-R01-D01",
+                                        "division_name": "Raipur Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "DN-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "CG-ZB01",
+                                                "branch_name": "Raipur Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-DN-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-DN-B01-01"
+                                                        "floor_id": "CG-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-CG-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-CG-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "zone_id": "ZN-E",
-        "zone_name": "Eastern",
-        "circles": [
-            {
-                "circle_id": "BR-C01",
-                "circle_name": "Patna Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "BR-C01-R01",
-                        "region_name": "Patna Region",
-                        "divisions": [
+                        "circle_id": "MP-C01",
+                        "circle_name": "Bhopal Circle",
+                        "regions": [
                             {
-                                "division_id": "BR-C01-R01-D01",
-                                "division_name": "Patna Division",
-                                "branches": [
+                                "region_id": "MP-C01-R01",
+                                "region_name": "Bhopal Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "BR-ZB01",
-                                        "branch_name": "Patna Branch 01",
-                                        "floors": [
+                                        "division_id": "MP-C01-R01-D01",
+                                        "division_name": "Bhopal Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "BR-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "MP-ZB01",
+                                                "branch_name": "Bhopal Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-BR-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-BR-B01-01"
+                                                        "floor_id": "MP-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-MP-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-MP-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "JH-C01",
-                "circle_name": "Ranchi Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "JH-C01-R01",
-                        "region_name": "Ranchi Region",
-                        "divisions": [
+                        "circle_id": "UP-C01",
+                        "circle_name": "Lucknow Circle",
+                        "regions": [
                             {
-                                "division_id": "JH-C01-R01-D01",
-                                "division_name": "Ranchi Division",
-                                "branches": [
+                                "region_id": "UP-C01-R01",
+                                "region_name": "Lucknow Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "JH-ZB01",
-                                        "branch_name": "Ranchi Branch 01",
-                                        "floors": [
+                                        "division_id": "UP-C01-R01-D01",
+                                        "division_name": "Lucknow Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "JH-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "UP-ZB01",
+                                                "branch_name": "Lucknow Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-JH-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-JH-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "OD-C01",
-                "circle_name": "Bhubaneswar Circle",
-                "regions": [
-                    {
-                        "region_id": "OD-C01-R01",
-                        "region_name": "Bhubaneswar Region",
-                        "divisions": [
-                            {
-                                "division_id": "OD-C01-R01-D01",
-                                "division_name": "Bhubaneswar Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "OD-ZB01",
-                                        "branch_name": "Bhubaneswar Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "OD-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                        "floor_id": "UP-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-UP-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-UP-B01-01"
+                                                            }
+                                                        ]
+                                                    },
                                                     {
-                                                        "site_id": "AC-OD-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-OD-B01-01"
+                                                        "floor_id": "UP-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-UP-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-UP-B01-02"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "UP-ZB01-F03",
+                                                        "floor_name": "Floor-03",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-UP-B01-03",
+                                                                "device_name": "AC-03",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-UP-B01-03"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
@@ -819,201 +503,203 @@
                 ]
             },
             {
-                "circle_id": "WB-C01",
-                "circle_name": "Kolkata Circle",
-                "regions": [
+                "zone_id": "ZN-W",
+                "zone_name": "Western",
+                "circles": [
                     {
-                        "region_id": "WB-C01-R01",
-                        "region_name": "Kolkata Region",
-                        "divisions": [
+                        "circle_id": "GA-C01",
+                        "circle_name": "Panaji Circle",
+                        "regions": [
                             {
-                                "division_id": "WB-C01-R01-D01",
-                                "division_name": "Kolkata Division",
-                                "branches": [
+                                "region_id": "GA-C01-R01",
+                                "region_name": "Panaji Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "WB-ZB01",
-                                        "branch_name": "Kolkata Branch 01",
-                                        "floors": [
+                                        "division_id": "GA-C01-R01-D01",
+                                        "division_name": "Panaji Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "WB-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "GA-ZB01",
+                                                "branch_name": "Panaji Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-WB-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-WB-B01-01"
+                                                        "floor_id": "GA-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-GA-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-GA-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            },
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "GJ-C01",
+                        "circle_name": "Ahmedabad Circle",
+                        "regions": [
+                            {
+                                "region_id": "GJ-C01-R01",
+                                "region_name": "Ahmedabad Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "GJ-C01-R01-D01",
+                                        "division_name": "Ahmedabad Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "WB-ZB01-F02",
-                                                "floor_name": "Floor-02",
+                                                "branch_id": "GJ-ZB01",
+                                                "branch_name": "Ahmedabad Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "GJ-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-GJ-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-GJ-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
                                                 "sites": [
                                                     {
-                                                        "site_id": "AC-WB-B01-02",
+                                                        "site_id": "AC-GJ-B01-02",
                                                         "device_name": "AC-02",
                                                         "status": "ON",
-                                                        "ac_id": "AC-WB-B01-02"
+                                                        "ac_id": "AC-GJ-B01-02"
                                                     }
                                                 ]
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "zone_id": "ZN-NE",
-        "zone_name": "North Eastern",
-        "circles": [
-            {
-                "circle_id": "AR-C01",
-                "circle_name": "Itanagar Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "AR-C01-R01",
-                        "region_name": "Itanagar Region",
-                        "divisions": [
+                        "circle_id": "MH-C01",
+                        "circle_name": "Pune Circle",
+                        "regions": [
                             {
-                                "division_id": "AR-C01-R01-D01",
-                                "division_name": "Itanagar Division",
-                                "branches": [
+                                "region_id": "MH-C01-R01",
+                                "region_name": "Pune Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "AR-ZB01",
-                                        "branch_name": "Itanagar Branch 01",
-                                        "floors": [
+                                        "division_id": "MH-C01-R01-D01",
+                                        "division_name": "Pune Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "AR-ZB01-F01",
-                                                "floor_name": "Floor-01",
+                                                "branch_id": "MH-ZB01",
+                                                "branch_name": "Pune Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "MH-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-MH-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-MH-B01-01"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "MH-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-MH-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-MH-B01-02"
+                                                            },
+                                                            {
+                                                                "site_id": "AC-MH-PU-05",
+                                                                "device_name": "Pune Office AC 05",
+                                                                "status": "ON"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "MH-ZB01-F03",
+                                                        "floor_name": "Floor-03",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-MH-B01-03",
+                                                                "device_name": "AC-03",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-MH-B01-03"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
                                                 "sites": [
                                                     {
-                                                        "site_id": "AC-AR-B01-01",
-                                                        "device_name": "AC-01",
+                                                        "site_id": "AC-MH-B01-04",
+                                                        "device_name": "AC-04",
+                                                        "status": "OFF",
+                                                        "ac_id": "AC-MH-B01-04"
+                                                    },
+                                                    {
+                                                        "site_id": "AC-MH-B1-10",
+                                                        "device_name": "Pune Deccan Office AC 10",
                                                         "status": "ON",
-                                                        "ac_id": "AC-AR-B01-01"
+                                                        "capacity_ton": 2.0,
+                                                        "installation_date": "2025-10-20",
+                                                        "last_maintenance_date": "2026-12-12"
                                                     }
                                                 ]
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "AS-C01",
-                "circle_name": "Guwahati Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "AS-C01-R01",
-                        "region_name": "Guwahati Region",
-                        "divisions": [
+                        "circle_id": "DN-C01",
+                        "circle_name": "Daman Circle",
+                        "regions": [
                             {
-                                "division_id": "AS-C01-R01-D01",
-                                "division_name": "Guwahati Division",
-                                "branches": [
+                                "region_id": "DN-C01-R01",
+                                "region_name": "Daman Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "AS-ZB01",
-                                        "branch_name": "Guwahati Branch 01",
-                                        "floors": [
+                                        "division_id": "DN-C01-R01-D01",
+                                        "division_name": "Daman Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "AS-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "DN-ZB01",
+                                                "branch_name": "Daman Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-AS-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-AS-B01-01"
+                                                        "floor_id": "DN-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-DN-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-DN-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "MN-C01",
-                "circle_name": "Imphal Circle",
-                "regions": [
-                    {
-                        "region_id": "MN-C01-R01",
-                        "region_name": "Imphal Region",
-                        "divisions": [
-                            {
-                                "division_id": "MN-C01-R01-D01",
-                                "division_name": "Imphal Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "MN-ZB01",
-                                        "branch_name": "Imphal Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "MN-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-MN-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-MN-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "ML-C01",
-                "circle_name": "Shillong Circle",
-                "regions": [
-                    {
-                        "region_id": "ML-C01-R01",
-                        "region_name": "Shillong Region",
-                        "divisions": [
-                            {
-                                "division_id": "ML-C01-R01-D01",
-                                "division_name": "Shillong Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "ML-ZB01",
-                                        "branch_name": "Shillong Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "ML-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-ML-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-ML-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
@@ -1022,35 +708,164 @@
                 ]
             },
             {
-                "circle_id": "MZ-C01",
-                "circle_name": "Aizawl Circle",
-                "regions": [
+                "zone_id": "ZN-E",
+                "zone_name": "Eastern",
+                "circles": [
                     {
-                        "region_id": "MZ-C01-R01",
-                        "region_name": "Aizawl Region",
-                        "divisions": [
+                        "circle_id": "BR-C01",
+                        "circle_name": "Patna Circle",
+                        "regions": [
                             {
-                                "division_id": "MZ-C01-R01-D01",
-                                "division_name": "Aizawl Division",
-                                "branches": [
+                                "region_id": "BR-C01-R01",
+                                "region_name": "Patna Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "MZ-ZB01",
-                                        "branch_name": "Aizawl Branch 01",
-                                        "floors": [
+                                        "division_id": "BR-C01-R01-D01",
+                                        "division_name": "Patna Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "MZ-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "BR-ZB01",
+                                                "branch_name": "Patna Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-MZ-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-MZ-B01-01"
+                                                        "floor_id": "BR-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-BR-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-BR-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "JH-C01",
+                        "circle_name": "Ranchi Circle",
+                        "regions": [
+                            {
+                                "region_id": "JH-C01-R01",
+                                "region_name": "Ranchi Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "JH-C01-R01-D01",
+                                        "division_name": "Ranchi Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "JH-ZB01",
+                                                "branch_name": "Ranchi Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "JH-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-JH-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-JH-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "OD-C01",
+                        "circle_name": "Bhubaneswar Circle",
+                        "regions": [
+                            {
+                                "region_id": "OD-C01-R01",
+                                "region_name": "Bhubaneswar Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "OD-C01-R01-D01",
+                                        "division_name": "Bhubaneswar Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "OD-ZB01",
+                                                "branch_name": "Bhubaneswar Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "OD-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-OD-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-OD-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "WB-C01",
+                        "circle_name": "Kolkata Circle",
+                        "regions": [
+                            {
+                                "region_id": "WB-C01-R01",
+                                "region_name": "Kolkata Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "WB-C01-R01-D01",
+                                        "division_name": "Kolkata Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "WB-ZB01",
+                                                "branch_name": "Kolkata Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "WB-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-WB-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-WB-B01-01"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "WB-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-WB-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-WB-B01-02"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1059,35 +874,300 @@
                 ]
             },
             {
-                "circle_id": "NL-C01",
-                "circle_name": "Kohima Circle",
-                "regions": [
+                "zone_id": "ZN-NE",
+                "zone_name": "North Eastern",
+                "circles": [
                     {
-                        "region_id": "NL-C01-R01",
-                        "region_name": "Kohima Region",
-                        "divisions": [
+                        "circle_id": "AR-C01",
+                        "circle_name": "Itanagar Circle",
+                        "regions": [
                             {
-                                "division_id": "NL-C01-R01-D01",
-                                "division_name": "Kohima Division",
-                                "branches": [
+                                "region_id": "AR-C01-R01",
+                                "region_name": "Itanagar Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "NL-ZB01",
-                                        "branch_name": "Kohima Branch 01",
-                                        "floors": [
+                                        "division_id": "AR-C01-R01-D01",
+                                        "division_name": "Itanagar Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "NL-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "AR-ZB01",
+                                                "branch_name": "Itanagar Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-NL-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-NL-B01-01"
+                                                        "floor_id": "AR-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-AR-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-AR-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "AS-C01",
+                        "circle_name": "Guwahati Circle",
+                        "regions": [
+                            {
+                                "region_id": "AS-C01-R01",
+                                "region_name": "Guwahati Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "AS-C01-R01-D01",
+                                        "division_name": "Guwahati Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "AS-ZB01",
+                                                "branch_name": "Guwahati Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "AS-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-AS-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-AS-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "MN-C01",
+                        "circle_name": "Imphal Circle",
+                        "regions": [
+                            {
+                                "region_id": "MN-C01-R01",
+                                "region_name": "Imphal Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "MN-C01-R01-D01",
+                                        "division_name": "Imphal Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "MN-ZB01",
+                                                "branch_name": "Imphal Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "MN-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-MN-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-MN-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "ML-C01",
+                        "circle_name": "Shillong Circle",
+                        "regions": [
+                            {
+                                "region_id": "ML-C01-R01",
+                                "region_name": "Shillong Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "ML-C01-R01-D01",
+                                        "division_name": "Shillong Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "ML-ZB01",
+                                                "branch_name": "Shillong Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "ML-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-ML-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-ML-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "MZ-C01",
+                        "circle_name": "Aizawl Circle",
+                        "regions": [
+                            {
+                                "region_id": "MZ-C01-R01",
+                                "region_name": "Aizawl Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "MZ-C01-R01-D01",
+                                        "division_name": "Aizawl Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "MZ-ZB01",
+                                                "branch_name": "Aizawl Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "MZ-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-MZ-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-MZ-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "NL-C01",
+                        "circle_name": "Kohima Circle",
+                        "regions": [
+                            {
+                                "region_id": "NL-C01-R01",
+                                "region_name": "Kohima Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "NL-C01-R01-D01",
+                                        "division_name": "Kohima Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "NL-ZB01",
+                                                "branch_name": "Kohima Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "NL-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-NL-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-NL-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "SK-C01",
+                        "circle_name": "Gangtok Circle",
+                        "regions": [
+                            {
+                                "region_id": "SK-C01-R01",
+                                "region_name": "Gangtok Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "SK-C01-R01-D01",
+                                        "division_name": "Gangtok Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "SK-ZB01",
+                                                "branch_name": "Gangtok Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "SK-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-SK-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-SK-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "circle_id": "TR-C01",
+                        "circle_name": "Agartala Circle",
+                        "regions": [
+                            {
+                                "region_id": "TR-C01-R01",
+                                "region_name": "Agartala Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "TR-C01-R01-D01",
+                                        "division_name": "Agartala Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "TR-ZB01",
+                                                "branch_name": "Agartala Branch 01",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "TR-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-TR-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-TR-B01-01"
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": []
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -1096,426 +1176,352 @@
                 ]
             },
             {
-                "circle_id": "SK-C01",
-                "circle_name": "Gangtok Circle",
-                "regions": [
+                "zone_id": "ZN-S",
+                "zone_name": "South",
+                "circles": [
                     {
-                        "region_id": "SK-C01-R01",
-                        "region_name": "Gangtok Region",
-                        "divisions": [
+                        "circle_id": "AP-C01",
+                        "circle_name": "Amaravati Circle",
+                        "regions": [
                             {
-                                "division_id": "SK-C01-R01-D01",
-                                "division_name": "Gangtok Division",
-                                "branches": [
+                                "region_id": "AP-C01-R01",
+                                "region_name": "Amaravati Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "SK-ZB01",
-                                        "branch_name": "Gangtok Branch 01",
-                                        "floors": [
+                                        "division_id": "AP-C01-R01-D01",
+                                        "division_name": "Amaravati Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "SK-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "AP-ZB01",
+                                                "branch_name": "Amaravati Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-SK-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-SK-B01-01"
+                                                        "floor_id": "AP-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-AP-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-AP-B01-01"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "AP-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-AP-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-AP-B01-02"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "TR-C01",
-                "circle_name": "Agartala Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "TR-C01-R01",
-                        "region_name": "Agartala Region",
-                        "divisions": [
+                        "circle_id": "KA-C01",
+                        "circle_name": "Bengaluru Circle",
+                        "regions": [
                             {
-                                "division_id": "TR-C01-R01-D01",
-                                "division_name": "Agartala Division",
-                                "branches": [
+                                "region_id": "KA-C01-R01",
+                                "region_name": "Bengaluru Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "TR-ZB01",
-                                        "branch_name": "Agartala Branch 01",
-                                        "floors": [
+                                        "division_id": "KA-C01-R01-D01",
+                                        "division_name": "Bengaluru Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "TR-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "KA-ZB01",
+                                                "branch_name": "Bengaluru Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-TR-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-TR-B01-01"
+                                                        "floor_id": "KA-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-KA-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-KA-B01-01"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "KA-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-KA-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-KA-B01-02"
+                                                            }
+                                                        ]
+                                                    },
+                                                    {
+                                                        "floor_id": "KA-ZB01-F03",
+                                                        "floor_name": "Floor-03",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-KA-B01-03",
+                                                                "device_name": "AC-03",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-KA-B01-03"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            }
-        ]
-    },
-    {
-        "zone_id": "ZN-S",
-        "zone_name": "South",
-        "circles": [
-            {
-                "circle_id": "AP-C01",
-                "circle_name": "Amaravati Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "AP-C01-R01",
-                        "region_name": "Amaravati Region",
-                        "divisions": [
+                        "circle_id": "KL-C01",
+                        "circle_name": "Thiruvananthapuram Circle",
+                        "regions": [
                             {
-                                "division_id": "AP-C01-R01-D01",
-                                "division_name": "Amaravati Division",
-                                "branches": [
+                                "region_id": "KL-C01-R01",
+                                "region_name": "Thiruvananthapuram Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "AP-ZB01",
-                                        "branch_name": "Amaravati Branch 01",
-                                        "floors": [
+                                        "division_id": "KL-C01-R01-D01",
+                                        "division_name": "Thiruvananthapuram Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "AP-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "KL-ZB01",
+                                                "branch_name": "Thiruvananthapuram Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-AP-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-AP-B01-01"
+                                                        "floor_id": "KL-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-KL-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-KL-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "AP-ZB01-F02",
-                                                "floor_name": "Floor-02",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-AP-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-AP-B01-02"
-                                                    }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "KA-C01",
-                "circle_name": "Bengaluru Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "KA-C01-R01",
-                        "region_name": "Bengaluru Region",
-                        "divisions": [
+                        "circle_id": "TN-C01",
+                        "circle_name": "Chennai Circle",
+                        "regions": [
                             {
-                                "division_id": "KA-C01-R01-D01",
-                                "division_name": "Bengaluru Division",
-                                "branches": [
+                                "region_id": "TN-C01-R01",
+                                "region_name": "Chennai Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "KA-ZB01",
-                                        "branch_name": "Bengaluru Branch 01",
-                                        "floors": [
+                                        "division_id": "TN-C01-R01-D01",
+                                        "division_name": "Chennai Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "KA-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "TN-ZB01",
+                                                "branch_name": "Chennai Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-KA-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-KA-B01-01"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "KA-ZB01-F02",
-                                                "floor_name": "Floor-02",
-                                                "sites": [
+                                                        "floor_id": "TN-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-TN-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-TN-B01-01"
+                                                            }
+                                                        ]
+                                                    },
                                                     {
-                                                        "site_id": "AC-KA-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-KA-B01-02"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "KA-ZB01-F03",
-                                                "floor_name": "Floor-03",
-                                                "sites": [
+                                                        "floor_id": "TN-ZB01-F02",
+                                                        "floor_name": "Floor-02",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-TN-B01-02",
+                                                                "device_name": "AC-02",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-TN-B01-02"
+                                                            }
+                                                        ]
+                                                    },
                                                     {
-                                                        "site_id": "AC-KA-B01-03",
-                                                        "device_name": "AC-03",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-KA-B01-03"
+                                                        "floor_id": "TN-ZB01-F03",
+                                                        "floor_name": "Floor-03",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-TN-B01-03",
+                                                                "device_name": "AC-03",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-TN-B01-03"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "KL-C01",
-                "circle_name": "Thiruvananthapuram Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "KL-C01-R01",
-                        "region_name": "Thiruvananthapuram Region",
-                        "divisions": [
+                        "circle_id": "TS-C01",
+                        "circle_name": "Hyderabad Circle",
+                        "regions": [
                             {
-                                "division_id": "KL-C01-R01-D01",
-                                "division_name": "Thiruvananthapuram Division",
-                                "branches": [
+                                "region_id": "TS-C01-R01",
+                                "region_name": "Hyderabad Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "KL-ZB01",
-                                        "branch_name": "Thiruvananthapuram Branch 01",
-                                        "floors": [
+                                        "division_id": "TS-C01-R01-D01",
+                                        "division_name": "Hyderabad Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "KL-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "TS-ZB01",
+                                                "branch_name": "Hyderabad Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-KL-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-KL-B01-01"
+                                                        "floor_id": "TS-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-TS-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-TS-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "TN-C01",
-                "circle_name": "Chennai Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "TN-C01-R01",
-                        "region_name": "Chennai Region",
-                        "divisions": [
+                        "circle_id": "AN-C01",
+                        "circle_name": "Port Blair Circle",
+                        "regions": [
                             {
-                                "division_id": "TN-C01-R01-D01",
-                                "division_name": "Chennai Division",
-                                "branches": [
+                                "region_id": "AN-C01-R01",
+                                "region_name": "Port Blair Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "TN-ZB01",
-                                        "branch_name": "Chennai Branch 01",
-                                        "floors": [
+                                        "division_id": "AN-C01-R01-D01",
+                                        "division_name": "Port Blair Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "TN-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "AN-ZB01",
+                                                "branch_name": "Port Blair Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-TN-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-TN-B01-01"
+                                                        "floor_id": "AN-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-AN-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-AN-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "TN-ZB01-F02",
-                                                "floor_name": "Floor-02",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-TN-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-TN-B01-02"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "floor_id": "TN-ZB01-F03",
-                                                "floor_name": "Floor-03",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-TN-B01-03",
-                                                        "device_name": "AC-03",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-TN-B01-03"
-                                                    }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "TS-C01",
-                "circle_name": "Hyderabad Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "TS-C01-R01",
-                        "region_name": "Hyderabad Region",
-                        "divisions": [
+                        "circle_id": "LD-C01",
+                        "circle_name": "Kavaratti Circle",
+                        "regions": [
                             {
-                                "division_id": "TS-C01-R01-D01",
-                                "division_name": "Hyderabad Division",
-                                "branches": [
+                                "region_id": "LD-C01-R01",
+                                "region_name": "Kavaratti Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "TS-ZB01",
-                                        "branch_name": "Hyderabad Branch 01",
-                                        "floors": [
+                                        "division_id": "LD-C01-R01-D01",
+                                        "division_name": "Kavaratti Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "TS-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
+                                                "branch_id": "LD-ZB01",
+                                                "branch_name": "Kavaratti Branch 01",
+                                                "floors": [
                                                     {
-                                                        "site_id": "AC-TS-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-TS-B01-01"
+                                                        "floor_id": "LD-ZB01-F01",
+                                                        "floor_name": "Floor-01",
+                                                        "sites": [
+                                                            {
+                                                                "site_id": "AC-LD-B01-01",
+                                                                "device_name": "AC-01",
+                                                                "status": "ON",
+                                                                "ac_id": "AC-LD-B01-01"
+                                                            }
+                                                        ]
                                                     }
-                                                ]
+                                                ],
+                                                "sites": []
                                             }
-                                        ],
-                                        "sites": []
+                                        ]
                                     }
                                 ]
                             }
                         ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "AN-C01",
-                "circle_name": "Port Blair Circle",
-                "regions": [
+                    },
                     {
-                        "region_id": "AN-C01-R01",
-                        "region_name": "Port Blair Region",
-                        "divisions": [
+                        "circle_id": "PY-C01",
+                        "circle_name": "Puducherry Circle",
+                        "regions": [
                             {
-                                "division_id": "AN-C01-R01-D01",
-                                "division_name": "Port Blair Division",
-                                "branches": [
+                                "region_id": "PY-C01-R01",
+                                "region_name": "Puducherry Region",
+                                "divisions": [
                                     {
-                                        "branch_id": "AN-ZB01",
-                                        "branch_name": "Port Blair Branch 01",
-                                        "floors": [
+                                        "division_id": "PY-C01-R01-D01",
+                                        "division_name": "Puducherry Division",
+                                        "branches": [
                                             {
-                                                "floor_id": "AN-ZB01-F01",
-                                                "floor_name": "Floor-01",
+                                                "branch_id": "PY-ZB01",
+                                                "branch_name": "Puducherry Branch 01",
+                                                "floors": [],
                                                 "sites": [
                                                     {
-                                                        "site_id": "AC-AN-B01-01",
+                                                        "site_id": "AC-PY-B01-01",
                                                         "device_name": "AC-01",
                                                         "status": "ON",
-                                                        "ac_id": "AC-AN-B01-01"
+                                                        "ac_id": "AC-PY-B01-01"
                                                     }
                                                 ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "LD-C01",
-                "circle_name": "Kavaratti Circle",
-                "regions": [
-                    {
-                        "region_id": "LD-C01-R01",
-                        "region_name": "Kavaratti Region",
-                        "divisions": [
-                            {
-                                "division_id": "LD-C01-R01-D01",
-                                "division_name": "Kavaratti Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "LD-ZB01",
-                                        "branch_name": "Kavaratti Branch 01",
-                                        "floors": [
-                                            {
-                                                "floor_id": "LD-ZB01-F01",
-                                                "floor_name": "Floor-01",
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-LD-B01-01",
-                                                        "device_name": "AC-01",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-LD-B01-01"
-                                                    }
-                                                ]
-                                            }
-                                        ],
-                                        "sites": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            },
-            {
-                "circle_id": "PY-C01",
-                "circle_name": "Puducherry Circle",
-                "regions": [
-                    {
-                        "region_id": "PY-C01-R01",
-                        "region_name": "Puducherry Region",
-                        "divisions": [
-                            {
-                                "division_id": "PY-C01-R01-D01",
-                                "division_name": "Puducherry Division",
-                                "branches": [
-                                    {
-                                        "branch_id": "PY-ZB01",
-                                        "branch_name": "Puducherry Branch 01",
-                                        "floors": [],
-                                        "sites": [
-                                            {
-                                                "site_id": "AC-PY-B01-01",
-                                                "device_name": "AC-01",
-                                                "status": "ON",
-                                                "ac_id": "AC-PY-B01-01"
                                             }
                                         ]
                                     }

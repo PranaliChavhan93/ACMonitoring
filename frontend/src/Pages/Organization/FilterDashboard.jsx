@@ -1,13 +1,20 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE =
-  "http://192.168.1.14:8000/api/v1/filters/locations/";
+const API_BASE = "http://192.168.1.8:8000/api/v1/filters/locations/";
+
+const DEFAULT_COUNTRY = "India";
 
 export const HIERARCHY_CONFIG = {
   GEOGRAPHICAL: {
     label: "Geographical",
     levels: [
+      {
+        name: "country",
+        label: "Country",
+        field: "country_name",
+        childrenKey: "states",
+      },
       {
         name: "state",
         label: "State",
@@ -50,6 +57,12 @@ export const HIERARCHY_CONFIG = {
   ZONAL: {
     label: "Zonal",
     levels: [
+      {
+        name: "country",
+        label: "Country",
+        field: "country_name",
+        childrenKey: "zones",
+      },
       {
         name: "zone",
         label: "Zone",
@@ -135,6 +148,7 @@ const pickHierarchy = (preferred, allowedKeys) => {
   return allowedKeys[0];
 };
 
+
 const buildSelection = (
   value,
   hierarchy,
@@ -148,10 +162,11 @@ const buildSelection = (
       level.name,
       lockedValues[level.name] ||
         value?.[level.name] ||
-        "",
+        (level.name === "country" ? DEFAULT_COUNTRY : ""),
     ])
   );
 };
+
 
 // ---------------------------------------------------------------
 // Component
@@ -271,16 +286,6 @@ const FilterDashboard = ({
           cache: "no-store",
         });
 
-        // if (
-        //   response.status === 401 ||
-        //   response.status === 403
-        // ) 
-        // {
-        //   throw new Error(
-        //     "Session expired. Please sign in again."
-        //   );
-        // }
-
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -288,11 +293,34 @@ const FilterDashboard = ({
         const result = await response.json();
 
         if (!cancelled) {
-          setTree(
-            Array.isArray(result?.data)
-              ? result.data
-              : []
-          );
+          const locations = Array.isArray(result?.data)
+            ? result.data
+            : [];
+
+          setTree(locations);
+
+          setSelected((previous) => {
+            const countryLevel = HIERARCHY_CONFIG[
+              hierarchy
+            ]?.levels.find((level) => level.name === "country");
+
+            if (!countryLevel) return previous;
+
+            const indiaExists = locations.some(
+              (item) =>
+                String(item?.[countryLevel.field] || "")
+                  .trim()
+                  .toLowerCase() === "india"
+            );
+
+            if (!indiaExists) return previous;
+
+            return {
+              ...previous,
+              country:
+                previous.country || DEFAULT_COUNTRY,
+            };
+          });
         }
       } catch (err) {
         if (cancelled) return;
@@ -429,9 +457,6 @@ const FilterDashboard = ({
     setError("");
   };
 
-  /*
-   * Change State/District/Taluka/City/etc.
-   */
   const changeLevel = (levelName, value) => {
     if (lockedValues?.[levelName]) {
       return;

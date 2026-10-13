@@ -40,7 +40,7 @@ DEBUG = True
 ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
-    "192.168.1.14",
+    "192.168.1.8",
     "192.168.1.11",
 ]
 
@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
 
     'account',
+    # "account.apps.AccountConfig",
 ]
 
 REST_FRAMEWORK = {

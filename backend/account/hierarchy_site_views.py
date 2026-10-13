@@ -76,92 +76,151 @@ def _customer_for_request(request, customer_id):
     )
 
 
+def _is_uuid(value):
+    try:
+        uuid.UUID(str(value))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
+def _resolve_location(model, value, **extra_filters):
+    """
+    Resolve a location node by its UUID primary key OR by its `code` field.
+
+    The frontend may send either form depending on which API populated the
+    dropdown (e.g. the filter API returns seed codes like 'MH-D01-T01-C01'
+    instead of real UUIDs).
+    """
+    if value in (None, "", "null", "undefined", "None"):
+        return None
+
+    value_str = str(value).strip()
+
+    # Fast path: real UUID primary key
+    if _is_uuid(value_str):
+        obj = model.objects.filter(pk=value_str, **extra_filters).first()
+        if obj:
+            return obj
+
+    # Fallback: lookup by code (case-insensitive)
+    return model.objects.filter(code__iexact=value_str, **extra_filters).first()
+
 def _validate_location(customer, data):
-    """Validate the complete location chain for the selected customer."""
+    """Validate the complete location chain for the selected customer.
+
+    Accepts either UUIDs or human-readable codes for every level, because
+    the frontend's filter API currently returns codes (e.g. 'MH-D01-T01-C01').
+    """
     hierarchy = customer.hierarchy_type
 
+    # ------------------------------------------------------------------
+    # GEOGRAPHICAL: State -> District -> Taluka -> City
+    # ------------------------------------------------------------------
     if hierarchy == "GEOGRAPHICAL":
-        city_id = data.get("city_id")
-
-        if not city_id:
+        if not data.get("city_id"):
             raise ValueError("Please select a city.")
 
-        city = (
-            City.objects
-            .select_related("taluka__district__state")
-            .filter(
-                pk=city_id,
-                taluka__district__state__customer_id=customer.pk,
-                is_active=True,
-                taluka__is_active=True,
-                taluka__district__is_active=True,
-                taluka__district__state__is_active=True,
-            )
-            .first()
+        city = _resolve_location(
+            City,
+            data.get("city_id"),
+            is_active=True,
+            taluka__is_active=True,
+            taluka__district__is_active=True,
+            taluka__district__state__is_active=True,
         )
 
         if not city:
             raise ValueError(
-                "The selected city does not belong to this customer."
+                "The selected city was not found or is inactive."
             )
 
-        # Verify all submitted ancestor IDs too. This prevents a forged
-        # state/district/taluka selection from disagreeing with the city.
-        if str(data.get("state_id")) != str(city.taluka.district.state_id):
-            raise ValueError("The selected state does not match the city.")
+        # Resolve the ancestors and make sure they line up with the city.
+        state = _resolve_location(
+            State,
+            data.get("state_id"),
+            is_active=True,
+        )
 
-        if str(data.get("district_id")) != str(city.taluka.district_id):
+        if not state or state.pk != city.taluka.district.state_id:
+            raise ValueError("The selected state does not match the city.")
+        district = _resolve_location(
+            District,
+            data.get("district_id"),
+            state=state,
+            is_active=True,
+        )
+        if not district or district.pk != city.taluka.district_id:
             raise ValueError("The selected district does not match the city.")
 
-        if str(data.get("taluka_id")) != str(city.taluka_id):
+        taluka = _resolve_location(
+            Taluka,
+            data.get("taluka_id"),
+            district=district,
+            is_active=True,
+        )
+        if not taluka or taluka.pk != city.taluka_id:
             raise ValueError("The selected taluka does not match the city.")
 
         return {"city": city, "division": None}
 
+    # ------------------------------------------------------------------
+    # ZONAL: Zone -> Circle -> Region -> Division
+    # ------------------------------------------------------------------
     if hierarchy == "ZONAL":
-        division_id = data.get("division_id")
-
-        if not division_id:
+        if not data.get("division_id"):
             raise ValueError("Please select a division.")
 
-        division = (
-            Division.objects
-            .select_related("region__circle__zone")
-            .filter(
-                pk=division_id,
-                region__circle__zone__customer_id=customer.pk,
-                is_active=True,
-                region__is_active=True,
-                region__circle__is_active=True,
-                region__circle__zone__is_active=True,
-            )
-            .first()
+        division = _resolve_location(
+            Division,
+            data.get("division_id"),
+            is_active=True,
+            region__is_active=True,
+            region__circle__is_active=True,
+            region__circle__zone__is_active=True,
         )
 
         if not division:
             raise ValueError(
-                "The selected division does not belong to this customer."
+                "The selected division was not found or is inactive."
+            )
+        
+        zone = _resolve_location(
+            Zone,
+            data.get("zone_id"),
+            is_active=True,
+        )
+
+        if not zone or zone.pk != division.region.circle.zone_id:
+            raise ValueError("The selected zone does not match the division.")
+        
+        circle = _resolve_location(
+            Circle,
+            data.get("circle_id"),
+            zone=zone,
+            is_active=True,
+        )
+        if not circle or circle.pk != division.region.circle_id:
+            raise ValueError(
+                "The selected circle does not match the division."
             )
 
-        if str(data.get("zone_id")) != str(
-            division.region.circle.zone_id
-        ):
-            raise ValueError("The selected zone does not match the division.")
-
-        if str(data.get("circle_id")) != str(
-            division.region.circle_id
-        ):
-            raise ValueError("The selected circle does not match the division.")
-
-        if str(data.get("region_id")) != str(division.region_id):
-            raise ValueError("The selected region does not match the division.")
+        region = _resolve_location(
+            Region,
+            data.get("region_id"),
+            circle=circle,
+            is_active=True,
+        )
+        if not region or region.pk != division.region_id:
+            raise ValueError(
+                "The selected region does not match the division."
+            )
 
         return {"city": None, "division": division}
 
     raise ValueError(
         "The selected customer has no valid hierarchy configured."
     )
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -177,7 +236,7 @@ def create_hierarchy_site(request):
 
     except PermissionError as exc:
         return _error(str(exc), status.HTTP_403_FORBIDDEN)
-    except ValueError as exc:
+    except (ValueError, DjangoValidationError) as exc:   # ← add DjangoValidationError
         return _error(str(exc))
 
     branch_id = data.get("branch_id")
@@ -186,8 +245,10 @@ def create_hierarchy_site(request):
     branch_name = str(data.get("branch_name") or "").strip()
     branch_code = str(data.get("branch_code") or "").strip().upper()
 
-    site_name = str(data.get("site_name") or "").strip()
-    site_code = str(data.get("site_code") or "").strip().upper()
+    
+    site_name = str( data.get("site_name") or data.get("name") or "" ).strip()
+    site_code = str( data.get("site_code") or data.get("code") or "" ).strip().upper()
+
     address = str(data.get("address") or "").strip()
     pincode = str(data.get("pincode") or "").strip()
 
@@ -222,11 +283,10 @@ def create_hierarchy_site(request):
     if create_branch and (not branch_name or not branch_code):
         return _error("Branch name and branch code are required.")
 
-    # Only local database work is wrapped in the transaction.
-    # 3TP is called afterwards because external API requests cannot be
-    # rolled back by a Django database transaction.
     try:
         with transaction.atomic():
+
+            # STEP 1: Create a new branch OR select an existing branch
             if create_branch:
                 if Branch.objects.filter(code=branch_code).exists():
                     return _error("This branch code already exists.")
@@ -238,7 +298,7 @@ def create_hierarchy_site(request):
 
                 if location["city"]:
                     duplicate = duplicate.filter(city=location["city"])
-                else:
+                elif location["division"]:
                     duplicate = duplicate.filter(
                         division=location["division"]
                     )
@@ -255,40 +315,27 @@ def create_hierarchy_site(request):
                     name=branch_name,
                     code=branch_code,
                 )
+
             else:
                 branch = (
                     Branch.objects
                     .select_related("customer", "city", "division")
-                    .filter(
-                        pk=branch_id,
-                        customer=customer,
-                    )
-                    .first()
+                    .filter(customer=customer)
                 )
 
-                if not branch:
+                if _is_uuid(branch_id):
+                    branch = branch.filter(pk=branch_id).first()
+                else:
+                    branch = branch.filter(code__iexact=branch_id).first()
+
+                if branch is None:
                     return _error(
                         "The selected branch does not belong to this customer."
                     )
-
-                # The branch must match the hierarchy path selected in the UI.
-                if (
-                    location["city"]
-                    and branch.city_id != location["city"].pk
-                ):
-                    return _error(
-                        "The selected branch does not belong to the selected city."
-                    )
-
-                if (
-                    location["division"]
-                    and branch.division_id != location["division"].pk
-                ):
-                    return _error(
-                        "The selected branch does not belong to the selected division."
-                    )
-
+    
+            # STEP 2: Create requested floors
             floors = []
+
             for floor_name in floor_names:
                 if Floor.objects.filter(
                     branch=branch,
@@ -305,18 +352,21 @@ def create_hierarchy_site(request):
                 )
                 floors.append(floor)
 
+            # STEP 3: Select an existing floor, if provided
             floor = None
+
             if selected_floor_id:
                 floor = Floor.objects.filter(
                     pk=selected_floor_id,
                     branch=branch,
                 ).first()
 
-                if not floor:
+                if floor is None:
                     raise ValueError(
                         "The selected floor does not belong to this branch."
                     )
 
+            # STEP 4: Validate site uniqueness
             if Site.objects.filter(code=site_code).exists():
                 raise ValueError("This site code already exists.")
 
@@ -328,6 +378,7 @@ def create_hierarchy_site(request):
                     "A site with this name already exists in this branch."
                 )
 
+            # STEP 5: Create the site locally
             site = Site.objects.create(
                 branch=branch,
                 floor=floor,
@@ -341,8 +392,9 @@ def create_hierarchy_site(request):
                 tpt_sync_error="",
             )
 
-    except (ValueError, DjangoValidationError) as exc:
+    except (ValueError, DjangoValidationError) as exc:   # ← add DjangoValidationError
         return _error(str(exc))
+
     except IntegrityError:
         return _error(
             "A duplicate branch, floor, or site was detected. "
@@ -350,11 +402,8 @@ def create_hierarchy_site(request):
             status.HTTP_409_CONFLICT,
         )
 
-    # Preserve the project's existing 3TP sync service.
-    # The local records remain available if 3TP is temporarily unavailable.
     sync_message = ""
     try:
-        # Imported lazily to avoid changing the existing views module.
         from .views import sync_site
 
         sync_site(site)

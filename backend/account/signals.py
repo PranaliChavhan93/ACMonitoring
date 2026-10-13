@@ -226,11 +226,152 @@ def seed_demo_data(sender, **kwargs):
             user.set_password(DEMO_PASSWORD)
             user.save()
 
-            # print(f"[seed] {'Created' if created else 'Refreshed'} user: {email} ({user.role})")
-
-        # print("[seed] Demo hierarchy + users ready.")
-        # print(f"[seed] All demo users share password: {DEMO_PASSWORD}")
 
     except Exception as exc:
         import logging
         logging.getLogger(__name__).warning("seed_demo_data skipped: %s", exc)
+
+
+import json
+import logging
+from pathlib import Path
+
+from django.conf import settings
+from django.db import transaction
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+from account.models import Customer, Country, State, District, Taluka, City
+
+logger = logging.getLogger(__name__)
+
+
+def get_geographical_json_path():
+    return (
+        Path(settings.BASE_DIR)
+        / "data"
+        / "locationData_geographical.json"
+    )
+
+
+@transaction.atomic
+def sync_geographical_hierarchy(customer):
+    """
+    Sync geographical hierarchy from JSON into the database
+    for the specified customer.
+    """
+
+    json_path = get_geographical_json_path()
+
+    if not json_path.exists():
+        logger.error("Geographical JSON file not found: %s", json_path)
+        return
+
+    with open(json_path, "r", encoding="utf-8") as file:
+        tree = json.load(file)
+
+    for country_data in tree:
+        country_code = country_data.get("country_id")
+        country_name = country_data.get("country_name")
+
+        if not country_code or not country_name:
+            continue
+
+        # Reuse an existing country where possible.
+        country, _ = Country.objects.get_or_create(
+            code=country_code,
+            defaults={"name": country_name},
+        )
+
+        for state_data in country_data.get("states", []):
+            state_code = state_data.get("state_id")
+            state_name = state_data.get("state_name")
+
+            if not state_code or not state_name:
+                continue
+
+            state, _ = State.objects.update_or_create(
+                customer=customer,
+                code=state_code,
+                defaults={
+                    "country": country,
+                    "name": state_name,
+                    "is_active": True,
+                },
+            )
+
+            for district_data in state_data.get("districts", []):
+                district_code = district_data.get("district_id")
+                district_name = district_data.get("district_name")
+
+                if not district_code or not district_name:
+                    continue
+
+                district, _ = District.objects.update_or_create(
+                    state=state,
+                    code=district_code,
+                    defaults={
+                        "name": district_name,
+                        "is_active": True,
+                    },
+                )
+
+                for taluka_data in district_data.get("talukas", []):
+                    taluka_code = taluka_data.get("taluka_id")
+                    taluka_name = taluka_data.get("taluka_name")
+
+                    if not taluka_code or not taluka_name:
+                        continue
+
+                    taluka, _ = Taluka.objects.update_or_create(
+                        district=district,
+                        code=taluka_code,
+                        defaults={
+                            "name": taluka_name,
+                            "is_active": True,
+                        },
+                    )
+
+                    for city_data in taluka_data.get("cities", []):
+                        city_code = city_data.get("city_id")
+                        city_name = city_data.get("city_name")
+
+                        if not city_code or not city_name:
+                            continue
+
+                        City.objects.update_or_create(
+                            taluka=taluka,
+                            code=city_code,
+                            defaults={
+                                "name": city_name,
+                                "is_active": True,
+                            },
+                        )
+
+    logger.info(
+        "Geographical hierarchy synced for customer %s",
+        customer.pk,
+    )
+
+
+@receiver(post_save, sender=Customer)
+def customer_geographical_hierarchy_signal(
+    sender, instance, created, **kwargs
+):
+    """
+    Automatically sync the geographical hierarchy when a
+    geographical customer is created or saved.
+    """
+
+    if getattr(instance, "hierarchy", None) != "GEOGRAPHICAL":
+        return
+
+    # Prevent a signal from breaking customer creation if the
+    # JSON file or hierarchy models are not configured correctly.
+    try:
+        sync_geographical_hierarchy(instance)
+    except Exception:
+        logger.exception(
+            "Failed to sync hierarchy for customer %s",
+            instance.pk,
+        )
