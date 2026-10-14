@@ -50,17 +50,53 @@ def _config():
 
 
 def _devices():
-    if not os.path.exists(DEVICES_FILE):
-        raise TelemetryError(f"{DEVICES_FILE} not found")
-    with open(DEVICES_FILE, "r", encoding="utf-8-sig") as f:
-        devs = json.load(f)
+    """
+    Devices to poll.
+
+    The database (ACDevice rows that have a 3TP device id) is the source of
+    truth, so a device created/assigned in the UI is polled automatically.
+    data/3tp_devices.json is still honoured as a fallback / seed list; its
+    entries win when the same ac_id appears in both.
+    """
+    devs = {}
+
+    if os.path.exists(DEVICES_FILE):
+        try:
+            with open(DEVICES_FILE, "r", encoding="utf-8-sig") as f:
+                for d in json.load(f) or []:
+                    if isinstance(d, dict) and d.get("ac_id") and d.get("device_id"):
+                        devs[d["ac_id"]] = d
+        except (OSError, ValueError) as exc:
+            log.warning("Could not read %s: %s", DEVICES_FILE, exc)
+
+    try:
+        from .models import ACDevice
+        rows = (
+            ACDevice.objects
+            .exclude(tpt_device_id__isnull=True)
+            .exclude(tpt_device_id="")
+            .values("ac_id", "device_name", "tpt_device_id")
+        )
+        for row in rows:
+            devs.setdefault(row["ac_id"], {
+                "ac_id": row["ac_id"],
+                "device_id": row["tpt_device_id"],
+                "device_name": row["device_name"] or row["ac_id"],
+            })
+    except Exception as exc:  # DB not ready (migrations etc.) - JSON still works
+        log.debug("Device table not available for telemetry: %s", exc)
+
     if not devs:
-        raise TelemetryError("3tp_devices.json has no devices")
-    return devs
+        raise TelemetryError(
+            "No devices to poll (no ACDevice with a 3TP id and no 3tp_devices.json)"
+        )
+    return list(devs.values())
 
 def _background_loop():
     while True:
         try:
+            from django.db import close_old_connections
+            close_old_connections()
             with _lock:
                 _refresh()
 

@@ -1209,7 +1209,7 @@ function ACDashboard({
 
     return (
         <div className="ac-dashboard">
-            <div className="ac-dashboard-header">
+            {/* <div className="ac-dashboard-header">
                 <div>
                     <h1>AC Energy Monitoring</h1>
                     <p>
@@ -1231,9 +1231,9 @@ function ACDashboard({
                         <span>LIVE</span>
                     </div>
                 </div>
-            </div>
+            </div> */}
 
-            <div className="dashboard-filter-info">
+            {/* <div className="dashboard-filter-info">
                 <span className="filter-label">Current View:</span>
 
                 <span className="filter-value">
@@ -1253,7 +1253,9 @@ function ACDashboard({
                     {filteredData.length} AC
                     {filteredData.length !== 1 ? "s" : ""}
                 </span>
-            </div>
+            </div> */}
+
+            <br />
 
             {filteredData.length === 0 ? (
                 <div className="dashboard-no-data">
@@ -1271,7 +1273,7 @@ function ACDashboard({
                         aria-expanded={showAIModule}
                         aria-controls="ai-module-panel"
                     >
-                        {showAIModule ? "Hide AI Module ▲" : "Show AI Module ✨"}
+                        {showAIModule ? "Hide AI Module ▲" : "Show AI Module"}
                     </button>
 
                     {showAIModule && (
@@ -1280,6 +1282,8 @@ function ACDashboard({
                         </div>
                     )}
                 </section>
+                
+                <br />
 
                 <section className="dashboard-section">
                     <div className="section-title">

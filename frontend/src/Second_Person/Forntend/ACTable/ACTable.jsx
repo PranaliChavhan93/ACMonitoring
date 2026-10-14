@@ -120,13 +120,9 @@
 import React, { useMemo } from "react";
 
 function ACTable({ data = [] }) {
-
     const rows = useMemo(() => {
-
         const branches = {};
-
         data.forEach((item) => {
-
             const zone =  item.zone_name 
                 ?? item.zone 
                 ?? "-" ;
@@ -189,8 +185,8 @@ function ACTable({ data = [] }) {
         <div className="chart-box table-chart-box">
             <div className="chart-header">
                 <div>
-                    <h3>📊 Top Energy Consuming Branches </h3>
-                    <span> Top 5 branches </span>
+                    <h3>📊 Top 5 Energy Consuming Branches </h3>
+                    {/* <span> Top 5 branches </span> */}
                 </div>
             </div>
 

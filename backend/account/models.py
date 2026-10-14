@@ -84,7 +84,7 @@ class Customer(models.Model):
     district = models.CharField(max_length=100, blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
     pincode = models.CharField(max_length=6, blank=True, default="")
-
+    ifsc_code = models.CharField( max_length=11, blank=True, default="")
     # Primary bank admin
     contact_person = models.CharField(max_length=255, blank=True)
     contact_person_email = models.EmailField(blank=True)

@@ -7199,7 +7199,10 @@ from .cloud_sync import (
 )
 
 
+from .access_scope import device_customer, site_customer
 from .models import (
+    CustomerDeviceMapping,
+    SiteDeviceMapping,
     CustomerSiteMapping,
     LocationCircle,
     LocationState,
@@ -8456,14 +8459,85 @@ def create_branch_or_floor(request):
         status=201,
     )
 
+def _local_site_list(request, customer_param=None):
+    """Sites the user may see (optionally narrowed to one customer), with hierarchy."""
+    user = request.user
+    qs = accessible_sites(user)
+
+    if customer_param:
+        try:
+            customer_pk = int(customer_param)
+        except (TypeError, ValueError):
+            customer_pk = None
+        if customer_pk is None:
+            return Response(
+                {"status": "error", "message": "Invalid customer."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        qs = qs.filter(
+            Q(branch__customer_id=customer_pk)
+            | Q(customer_mappings__customer_id=customer_pk,
+                customer_mappings__is_active=True)
+        )
+
+    sites = []
+    for site in qs.distinct().order_by("name"):
+        ctx = resolve_site_hierarchy(site)
+        owner = site_customer(site)
+        sites.append({
+            "id": str(site.pk),
+            "local_site_id": str(site.pk),
+            "tpt_site_id": site.tpt_site_id or "",
+            # the assign call accepts either the 3TP id or the local id
+            "asset_id": site.tpt_site_id or str(site.pk),
+            "name": site.name,
+            "code": site.code,
+            "asset_type": "SITE",
+            "address": site.address or "",
+            "customer_id": str(owner.pk) if owner else "",
+            "customer_name": owner.company if owner else "",
+            "hierarchy_type": ctx.get("hierarchy_type", ""),
+            "state_name": ctx.get("state_name", ""),
+            "district_name": ctx.get("district_name", ""),
+            "taluka_name": ctx.get("taluka_name", ""),
+            "city_name": ctx.get("city_name", ""),
+            "zone_name": ctx.get("zone_name", ""),
+            "circle_name": ctx.get("circle_name", ""),
+            "region_name": ctx.get("region_name", ""),
+            "division_name": ctx.get("division_name", ""),
+            "branch_name": ctx.get("branch_name", ""),
+            "floor_name": ctx.get("floor_name", ""),
+            "acs": [],
+        })
+
+    return Response(
+        {
+            "status": "success",
+            "count": len(sites),
+            "total_pages": 1,
+            "total_elements": len(sites),
+            "sites": sites,
+        },
+        status=status.HTTP_200_OK,
+    )
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def three_tp_sites(request):
     """
     Fetch Sites directly from 3TP.
 
-    Local Django Site table is NOT used.
+    Local Django Site table is NOT used for the Super Admin's full list.
+
+    Customers / admins - and the Super Admin when ?customer=<local id> is
+    given (e.g. assigning a device that already has a customer) - get the
+    sites of the allowed customer(s) only, straight from the local database.
     """
+
+    customer_param = request.query_params.get("customer")
+    if request.user.role != Role.ORG_SUPER_ADMIN or customer_param:
+        return _local_site_list(request, customer_param)
 
     try:
         page_size = int(
@@ -9652,8 +9726,22 @@ def user_can_see_ac(user, ac_id, device_map, branch_index):
         .first()
     )
 
+    # A device explicitly assigned to a customer belongs to that customer
+    # only, whether or not it has been placed on a site yet.
+    if db_device and user.role == Role.CUSTOMER:
+        owners = set(
+            CustomerDeviceMapping.objects
+            .filter(device=db_device, is_active=True)
+            .values_list("customer_id", flat=True)
+        )
+        if owners:
+            return user.customer_id in owners
+
     if db_device and db_device.site_id:
         site = db_device.site
+
+        if not site.branch_id:
+            return False
 
         if user.role == Role.CUSTOMER:
             return site.branch.customer_id == user.customer_id
@@ -9779,144 +9867,115 @@ def fetch_3tp_devices(request):
     return devices
 
     
+_DEVICE_SELECT = (
+    "site",
+    "site__branch",
+    "site__branch__customer",
+    "site__floor",
+)
+
+
+def _local_device_row(device, cloud_item=None):
+    """One /devices/ row for a local ACDevice (customer comes from the mapping)."""
+    cloud_item = cloud_item or {}
+    site = device.site if device.site_id else None
+    branch = site.branch if site and site.branch_id else None
+    customer = device_customer(device)
+    profile = cloud_item.get("deviceProfileId") or {}
+
+    return {
+        "id": str(device.tpt_device_id or device.pk),
+        "local_device_id": str(device.pk),
+        "tpt_device_id": device.tpt_device_id or "",
+        "ac_id": device.ac_id,
+        "device_name": device.device_name,
+        "label": cloud_item.get("label") or device.device_name,
+        "device_profile_id": profile.get("id") if isinstance(profile, dict) else "",
+        "site_id": str(site.pk) if site else "",
+        "site_name": site.name if site else "",
+        "site_code": site.code if site else "",
+        "branch_id": str(branch.pk) if branch else "",
+        "branch_name": branch.name if branch else "",
+        "customer_id": str(customer.pk) if customer else "",
+        "customer_name": customer.company if customer else "",
+        "tpt_customer_id": (customer.tpt_customer_id or "") if customer else "",
+        "floor_id": str(site.floor_id) if site and site.floor_id else "",
+        "floor_name": site.floor.name if site and site.floor_id else "",
+        "status": "ASSIGNED" if site else "UNASSIGNED",
+        "local_sync_status": device.tpt_sync_status,
+        "local_sync_error": device.tpt_sync_error,
+    }
+
+
 def get_3tp_devices(request):
+    """
+    Devices visible to the logged-in user.
+
+    Super Admin  -> every 3TP device (+ local-only devices).
+    Everyone else-> only devices in their own scope: a customer sees the
+                    devices assigned to that customer (directly, or through
+                    its sites); admins/engineers see devices on their sites.
+    """
+    user = request.user
+    is_org = user.role == Role.ORG_SUPER_ADMIN
+
     try:
         cloud_devices = fetch_3tp_devices(request)
     except Exception:
         # The local database remains usable when 3TP is unavailable.
         cloud_devices = []
+
+    visible_ids = None
+    if not is_org:
+        visible_ids = set(accessible_devices(user).values_list("pk", flat=True))
+
     result = []
+    seen_local_ids = set()
+
     for item in cloud_devices:
         device_id = _id_of(item)
         if not device_id:
             continue
-        name = (
-            item.get("name")
-            or item.get("label")
-            or ""
-        )
-        label = item.get("label") or ""
-        device_profile = item.get("deviceProfileId") or {}
 
         local_device = (
             ACDevice.objects
-            .select_related(
-                "site",
-                "site__branch",
-                "site__branch__customer",
-                "site__floor",
-            )
+            .select_related(*_DEVICE_SELECT)
             .filter(tpt_device_id=device_id)
             .first()
         )
 
-        row = {
-            "id": device_id,
-            "tpt_device_id": device_id,
-
-            "ac_id": name,
-            "device_name": name,
-            "label": label,
-
-            "device_profile_id": (
-                device_profile.get("id")
-                if isinstance(device_profile, dict)
-                    else ""
-                ),
-
-            "site_id": "",
-            "site_name": "",
-            "site_code": "",
-
-            "branch_id": "",
-            "branch_name": "",
-
-            "customer_id": "",
-            "customer_name": "",
-
-            "floor_id": "",
-            "floor_name": "",
-
-            "status": "UNASSIGNED",
-        }
-
-        if local_device and local_device.site_id:
-            site = local_device.site
-            branch = site.branch
-
-            row["site_id"] = str(site.id)
-            row["site_name"] = site.name
-            row["site_code"] = getattr(site, "code", "") or ""
-
-            if branch:
-                row["branch_id"] = str(branch.id)
-                row["branch_name"] = branch.name
-
-                if branch.customer_id:
-                    customer = branch.customer
-
-                    row["customer_id"] = str(branch.customer_id)
-                    row["customer_name"] = (
-                        customer.company
-                        if customer
-                        else ""
-                    )
-
-            if site.floor_id:
-                row["floor_id"] = str(site.floor_id)
-                row["floor_name"] = (
-                    site.floor.name
-                    if site.floor
-                    else ""
-                )
-
-            row["status"] = "ASSIGNED"
-
-        result.append(row)
-
-    local_devices = accessible_devices(request.user).select_related(
-        "site",
-        "site__branch",
-        "site__branch__customer",
-        "site__floor",
-    )
-
-    seen_local_ids = {
-        str(row.get("local_device_id", ""))
-        for row in result
-    }
-
-    for device in local_devices:
-        if str(device.pk) in seen_local_ids:
+        if local_device is not None:
+            if visible_ids is not None and local_device.pk not in visible_ids:
+                continue
+            seen_local_ids.add(local_device.pk)
+            result.append(_local_device_row(local_device, item))
             continue
 
-        site = device.site
-        branch = site.branch if site else None
-        customer = branch.customer if branch and branch.customer_id else None
+        # Exists only in 3TP (no local record yet): only the Super Admin
+        # may see it, so it can be assigned to a customer.
+        if not is_org:
+            continue
 
+        name = item.get("name") or item.get("label") or ""
+        profile = item.get("deviceProfileId") or {}
         result.append({
-            # Keep the existing response keys for the frontend.
-            "id": str(device.tpt_device_id or device.pk),
-            "local_device_id": str(device.pk),
-            "tpt_device_id": device.tpt_device_id or "",
-            "ac_id": device.ac_id,
-            "device_name": device.device_name,
-            "label": device.device_name,
-            "device_profile_id": "",
-            "site_id": str(site.pk) if site else "",
-            "site_name": site.name if site else "",
-            "site_code": site.code if site else "",
-            "branch_id": str(branch.pk) if branch else "",
-            "branch_name": branch.name if branch else "",
-            "customer_id": str(customer.pk) if customer else "",
-            "customer_name": customer.company if customer else "",
-            "floor_id": str(site.floor_id) if site and site.floor_id else "",
-            "floor_name": site.floor.name if site and site.floor_id else "",
-            "status": "ASSIGNED" if site else "UNASSIGNED",
-            "local_sync_status": device.tpt_sync_status,
-            "local_sync_error": device.tpt_sync_error,
+            "id": device_id,
+            "tpt_device_id": device_id,
+            "ac_id": name,
+            "device_name": name,
+            "label": item.get("label") or "",
+            "device_profile_id": profile.get("id") if isinstance(profile, dict) else "",
+            "site_id": "", "site_name": "", "site_code": "",
+            "branch_id": "", "branch_name": "",
+            "customer_id": "", "customer_name": "",
+            "floor_id": "", "floor_name": "",
+            "status": "UNASSIGNED",
         })
 
+    for device in accessible_devices(user).select_related(*_DEVICE_SELECT):
+        if device.pk in seen_local_ids:
+            continue
+        result.append(_local_device_row(device))
 
     return JsonResponse(
         {
@@ -9926,7 +9985,8 @@ def get_3tp_devices(request):
         },
         status=200,
     )
-    
+
+
 def _devices_impl(request):
     device_map = build_device_location_map()
 
@@ -13390,6 +13450,15 @@ class DeviceCreateView(generics.CreateAPIView):
 
         device = serializer.instance
 
+        # A device created by a customer / branch admin belongs to that
+        # customer from the start (saved locally, before touching 3TP).
+        if user.role != Role.ORG_SUPER_ADMIN and user.customer_id:
+            CustomerDeviceMapping.objects.update_or_create(
+                customer_id=user.customer_id,
+                device=device,
+                defaults={"is_active": True},
+            )
+
         # -----------------------------------------
         # CREATE DEVICE IN 3TP
         # -----------------------------------------
@@ -13769,156 +13838,391 @@ def create_device(request):
             status=500
         )
 
+def _resolve_customer_ref(ref, user):
+    """Accept the local customer id or the 3TP customer id."""
+    ref = str(ref or "").strip()
+    if not ref:
+        return None
+    qs = Customer.objects.all()
+    if user.role == Role.ORG_SUPER_ADMIN:
+        qs = qs.filter(organization_id=user.organization_id)
+    customer = qs.filter(tpt_customer_id=ref).first()
+    if customer is None and ref.isdigit():
+        customer = qs.filter(pk=int(ref)).first()
+    return customer
+
+
+def _ensure_local_device(request, ref):
+    """
+    Return the local ACDevice for a 3TP device id / local id / ac_id.
+    A device that only exists in 3TP gets a local record, so every
+    assignment is always saved locally.
+    """
+    ref = str(ref or "").strip()
+    if not ref:
+        return None
+
+    device = ACDevice.objects.filter(tpt_device_id=ref).first()
+    if device is None:
+        try:
+            device = ACDevice.objects.filter(pk=uuid.UUID(ref)).first()
+        except ValueError:
+            device = None
+    if device is None:
+        device = ACDevice.objects.filter(ac_id=ref).first()
+    if device is not None:
+        return device
+
+    try:
+        res = requests.get(
+            f"{CLOUD_URL}/api/device/{ref}",
+            headers=_tpt_user_headers(request),
+            timeout=15,
+        )
+        if res.status_code != 200:
+            return None
+        data = res.json()
+    except (requests.RequestException, ValueError):
+        return None
+
+    name = data.get("name") or data.get("label") or ""
+    if not name:
+        return None
+
+    device, _ = ACDevice.objects.get_or_create(
+        ac_id=name,
+        defaults={
+            "device_name": data.get("label") or name,
+            "tpt_device_id": ref,
+            "tpt_sync_status": "SYNCED",
+        },
+    )
+    if not device.tpt_device_id:
+        device.tpt_device_id = ref
+        device.tpt_sync_status = "SYNCED"
+        device.save(update_fields=["tpt_device_id", "tpt_sync_status", "updated_at"])
+    return device
+
+
+def _remove_device_from_location_files(ac_id):
+    """Drop a device from DeviceLocationMap.json and both location trees."""
+    try:
+        device_map = build_device_location_map()
+        if ac_id in device_map:
+            device_map.pop(ac_id)
+            save_device_location_map(device_map)
+        for hierarchy, location_file in (
+            ("GEOGRAPHICAL", GEOGRAPHICAL_LOCATION_FILE),
+            ("ZONAL", ZONAL_LOCATION_FILE),
+        ):
+            tree = load_location_tree(location_file)
+            if remove_site_from_tree(tree, ac_id):
+                save_location_tree(tree, location_file)
+    except Exception:
+        pass
+
+
+def _stamp_customer_on_device_map(device, customer):
+    """Keep DeviceLocationMap.json's customer fields in step with the DB."""
+    try:
+        device_map = build_device_location_map()
+        mapping = device_map.get(device.ac_id)
+        if mapping is None:
+            return
+        mapping["customer_id"] = str(customer.pk)
+        mapping["customer_name"] = customer.company
+        save_device_location_map(device_map)
+    except Exception:
+        pass
+
+
 @csrf_exempt
 @api_view(["POST"])
 def assign_device_to_customer(request):
+    """
+    Device -> Customer.
+
+    The assignment is saved locally first (CustomerDeviceMapping); after that
+    the customer sees the device under their own login. The 3TP mapping is
+    then attempted and reported, but never blocks the local assignment.
+    """
+    user = request.user
+
+    if not (user and user.is_authenticated):
+        return JsonResponse({"error": "Valid Bearer token required"}, status=401)
+
+    if user.role != Role.ORG_SUPER_ADMIN:
+        return JsonResponse(
+            {"error": "Only the Super Admin can assign a device to a customer."},
+            status=403,
+        )
 
     try:
-        auth_header = request.headers.get("Authorization")
+        body = request.data
+        customer_ref = body.get("customer_id")
+        device_ref = body.get("device_id")
 
-        if not auth_header or not auth_header.startswith("Bearer "):
-            return JsonResponse(
-                {"error": "Valid Bearer token required"},
-                status=401
-            )
-
-        token = auth_header.split(" ")[1]
-
-        body = json.loads(request.body)
-
-        customer_id = body.get("customer_id")
-        device_id = body.get("device_id")
-
-        if not customer_id or not device_id:
+        if not customer_ref or not device_ref:
             return JsonResponse(
                 {"error": "customer_id and device_id are required"},
-                status=400
+                status=400,
             )
 
-        # ---------------- 3TP MAPPING ----------------
+        customer = _resolve_customer_ref(customer_ref, user)
+        if customer is None:
+            return JsonResponse({"error": "Customer not found."}, status=404)
 
-        response = requests.post(
-            f"{CLOUD_URL}/api/customer/{customer_id}/device/{device_id}",
-            headers={
-                "Accept": "application/json",
-                "X-Authorization": f"Bearer {token}"
-            }
-        )
+        device = _ensure_local_device(request, device_ref)
+        if device is None:
+            return JsonResponse({"error": "Device not found."}, status=404)
 
-        if response.status_code not in [200, 201]:
-            return JsonResponse(
-                {
-                    "error": "Failed to map device to customer",
-                    "details": response.json()
-                },
-                status=response.status_code
+        released_site = ""
+
+        with transaction.atomic():
+            # One owner per device: switching customer retires the old link.
+            CustomerDeviceMapping.objects.filter(
+                device=device, is_active=True
+            ).exclude(customer=customer).update(is_active=False)
+
+            mapping, created = CustomerDeviceMapping.objects.update_or_create(
+                customer=customer,
+                device=device,
+                defaults={"is_active": True},
             )
+
+            # If the device is sitting on another customer's site, take it
+            # off that site; the new customer places it on their own site.
+            site = device.site if device.site_id else None
+            if (
+                site
+                and site.branch_id
+                and site.branch.customer_id
+                and site.branch.customer_id != customer.pk
+            ):
+                released_site = site.name
+                SiteDeviceMapping.objects.filter(
+                    device=device, is_active=True
+                ).update(is_active=False)
+                device.site = None
+
+            device.assigned_by = user
+            device.save()
+
+        if released_site:
+            _remove_device_from_location_files(device.ac_id)
+        else:
+            _stamp_customer_on_device_map(device, customer)
+
+        # ---- 3TP mapping (best effort, reported not fatal) ----
+        sync_error = ""
+        try:
+            if not customer.tpt_customer_id:
+                raise ThreeTPError("Customer has no 3TP id yet.")
+            if not device.tpt_device_id:
+                raise ThreeTPError("Device has no 3TP id yet.")
+            map_3tp_customer_to_device(
+                request, customer.tpt_customer_id, device.tpt_device_id
+            )
+        except Exception as exc:
+            sync_error = _one_line(exc, 1000)
 
         return JsonResponse({
-            "message": "Device mapped to customer successfully",
-            "customer_id": customer_id,
-            "device_id": device_id
-        })
+            "message": (
+                "Device assigned to customer (saved locally; 3TP sync pending)."
+                if sync_error
+                else "Device mapped to customer successfully"
+            ),
+            "customer_id": str(customer_ref),
+            "device_id": str(device_ref),
+            "data": {
+                "mapping_id": str(mapping.id),
+                "customer_id": str(customer.pk),
+                "customer_name": customer.company,
+                "device_id": str(device.pk),
+                "ac_id": device.ac_id,
+                "released_from_site": released_site,
+                "sync_status": "ERROR" if sync_error else "SYNCED",
+                "sync_error": sync_error,
+            },
+        }, status=201 if created else 200)
 
     except Exception as e:
-
-        return JsonResponse(
-            {"error": str(e)},
-            status=500
-        )
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 @csrf_exempt
 @api_view(["POST"])
 def assign_device_to_site(request):
+    """
+    Device -> Site.
+
+    The site must sit in the same customer's hierarchy as the device:
+      * device already has a customer  -> site must belong to that customer;
+      * device has no customer yet     -> it is assigned to the site's customer.
+    Saved locally first (and placed in the site's hierarchy); the 3TP relation
+    is attempted afterwards and reported.
+    """
+    user = request.user
+
+    if not (user and user.is_authenticated):
+        return JsonResponse({"error": "Valid Bearer token required"}, status=401)
+
+    if user.role not in (Role.ORG_SUPER_ADMIN, Role.CUSTOMER, Role.BR_ADMIN):
+        return JsonResponse(
+            {"error": "You are not allowed to assign devices to sites."},
+            status=403,
+        )
 
     try:
-        auth_header = request.headers.get("Authorization")
+        body = request.data
+        asset_ref = str(body.get("asset_id") or "").strip()
+        site_ref = str(body.get("site_id") or "").strip()
+        device_ref = body.get("device_id")
 
-        if not auth_header or not auth_header.startswith("Bearer "):
+        if not (asset_ref or site_ref) or not device_ref:
             return JsonResponse(
-                {"error": "Valid Bearer token required"},
-                status=401
+                {"error": "asset_id (or site_id) and device_id are required"},
+                status=400,
             )
 
-        token = auth_header.split(" ")[1]
+        device = _ensure_local_device(request, device_ref)
+        if device is None:
+            return JsonResponse({"error": "Device not found."}, status=404)
 
-        body = json.loads(request.body)
-
-        asset_id = body.get("asset_id")
-        device_id = body.get("device_id")
-
-        if not asset_id or not device_id:
-            return JsonResponse(
-                {"error": "asset_id and device_id are required"},
-                status=400
+        # ---- resolve the local site (3TP asset id first, then local id) ----
+        site = None
+        for ref in (asset_ref, site_ref):
+            if not ref or site is not None:
+                continue
+            site = (
+                Site.objects
+                .select_related("branch", "branch__customer", "floor")
+                .filter(tpt_site_id=ref)
+                .first()
             )
+            if site is None:
+                try:
+                    site = (
+                        Site.objects
+                        .select_related("branch", "branch__customer", "floor")
+                        .filter(pk=uuid.UUID(ref))
+                        .first()
+                    )
+                except ValueError:
+                    site = None
 
-        # ---------------- SITE -> DEVICE ----------------
+        if site is None and user.role != Role.ORG_SUPER_ADMIN:
+            return JsonResponse({"error": "Site not found."}, status=404)
 
-        payload = {
-            "from": {
-                "entityType": "ASSET",
-                "id": asset_id
-            },
-            "to": {
-                "entityType": "DEVICE",
-                "id": device_id
-            },
-            "type": "Contains",
-            "typeGroup": "COMMON"
-        }
+        owner = device_customer(device)
 
-        response = requests.post(
-            f"{CLOUD_URL}/api/relation",
-            json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "X-Authorization": f"Bearer {token}"
-            }
-        )
+        if user.role != Role.ORG_SUPER_ADMIN:
+            if owner is None or owner.pk != user.customer_id:
+                return JsonResponse(
+                    {"error": "This device is not assigned to your account."},
+                    status=403,
+                )
+            if not accessible_sites(user).filter(pk=site.pk).exists():
+                return JsonResponse(
+                    {"error": "This site is outside your scope."}, status=403
+                )
 
-        if response.status_code not in [200, 201]:
-            return JsonResponse(
-                {
-                    "error": "Failed to map device to site",
-                    "details": response.json()
+        sync_error = ""
+        ctx = {}
+
+        if site is not None:
+            target = site_customer(site)
+
+            if owner and target and owner.pk != target.pk:
+                return JsonResponse(
+                    {
+                        "error": (
+                            f"Device belongs to {owner.company} but this site "
+                            f"belongs to {target.company}. Assign the device "
+                            "to the right customer first."
+                        )
+                    },
+                    status=400,
+                )
+
+            # ---- save locally first ----
+            with transaction.atomic():
+                SiteDeviceMapping.objects.filter(
+                    device=device, is_active=True
+                ).exclude(site=site).update(is_active=False)
+                SiteDeviceMapping.objects.update_or_create(
+                    site=site, device=device, defaults={"is_active": True}
+                )
+
+                if owner is None and target is not None:
+                    CustomerDeviceMapping.objects.update_or_create(
+                        customer=target,
+                        device=device,
+                        defaults={"is_active": True},
+                    )
+
+                device.site = site
+                device.assigned_by = user
+                device.save()
+
+            # Place the device in the site's hierarchy (JSON map + tree).
+            try:
+                ctx = apply_site_hierarchy_to_device(device)
+            except Exception as exc:
+                sync_error = _one_line(exc, 500)
+
+        # ---- 3TP relation (best effort) ----
+        tpt_site_id = (site.tpt_site_id if site is not None else "") or asset_ref
+        try:
+            if not tpt_site_id or not device.tpt_device_id:
+                raise ThreeTPError("Site or device has no 3TP id yet.")
+
+            response = requests.post(
+                f"{CLOUD_URL}/api/relation",
+                json={
+                    "from": {"entityType": "ASSET", "id": tpt_site_id},
+                    "to": {"entityType": "DEVICE", "id": device.tpt_device_id},
+                    "type": "Contains",
+                    "typeGroup": "COMMON",
                 },
-                status=response.status_code
+                headers=_tpt_user_headers(request),
+                timeout=15,
             )
-
-        # ---------------- LOCAL UPDATE ----------------
-
-        site = (
-            Site.objects
-            .select_related("branch", "branch__customer", "floor")
-            .filter(tpt_site_id=asset_id)
-            .first()
-        )
-
-        device = ACDevice.objects.filter(
-            tpt_device_id=device_id
-        ).first()
-
-        if site and device:
-            device.site = site
-            device.save(update_fields=["site"])
-            # Automatically place the device in the site's hierarchy.
-            apply_site_hierarchy_to_device(device)
+            if response.status_code not in (200, 201, 204):
+                raise ThreeTPError(
+                    f"3TP relation failed ({response.status_code}): "
+                    f"{response.text[:300]}"
+                )
+        except Exception as exc:
+            if site is None:
+                # Legacy path: nothing exists locally, so 3TP is the only record.
+                return JsonResponse(
+                    {"error": "Failed to map device to site", "details": _one_line(exc, 500)},
+                    status=502,
+                )
+            sync_error = (sync_error + " " if sync_error else "") + _one_line(exc, 1000)
 
         return JsonResponse({
-            "message": "Device mapped to site successfully",
-            "asset_id": asset_id,
-            "device_id": device_id
+            "message": (
+                "Device assigned to site (saved locally; 3TP sync pending)."
+                if sync_error
+                else "Device mapped to site successfully"
+            ),
+            "asset_id": asset_ref,
+            "device_id": str(device_ref),
+            "data": {
+                "device_id": str(device.pk),
+                "ac_id": device.ac_id,
+                "site_id": str(site.pk) if site else "",
+                "site_name": site.name if site else "",
+                "hierarchy_type": ctx.get("hierarchy_type", ""),
+                "sync_status": "ERROR" if sync_error else "SYNCED",
+                "sync_error": sync_error,
+            },
         })
 
     except Exception as e:
-
-        return JsonResponse(
-            {"error": str(e)},
-            status=500
-        )
+        return JsonResponse({"error": str(e)}, status=500)
 
 
 def get_or_create_local_site_from_3tp(request, tpt_site_id, customer, branch_id=None):

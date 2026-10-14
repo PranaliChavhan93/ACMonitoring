@@ -1,5 +1,5 @@
 
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 
 from .models import (
     Role,
@@ -8,7 +8,46 @@ from .models import (
     Branch,
     Site,
     ACDevice,
+    CustomerDeviceMapping,
+    CustomerSiteMapping,
 )
+
+
+def device_customer(device):
+    """
+    The customer a device belongs to.
+
+    1. An explicit Customer -> Device assignment (CustomerDeviceMapping) wins.
+    2. Otherwise fall back to the customer that owns the site's branch.
+    """
+    mapping = (
+        CustomerDeviceMapping.objects
+        .select_related("customer")
+        .filter(device=device, is_active=True)
+        .order_by("-updated_at")
+        .first()
+    )
+    if mapping:
+        return mapping.customer
+
+    site = device.site if device.site_id else None
+    if site and site.branch_id and site.branch.customer_id:
+        return site.branch.customer
+    return None
+
+
+def site_customer(site):
+    """The customer whose hierarchy a site sits in (branch owner, else mapping)."""
+    if site.branch_id and site.branch.customer_id:
+        return site.branch.customer
+    mapping = (
+        CustomerSiteMapping.objects
+        .select_related("customer")
+        .filter(site=site, is_active=True)
+        .order_by("-updated_at")
+        .first()
+    )
+    return mapping.customer if mapping else None
 
 
 def accessible_branches(user):
@@ -106,13 +145,20 @@ def accessible_devices(user):
         )
 
     if user.role == Role.CUSTOMER:
+        # A device explicitly assigned to another customer is never visible
+        # here, even if it happens to sit on a site in this customer's tree.
+        owned_by_someone_else = CustomerDeviceMapping.objects.filter(
+            device=OuterRef("pk"),
+            is_active=True,
+        ).exclude(customer_id=user.customer_id)
+
         return qs.filter(
             Q(site__branch__customer_id=user.customer_id)
             | Q(
                 customer_mappings__customer_id=user.customer_id,
                 customer_mappings__is_active=True,
             )
-        )
+        ).filter(~Exists(owned_by_someone_else))
 
     if user.role == Role.BR_ADMIN:
         return qs.filter(
