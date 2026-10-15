@@ -1,103 +1,113 @@
 import React, { useMemo } from "react";
-
 import {
-    ResponsiveContainer,
-    LineChart,
-    Line,
-    CartesianGrid,
-    XAxis,
-    YAxis,
-    Tooltip,
-    Legend,
+    ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
 } from "recharts";
 
-function TemperatureChart({ data = [] }) {
+const CHART_INTERVAL_MS = 10 * 1000;
+
+const timestampOf = (item) => {
+    const raw = item?.timestamp ?? item?.ts ?? item?.time ?? item?.created_at ?? item?.datetime;
+    if (raw == null || raw === "") return NaN;
+    if (typeof raw === "number") return raw > 1e12 ? raw : raw * 1000;
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? parsed : NaN;
+};
+
+const indoorValue = (item) => {
+    const value = item?.indoor_temperature ?? item?.indoor_temp ?? item?.temperature ?? item?.temp;
+    return value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+};
+
+const outdoorValue = (item) => {
+    const value = item?.temperature_2m ?? item?.outdoor_temperature ?? item?.temperature;
+    return value == null || value === "" || !Number.isFinite(Number(value)) ? null : Number(value);
+};
+
+// Keep every indoor telemetry timestamp (the dashboard's existing cadence) as an X-axis point.
+// The hourly outdoor series is interpolated at those exact timestamps for a fair comparison.
+function outdoorAt(timestamp, weather) {
+    if (!weather.length) return null;
+    let before = null;
+    let after = null;
+    for (const point of weather) {
+        if (point.timestampMs <= timestamp) before = point;
+        if (point.timestampMs >= timestamp) { after = point; break; }
+    }
+    if (!before) return after?.value ?? null;
+    if (!after) return before.value ?? null;
+    if (before.value == null && after.value == null) return null;
+    if (before.value == null) return after.value;
+    if (after.value == null) return before.value;
+    if (before.timestampMs === after.timestampMs) return before.value;
+    const ratio = (timestamp - before.timestampMs) / (after.timestampMs - before.timestampMs);
+    return before.value + (after.value - before.value) * ratio;
+}
+
+function TemperatureChart({ data = [], indoorData = [], locationName = "selected branch", status = "idle", error = "" }) {
     const chartData = useMemo(() => {
-        return data.map((item, index) => {
-            const timestamp =
-                item.timestamp ??
-                item.time ??
-                item.created_at ??
-                "";
+        const weather = data.map((item) => ({ timestampMs: timestampOf(item), value: outdoorValue(item) }))
+            .filter((p) => Number.isFinite(p.timestampMs) && p.value != null)
+            .sort((a, b) => a.timestampMs - b.timestampMs);
+        const indoor = indoorData.map((item) => ({ timestampMs: timestampOf(item), value: indoorValue(item) }))
+            .filter((p) => Number.isFinite(p.timestampMs))
+            .sort((a, b) => a.timestampMs - b.timestampMs);
 
-            return {
-                name:
-                    timestamp
-                        ? String(timestamp).slice(11, 16)
-                        : item.ac_id ??
-                          item.unit_name ??
-                          `AC ${index + 1}`,
+            if (indoor.length) {
+                // Sort and keep one indoor reading per 10-second interval.
+                const sampledIndoor = [];
+                let lastBucket = null;
 
-                indoor: Number(
-                    item.indoor_temperature ??
-                    item.indoor_temp ??
-                    item.temperature ??
-                    0
-                ),
+                for (const point of indoor) {
+                    const bucket = Math.floor(
+                        point.timestampMs / CHART_INTERVAL_MS
+                    );
 
-                outdoor: Number(
-                    item.outdoor_temperature ??
-                    item.outdoor_temp ??
-                    0
-                ),
-            };
-        });
-    }, [data]);
+                    if (bucket !== lastBucket) {
+                        sampledIndoor.push(point);
+                        lastBucket = bucket;
+                    }
+                }
+
+                return sampledIndoor.map((point) => ({
+                    timestampMs: point.timestampMs,
+                    name: new Date(point.timestampMs).toLocaleTimeString([], {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                    }),
+                    indoorTemperature: point.value,
+                    outdoorTemperature: outdoorAt(point.timestampMs, weather),
+                }));
+            }        return weather.map((point) => ({
+            timestampMs: point.timestampMs,
+            name: new Date(point.timestampMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            indoorTemperature: null,
+            outdoorTemperature: point.value,
+        }));
+    }, [data, indoorData]);
+
+    const hasOutdoor = data.some((item) => outdoorValue(item) != null);
+    const hasIndoor = indoorData.some((item) => indoorValue(item) != null);
 
     return (
         <div className="chart-box">
-            <div className="chart-header">
-                <div>
-                    <h3>🌡 Temperature Monitoring </h3>
-                    <span> Indoor vs Outdoor </span>
-                </div>
-            </div>
-
-            <ResponsiveContainer
-                width="100%"
-                height={280}
-            >
-                <LineChart
-                    data={chartData}
-                    margin={{
-                        top: 10,
-                        right: 20,
-                        left: 0,
-                        bottom: 5,
-                    }}
-                >
-                    <CartesianGrid
-                        strokeDasharray="3 3"
-                    />
-                    <XAxis
-                        dataKey="name"
-                        tick={{ fontSize: 11 }}
-                    />
-                    <YAxis
-                        tick={{ fontSize: 11 }}
-                        ticks={[0, 25, 50, 75]}
-                        domain={[0, 75]}
-                    />
-                    <Tooltip />
+            <div className="chart-header"><div>
+                <h3>🌡 Temperature Monitoring</h3>
+                <span>{locationName ? `Device temperature and outdoor weather near ${locationName}` : "Device temperature and outdoor weather"}</span>
+            </div></div>
+            {chartData.length ? <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} minTickGap={24} />
+                    <YAxis tick={{ fontSize: 11 }} unit="°C" />
+                    <Tooltip formatter={(value, name) => [value == null ? "No reading" : `${Number(value).toFixed(1)} °C`, name]} />
                     <Legend />
-                    <Line
-                        type="monotone"
-                        dataKey="indoor"
-                        stroke="#3182BD"
-                        name="Indoor °C"
-                        strokeWidth={3}
-                        dot={false}
-                    />
-                    <Line
-                        type="monotone"
-                        dataKey="outdoor"
-                        name="Outdoor °C"
-                        stroke="#94a3b8"
-                        strokeWidth={2}
-                        dot={false}
-                    />
+                    <Line type="monotone" dataKey="indoorTemperature" name="Indoor" stroke="#3182bd" strokeWidth={2.5} dot={false} connectNulls />
+                    <Line type="monotone" dataKey="outdoorTemperature" name="Outdoor" stroke="#f28e2b" strokeWidth={2.5} dot={false} connectNulls />
                 </LineChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer> : <div style={{ minHeight: 120, display: "grid", placeItems: "center", padding: 16, textAlign: "center" }}>{status === "loading" ? "Loading outdoor weather…" : error || "Temperature data will appear when device readings and branch coordinates are available."}</div>}
+            {!hasIndoor && <small style={{ display: "block", padding: "0 12px 8px", color: "#64748b" }}>Waiting for indoor temperature telemetry from the device.</small>}
+            {!hasOutdoor && status !== "loading" && <small style={{ display: "block", padding: "0 12px 8px", color: "#64748b" }}>Outdoor temperature is unavailable until valid branch coordinates are saved.</small>}
         </div>
     );
 }

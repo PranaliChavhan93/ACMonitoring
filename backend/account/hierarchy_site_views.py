@@ -1,5 +1,6 @@
 
 import uuid
+from decimal import Decimal, InvalidOperation
 
 from django.db import transaction, IntegrityError
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -490,6 +491,16 @@ def create_hierarchy_branch(request):
         address = str(data.get("address") or "").strip()
         pincode = str(data.get("pincode") or "").strip()
 
+        try:
+            latitude = Decimal(str(data.get("latitude"))) if data.get("latitude") not in (None, "") else None
+            longitude = Decimal(str(data.get("longitude"))) if data.get("longitude") not in (None, "") else None
+        except (InvalidOperation, TypeError, ValueError):
+            return _error("Latitude and longitude must be valid numbers.")
+        if latitude is not None and not Decimal("-90") <= latitude <= Decimal("90"):
+            return _error("Latitude must be between -90 and 90.")
+        if longitude is not None and not Decimal("-180") <= longitude <= Decimal("180"):
+            return _error("Longitude must be between -180 and 180.")
+
         if not name or not code:
             return _error("Branch name and branch code are required.")
         if len(pincode) not in (0, 6) or (pincode and not pincode.isdigit()):
@@ -512,6 +523,7 @@ def create_hierarchy_branch(request):
             branch = Branch.objects.create(
                 customer=customer, taluka=taluka, city=None, division=None,
                 name=name, code=code, pincode=pincode, address=address,
+                latitude=latitude, longitude=longitude,
             )
         elif hierarchy == "ZONAL":
             zone = _resolve_location(Zone, data.get("zone_id"), is_active=True)
@@ -531,6 +543,7 @@ def create_hierarchy_branch(request):
             branch = Branch.objects.create(
                 customer=customer, city=None, taluka=None, division=division,
                 name=name, code=code, pincode=pincode, address=address,
+                latitude=latitude, longitude=longitude,
             )
         else:
             return _error("The selected customer has no valid hierarchy configured.")
@@ -592,6 +605,8 @@ def create_hierarchy_branch(request):
             "data": {
                 "id": str(branch.pk), "name": branch.name, "code": branch.code,
                 "address": branch.address, "pincode": branch.pincode,
+                "latitude": float(branch.latitude) if branch.latitude is not None else None,
+                "longitude": float(branch.longitude) if branch.longitude is not None else None,
                 "customer_id": str(branch.customer_id),
                 "hierarchy_type": hierarchy,
                 "taluka_id": str(branch.taluka_id) if branch.taluka_id else None,

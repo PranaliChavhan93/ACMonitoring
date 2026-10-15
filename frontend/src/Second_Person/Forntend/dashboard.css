@@ -182,7 +182,7 @@
 
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
     gap: 16px;
 }
 
@@ -780,3 +780,29 @@
 .trends-button:active {
     transform: translateY(0);
 }
+
+/* Filter-aware dashboard layout additions */
+.dashboard-scope-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.dashboard-scope-heading h2 { margin: 0; }
+.dashboard-scope-heading p { margin: 5px 0 0; color: #7b8ba3; font-size: 12px; }
+.dashboard-grid--primary { align-items: stretch; margin-bottom: 16px; }
+.dashboard-grid--secondary { align-items: stretch; margin-bottom: 16px; }
+.dashboard-grid--regional, .dashboard-grid--devices { align-items: stretch; margin-bottom: 18px; }
+.dashboard-context-card { min-height: 240px; }
+.dashboard-context-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
+.dashboard-context-stats > div { display: flex; flex-direction: column; gap: 6px; padding: 13px; border: 1px solid #edf2f7; border-radius: 10px; background: #f8fbff; }
+.dashboard-context-stats span { color: #7b8ba3; font-size: 11px; }
+.dashboard-context-stats strong { color: #172033; font-size: 17px; font-weight: 800; }
+.dashboard-context-note { margin-top: 14px; color: #718096; font-size: 11px; line-height: 1.5; }
+.ai-module-toggle-section { margin: 4px 0 18px; }
+.ai-module-toggle-button { min-height: 40px; }
+.ai-module-panel { margin-top: 14px; }
+@media (max-width: 700px) {
+  .dashboard-scope-heading { align-items: flex-start; }
+  .dashboard-scope-heading .trends-button { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+  .dashboard-context-stats { grid-template-columns: 1fr 1fr; }
+}
+.ac-device-table { min-width: 1050px; }
+.ac-device-status { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 10px; font-weight: 750; text-transform: capitalize; }
+.ac-device-status.is-on { color: #15803d; background: #dcfce7; }
+.ac-device-status.is-off { color: #64748b; background: #f1f5f9; }

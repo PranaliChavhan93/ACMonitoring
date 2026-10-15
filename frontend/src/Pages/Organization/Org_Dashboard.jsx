@@ -55,6 +55,7 @@ const DEFAULT_WIDGETS = {
     temperature: true,
     humidity: true,
     alerts: true,
+    cost_card: true,
     energy_chart: true,
     power_chart: true,
     temperature_chart: true,
@@ -227,7 +228,7 @@ function Org_Dashboard() {
             }
 
             if (!response.ok) {
-                throw new Error("3TP Error");
+                throw new Error("Cloud Error");
             }
 
             const result = await response.json();

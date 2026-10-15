@@ -11164,19 +11164,56 @@ def filter_by_location(data, request):
 
 def attach_location(record, device_map):
     enriched = dict(record)
-    ac_id    = record.get("ac_id", "")
-    loc      = resolve_ac_location(ac_id, device_map)
+    ac_id = record.get("ac_id", "")
+    device_info = device_map.get(ac_id, {}) or {}
+    loc = resolve_ac_location(ac_id, device_map) or {}
+    geographical = loc.get("geographical") or {}
+    zonal = loc.get("zonal") or {}
 
-    enriched.update(loc["geographical"])
-    enriched.update(loc["zonal"])
+    enriched.update(geographical)
+    enriched.update(zonal)
 
-    if loc["site_id"]:
+    if loc.get("site_id"):
         enriched["site_id"] = loc["site_id"]
-    if loc["device_name"]:
+    if loc.get("device_name"):
         enriched["device_name"] = loc["device_name"]
 
-    enriched["location_type"]  = loc["location_type"]
-    enriched["hierarchy_type"] = loc["hierarchy_type"]
+    enriched["location_type"] = loc.get("location_type", "")
+    enriched["hierarchy_type"] = loc.get("hierarchy_type", "")
+
+    # Weather charts need coordinates saved on the mapped local Branch.
+    # Prefer stable UUID, then branch code (e.g. KO-01), then a name fallback.
+    branch_ref = (
+        device_info.get("branch_id")
+        or geographical.get("branch_id")
+        or zonal.get("branch_id")
+    )
+    branch_obj = None
+    if branch_ref:
+        try:
+            branch_obj = Branch.objects.filter(pk=branch_ref).first()
+        except (ValueError, TypeError, DjangoValidationError):
+            branch_obj = None
+        if branch_obj is None:
+            branch_obj = Branch.objects.filter(code__iexact=str(branch_ref)).first()
+
+    if branch_obj is None:
+        branch_name = (
+            geographical.get("branch_name")
+            or zonal.get("branch_name")
+            or device_info.get("branch_name")
+        )
+        if branch_name:
+            customer_ref = device_info.get("customer_id")
+            branch_query = Branch.objects.filter(name__iexact=str(branch_name))
+            if customer_ref:
+                branch_query = branch_query.filter(customer_id=customer_ref)
+            branch_obj = branch_query.first()
+
+    latitude = branch_obj.latitude if branch_obj and branch_obj.latitude is not None else device_info.get("latitude")
+    longitude = branch_obj.longitude if branch_obj and branch_obj.longitude is not None else device_info.get("longitude")
+    enriched["latitude"] = float(latitude) if latitude not in (None, "") else None
+    enriched["longitude"] = float(longitude) if longitude not in (None, "") else None
 
     return enriched
 

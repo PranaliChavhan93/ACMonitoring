@@ -6,7 +6,7 @@ function Average_Humidity({ value = 0 }) {
       <div className="kpi-icon">💧</div>
 
       <div className="kpi-content">
-        <p>Average Humidity</p>
+        <p>Avg. Humidity</p>
 
         <h2>{Number(value).toFixed(1)}%</h2>
 

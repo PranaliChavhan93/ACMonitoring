@@ -6,7 +6,7 @@ function Average_Temperature({ value = 0 }) {
       <div className="kpi-icon">🌡️</div>
 
       <div className="kpi-content">
-        <p>Average Temperature</p>
+        <p>Avg. Temperature</p>
 
         <h2>{Number(value).toFixed(1)}°C</h2>
 

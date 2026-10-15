@@ -144,6 +144,43 @@ body {
   box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.12);
 }
 
+
+.project-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding-left: 2px;
+}
+.project-brand__mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2563eb, #60a5fa);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -.03em;
+  box-shadow: 0 5px 12px rgba(37, 99, 235, .18);
+}
+.project-brand__copy { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
+.project-brand__copy strong { color: #14213d; font-size: 14px; font-weight: 800; line-height: 1.2; white-space: nowrap; }
+.project-brand__copy small { color: #7b8ba3; font-size: 10px; line-height: 1.2; white-space: nowrap; }
+@media (max-width: 600px) {
+  .top-navbar { padding: 0 12px; gap: 8px; }
+  .project-brand { gap: 7px; }
+  .project-brand__mark { width: 32px; height: 32px; }
+  .project-brand__copy strong { font-size: 11px; }
+  .project-brand__copy small { display: none; }
+  .profile-section { gap: 8px; }
+  .welcome-text h4 { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+  .welcome-text p, .welcome-text h6 { font-size: 10px; }
+  .profile-logo { width: 34px; height: 34px; }
+}
+
 /* ---------- Profile Section ---------- */
 .profile-section {
   display: flex;

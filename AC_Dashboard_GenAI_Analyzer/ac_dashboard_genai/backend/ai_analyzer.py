@@ -23,6 +23,10 @@ DASHBOARD_SECTIONS = [
 
 MAINTENANCE_TYPES = [
     "Routine Service",
+    "Preventive",
+    "Corrective",
+    "Inspection",
+    "Repair",
     "Filter Cleaning",
     "Coil Cleaning",
     "Gas Refilling",
@@ -39,20 +43,23 @@ MAINTENANCE_TYPES = [
 SYSTEM_PROMPT = """
 You are a professional AI analyst for an AC energy monitoring system.
 
-Use only the supplied dashboard, telemetry, and maintenance data.
+Use only the supplied dashboard data, telemetry, calculations,
+and maintenance records.
 
-Rules:
-1. Never invent readings, dates, trends, faults, causes, or maintenance records.
-2. Distinguish observed facts from possible explanations.
+RULES:
+1. Never invent readings, dates, trends, faults, causes, or records.
+2. Distinguish measured facts from possible explanations.
 3. Missing data is not the same as zero.
-4. Do not claim a component has failed without supporting evidence.
-5. Give practical recommendations based on available evidence.
-6. Use concise, professional language.
+4. Never claim a component has failed without evidence.
+5. Use supplied mathematical calculations when available.
+6. Give practical recommendations based on the evidence.
+7. Do not claim that a difference in consumption proves a fault.
+8. Use concise, professional language.
 """
 
 
 # ============================================================
-# GROQ CLIENT AND RESPONSE HANDLING
+# GROQ CLIENT
 # ============================================================
 
 def get_groq_client():
@@ -81,10 +88,8 @@ def serialize_data(data):
 
 def ask_model(prompt, max_tokens=2500):
     """
-    Call Groq and return its visible answer.
-
-    Logs response metadata to help diagnose empty responses.
-    Does not print the API key or the submitted prompt.
+    Call Groq and return visible answer text.
+    Log response metadata if the model returns empty content.
     """
     client = get_groq_client()
     model = get_model_name()
@@ -114,9 +119,7 @@ def ask_model(prompt, max_tokens=2500):
             )
 
         choice = response.choices[0]
-        message = choice.message
-        answer = (message.content or "").strip()
-
+        answer = (choice.message.content or "").strip()
         usage = getattr(response, "usage", None)
 
         print(
@@ -135,8 +138,7 @@ def ask_model(prompt, max_tokens=2500):
         if not answer:
             raise RuntimeError(
                 "Groq returned empty text. "
-                f"Finish reason: {choice.finish_reason}. "
-                "Check the backend terminal for diagnostics."
+                f"Finish reason: {choice.finish_reason}."
             )
 
         return answer
@@ -155,11 +157,11 @@ def ask_model(prompt, max_tokens=2500):
 
 
 # ============================================================
-# DATA HELPERS
+# BASIC DATA HELPERS
 # ============================================================
 
 def number(value):
-    if value is None or value == "":
+    if value is None or value == "" or isinstance(value, bool):
         return None
 
     try:
@@ -185,6 +187,10 @@ def get_value(item, *keys):
             return value
 
     return None
+
+
+def first_number(item, *keys):
+    return number(get_value(item, *keys))
 
 
 def get_power(item):
@@ -249,16 +255,12 @@ def get_temperature(item):
 
 def get_humidity(item):
     return number(
-        get_value(
-            item,
-            "indoor_humidity",
-            "humidity",
-        )
+        get_value(item, "indoor_humidity", "humidity")
     )
 
 
 # ============================================================
-# LOCATION AGGREGATION
+# AGGREGATE LOCATION VALUES
 # ============================================================
 
 def aggregate_locations(records, location_keys, value_keys):
@@ -275,23 +277,21 @@ def aggregate_locations(records, location_keys, value_keys):
             name = str(location).strip()
             totals[name] = totals.get(name, 0.0) + value
 
-    results = [
-        {
-            "name": name,
-            "value": round(value, 3),
-        }
-        for name, value in totals.items()
-    ]
-
     return sorted(
-        results,
+        [
+            {
+                "name": name,
+                "value": round(value, 3),
+            }
+            for name, value in totals.items()
+        ],
         key=lambda item: item["value"],
         reverse=True,
     )[:10]
 
 
 # ============================================================
-# CALCULATE SUMMARY FROM AC DATA
+# CALCULATE SUMMARY FROM AC TELEMETRY
 # ============================================================
 
 def summarize_ac_data(ac_data):
@@ -416,6 +416,258 @@ def summarize_ac_data(ac_data):
 
 
 # ============================================================
+# MATHEMATICAL INSIGHTS
+# ============================================================
+
+def calculate_math_insights(dashboard):
+    """
+    Calculate comparisons only when compatible values exist.
+
+    Branch energy comparisons use the supplied branch records.
+    AC energy is not added across locations unless the data
+    clearly represents compatible measurements.
+    """
+    if not isinstance(dashboard, dict):
+        dashboard = {}
+
+    kpis = dashboard.get("kpis", {})
+    if not isinstance(kpis, dict):
+        kpis = {}
+
+    ac_data = dashboard.get("ac_data", [])
+    if not isinstance(ac_data, list):
+        ac_data = []
+
+    insights = {}
+
+    total_energy = first_number(
+        kpis,
+        "total_energy",
+        "totalEnergy",
+        "total_energy_consumption",
+        "totalEnergyConsumption",
+    )
+
+    active_energy = first_number(
+        kpis,
+        "active_energy",
+        "activeEnergy",
+        "active_energy_consumption",
+        "activeEnergyConsumption",
+    )
+
+    total_acs = first_number(
+        kpis,
+        "total_acs",
+        "totalACs",
+        "total_ac_count",
+        "totalACCount",
+    )
+
+    active_acs = first_number(
+        kpis,
+        "active_acs",
+        "activeACs",
+        "active_ac_count",
+        "activeACCount",
+    )
+
+    if total_energy is not None and active_energy is not None:
+        insights["energy_difference_kwh"] = round(
+            total_energy - active_energy, 3
+        )
+
+        if total_energy > 0:
+            insights["active_energy_percentage"] = round(
+                active_energy / total_energy * 100, 2
+            )
+
+    if (
+        total_acs is not None
+        and active_acs is not None
+        and total_acs > 0
+        and 0 <= active_acs <= total_acs
+    ):
+        insights["active_ac_percentage"] = round(
+            active_acs / total_acs * 100, 2
+        )
+
+        insights["inactive_ac_count"] = int(
+            total_acs - active_acs
+        )
+
+    # If KPI counts are missing, derive counts from individual ACs.
+    if ac_data and (
+        total_acs is None or active_acs is None
+    ):
+        active_statuses = {
+            "active", "running", "on", "1", "true"
+        }
+
+        inactive_statuses = {
+            "inactive", "stopped", "off", "0", "false"
+        }
+
+        statuses = [
+            str(
+                get_value(item, "status", "ac_status", "state")
+                or "unknown"
+            ).strip().lower()
+            for item in ac_data
+            if isinstance(item, dict)
+        ]
+
+        known_active = sum(
+            status in active_statuses for status in statuses
+        )
+
+        known_inactive = sum(
+            status in inactive_statuses for status in statuses
+        )
+
+        if total_acs is None:
+            total_acs = len(statuses)
+
+        if active_acs is None:
+            active_acs = known_active
+
+        if total_acs > 0:
+            insights["active_ac_count_from_records"] = known_active
+            insights["inactive_ac_count_from_records"] = known_inactive
+            insights["unknown_status_count_from_records"] = (
+                len(statuses) - known_active - known_inactive
+            )
+
+            insights["active_ac_percentage_from_records"] = round(
+                known_active / len(statuses) * 100, 2
+            ) if statuses else None
+
+    # Branch data may be represented as a list of objects.
+    branch_records = dashboard.get("branches", [])
+    branch_totals = {}
+
+    if isinstance(branch_records, list):
+        for branch in branch_records:
+            if not isinstance(branch, dict):
+                continue
+
+            name = get_value(
+                branch,
+                "name",
+                "branch",
+                "branch_name",
+                "label",
+            )
+
+            energy = get_energy(branch)
+
+            if energy is None:
+                energy = first_number(
+                    branch,
+                    "value",
+                    "totalEnergy",
+                )
+
+            if name and energy is not None:
+                name = str(name).strip()
+                branch_totals[name] = (
+                    branch_totals.get(name, 0.0) + energy
+                )
+
+    # Fall back to AC records if branch-level records are absent.
+    if not branch_totals:
+        for record in ac_data:
+            if not isinstance(record, dict):
+                continue
+
+            branch = get_value(
+                record,
+                "branch",
+                "branch_name",
+            )
+
+            energy = get_energy(record)
+
+            if branch and energy is not None:
+                name = str(branch).strip()
+                branch_totals[name] = (
+                    branch_totals.get(name, 0.0) + energy
+                )
+
+    ranked_branches = sorted(
+        [
+            {
+                "name": name,
+                "energy_kwh": round(value, 3),
+            }
+            for name, value in branch_totals.items()
+        ],
+        key=lambda item: item["energy_kwh"],
+        reverse=True,
+    )
+
+    if ranked_branches:
+        insights["branch_energy_ranking"] = ranked_branches[:10]
+        insights["highest_energy_branch"] = ranked_branches[0]
+
+    if len(ranked_branches) >= 2:
+        highest = ranked_branches[0]
+        lowest = ranked_branches[-1]
+
+        insights["branch_energy_difference_kwh"] = round(
+            highest["energy_kwh"] - lowest["energy_kwh"],
+            3,
+        )
+
+        if lowest["energy_kwh"] > 0:
+            insights["branch_energy_ratio"] = round(
+                highest["energy_kwh"] / lowest["energy_kwh"],
+                2,
+            )
+
+        insights["lowest_energy_branch"] = lowest
+
+    # Temperature and humidity averages from actual telemetry.
+    temperatures = [
+        get_temperature(item)
+        for item in ac_data
+        if isinstance(item, dict)
+    ]
+
+    temperatures = [
+        value for value in temperatures
+        if value is not None
+    ]
+
+    if temperatures:
+        insights["average_temperature"] = round(
+            sum(temperatures) / len(temperatures), 2
+        )
+
+        insights["temperature_range"] = round(
+            max(temperatures) - min(temperatures), 2
+        )
+
+    humidities = [
+        get_humidity(item)
+        for item in ac_data
+        if isinstance(item, dict)
+    ]
+
+    humidities = [
+        value for value in humidities
+        if value is not None
+    ]
+
+    if humidities:
+        insights["average_humidity"] = round(
+            sum(humidities) / len(humidities), 2
+        )
+
+    return insights
+
+
+# ============================================================
 # PREPARE DASHBOARD CONTEXT
 # ============================================================
 
@@ -452,11 +704,12 @@ def prepare_dashboard_context(dashboard):
         "calculated_summary_from_ac_data": summarize_ac_data(
             dashboard.get("ac_data", [])
         ),
+        "mathematical_insights": calculate_math_insights(dashboard),
     }
 
 
 # ============================================================
-# OUTPUT HELPERS
+# PARSE MODEL OUTPUT
 # ============================================================
 
 def extract_sections(raw, labels):
@@ -521,7 +774,6 @@ def limit_words(text, max_words=30):
 
 # ============================================================
 # DASHBOARD ANALYSIS
-# Returns short and descriptive versions
 # ============================================================
 
 def analyze_dashboard(dashboard):
@@ -532,30 +784,37 @@ def analyze_dashboard(dashboard):
         f"{section}:" for section in DASHBOARD_SECTIONS
     )
 
-    # SHORT VERSION: maximum 3 sentences and 30 words per section.
     short_prompt = f"""
-Analyze the AC monitoring dashboard.
+Analyze the supplied AC monitoring dashboard using actual data
+and the precomputed mathematical_insights.
 
 Return exactly these headings:
 {headings}
 
-STRICT RULES:
-- Maximum 3 sentences per section.
-- Maximum 30 words per section.
+SHORT ANSWER RULES:
+- Maximum 3 sentences and 30 words per section.
 - Prefer 1 or 2 sentences.
-- State the key finding and one useful action.
-- Use actual values and units.
-- Do not repeat information between sections.
-- Do not invent values, trends, locations, or faults.
+- State important numerical findings.
+- Use calculated differences, percentages, and ratios when relevant.
+- Give one useful action where appropriate.
+- Explain what the result means without claiming unsupported faults.
+- Do not invent values or trends.
+- Do not compare periods without matching historical data.
 - If data is missing, state that briefly.
-- No introduction, conclusion, or table.
+- Do not add an introduction, conclusion, or table.
+
+MATHEMATICAL REASONING:
+- Use the supplied mathematical_insights.
+- Show a brief calculation when it helps explain a finding.
+- Do not add incompatible energy values.
+- Do not treat cumulative meter readings as interval consumption.
+- Do not calculate savings without sufficient evidence.
 
 DASHBOARD DATA:
 {dashboard_json}
 """
 
     short_raw = ask_model(short_prompt, max_tokens=1000)
-
     short_sections = extract_sections(
         short_raw,
         DASHBOARD_SECTIONS,
@@ -569,24 +828,26 @@ DASHBOARD DATA:
         if not content:
             content = "Insufficient data is available."
 
-        content = limit_sentences(content, 3)
-        content = limit_words(content, 30)
+        short_result[section] = limit_words(
+            limit_sentences(content, 3),
+            30,
+        )
 
-        short_result[section] = content
-
-    # DESCRIPTIVE VERSION: shown only when requested by the frontend.
     descriptive_prompt = f"""
-Provide a detailed analysis of the AC monitoring dashboard.
+Provide a detailed mathematical analysis of the AC dashboard.
 
 Return exactly these headings:
 {headings}
 
-Explain the finding, relevant evidence, and practical implications.
-Use only actual supplied data. Mention missing data where relevant.
-Give useful recommendations without inventing faults, causes,
-values, trends, dates, or savings.
+Use actual readings and the supplied mathematical_insights.
+Explain relevant calculations, percentages, ratios, and comparisons.
+Describe what the evidence means and suggest practical next steps.
+Distinguish mathematical findings from possible causes.
 
-Use readable paragraphs. Do not return JSON or a table.
+Do not invent values, dates, trends, faults, or savings.
+Do not combine incompatible measurements.
+Mention missing data where relevant.
+Return readable paragraphs, not JSON or a table.
 
 DASHBOARD DATA:
 {dashboard_json}
@@ -618,7 +879,6 @@ DASHBOARD DATA:
 
 # ============================================================
 # ASK AI
-# Returns short and descriptive answers
 # ============================================================
 
 def answer_dashboard_question(
@@ -632,7 +892,9 @@ def answer_dashboard_question(
         raise ValueError("Please enter a question.")
 
     if len(question) > 2000:
-        raise ValueError("Question cannot exceed 2000 characters.")
+        raise ValueError(
+            "Question cannot exceed 2000 characters."
+        )
 
     context = prepare_dashboard_context(dashboard)
 
@@ -650,30 +912,20 @@ def answer_dashboard_question(
     short_prompt = f"""
 Answer the user's question using only the supplied data.
 
-Rules:
-- Maximum 3 sentences and 30 words in total.
+SHORT ANSWER RULES:
+- Maximum 3 sentences and 30 words total.
 - Answer directly.
-- Mention the most relevant values.
-- Give one practical action if useful.
-- Never invent information.
-- If information is missing, say so briefly.
+- Calculate differences, ratios, percentages, or averages when possible.
+- Show the key numerical result.
+- Briefly explain its practical meaning.
+- Never invent missing values.
+- If information is unavailable, say so briefly.
 
-QUESTION:
-{question}
-
-DATA:
-{data_json}
-"""
-
-    descriptive_prompt = f"""
-Answer the user's question using only the supplied data.
-
-Start with the direct answer. Explain the supporting evidence,
-what it means, and practical next steps where useful.
-
-Never invent readings, dates, causes, faults, or maintenance records.
-For maintenance questions, use only supplied maintenance history.
-If information is unavailable, state what is missing.
+MATHEMATICAL REASONING:
+- Use mathematical_insights when relevant.
+- Show calculations using the supplied values.
+- Do not infer faults from consumption differences alone.
+- Do not combine incompatible measurements.
 
 QUESTION:
 {question}
@@ -687,8 +939,29 @@ DATA:
         max_tokens=500,
     )
 
-    short_answer = limit_sentences(short_answer, 3)
-    short_answer = limit_words(short_answer, 30)
+    short_answer = limit_words(
+        limit_sentences(short_answer, 3),
+        30,
+    )
+
+    descriptive_prompt = f"""
+Answer the user's question using only the supplied data.
+
+Give the direct answer first. Explain the relevant numerical evidence,
+show calculations where useful, and describe the practical meaning.
+Recommend a reasonable next step when appropriate.
+
+Never invent readings, dates, causes, faults, or maintenance records.
+Use only supplied maintenance history for maintenance questions.
+Do not combine incompatible energy measurements.
+If the data is insufficient, state what is missing.
+
+QUESTION:
+{question}
+
+DATA:
+{data_json}
+"""
 
     descriptive_answer = ask_model(
         descriptive_prompt,
@@ -734,7 +1007,9 @@ def recommend_maintenance(
     ).strip()
 
     if maintenance_type not in MAINTENANCE_TYPES:
-        raise ValueError("Select a valid maintenance type.")
+        raise ValueError(
+            "Select a valid maintenance type."
+        )
 
     if maintenance_type == "Other":
         other_maintenance_type = str(
@@ -784,22 +1059,22 @@ SUGGESTED_CHECKS:
 PREVIOUS_MAINTENANCE_REVIEW:
 TECHNICIAN_NOTE:
 
-Rules:
-- LIKELY_ISSUE: maximum 30 words.
-- RECOMMENDED_MAINTENANCE: maximum 30 words.
-- REASON: maximum 30 words.
-- PREVIOUS_MAINTENANCE_REVIEW: maximum 30 words.
+RULES:
+- Keep LIKELY_ISSUE within 30 words.
+- Keep RECOMMENDED_MAINTENANCE within 30 words.
+- Keep REASON within 30 words.
+- Keep PREVIOUS_MAINTENANCE_REVIEW within 30 words.
 - PRIORITY must be Low, Medium, High, or Urgent.
-- State that priority is provisional when evidence is incomplete.
-- Recommend maintenance based on the reported problem and evidence.
+- Explain that priority is provisional when evidence is incomplete.
+- Use previous maintenance dates and history when supplied.
+- Do not invent maintenance records or dates.
 - Do not treat the selected maintenance type as proof of a fault.
-- Do not invent dates or previous maintenance records.
-- If telemetry is missing, say the assessment is based on the
-  reported problem and supplied history only.
-- Do not claim a component has failed without evidence.
-- Include relevant practical inspection steps.
-- For electrical safety symptoms, recommend isolating the unit
-  and involving a qualified technician.
+- Never claim a component has failed without evidence.
+- Recommend practical checks.
+- If telemetry is missing, state that the assessment uses the
+  reported problem and supplied maintenance history only.
+- For electrical safety symptoms, advise isolating the unit and
+  involving a qualified technician.
 
 MAINTENANCE DATA:
 {serialize_data(context)}
