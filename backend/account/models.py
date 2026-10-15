@@ -84,7 +84,6 @@ class Customer(models.Model):
     district = models.CharField(max_length=100, blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
     pincode = models.CharField(max_length=6, blank=True, default="")
-    ifsc_code = models.CharField( max_length=11, blank=True, default="")
     # Primary bank admin
     contact_person = models.CharField(max_length=255, blank=True)
     contact_person_email = models.EmailField(blank=True)
@@ -304,9 +303,13 @@ class Branch(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="branches", null=True, blank=True)
     city = models.ForeignKey(City, on_delete=models.CASCADE, related_name="branches", null=True, blank=True)
+    # New direct geographical parent: a branch can be attached to a Taluka
+    # without requiring a City node. Existing city-linked branches are retained.
+    taluka = models.ForeignKey(Taluka, on_delete=models.CASCADE, related_name="branches", null=True, blank=True)
     division = models.ForeignKey(Division, on_delete=models.CASCADE, related_name="branches", null=True, blank=True)
 
     name = models.CharField(max_length=255)
+    address = models.TextField(blank=True, default="")
     code = models.CharField(max_length=50, unique=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -327,6 +330,17 @@ class Branch(models.Model):
         blank=True,
         default=""
     )
+    ifsc_code = models.CharField(
+        max_length=11,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+
+    # 3TP represents each local Branch as an ASSET.
+    tpt_asset_id = models.CharField(max_length=100, null=True, blank=True, unique=True)
+    tpt_sync_status = models.CharField(max_length=20, default="PENDING")
+    tpt_sync_error = models.TextField(null=True, blank=True)
 
     class Meta:
         db_table = "branches"
@@ -334,10 +348,12 @@ class Branch(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["city", "name"], name="unique_branch_per_city"),
             models.UniqueConstraint(fields=["division", "name"], name="unique_branch_per_division"),
+            models.UniqueConstraint(fields=["taluka", "name"], name="unique_branch_per_taluka"),
             models.CheckConstraint(
                 condition=(
-                    models.Q(city__isnull=False, division__isnull=True)
-                    | models.Q(city__isnull=True, division__isnull=False)
+                    models.Q(city__isnull=False, taluka__isnull=True, division__isnull=True)
+                    | models.Q(city__isnull=True, taluka__isnull=False, division__isnull=True)
+                    | models.Q(city__isnull=True, taluka__isnull=True, division__isnull=False)
                 ),
                 name="branch_has_exactly_one_parent",
             ),
@@ -352,12 +368,12 @@ class Branch(models.Model):
             raise ValidationError("A branch must belong to a customer.")
 
         ht = self.customer.hierarchy_type if self.customer_id else None
-        if ht == HierarchyType.GEOGRAPHICAL and not self.city_id:
-            raise ValidationError("This customer follows the Geographical hierarchy: select a City.")
+        if ht == HierarchyType.GEOGRAPHICAL and not (self.city_id or self.taluka_id):
+            raise ValidationError("This customer follows the Geographical hierarchy: select a Taluka or City.")
         if ht == HierarchyType.ZONAL and not self.division_id:
             raise ValidationError("This customer follows the Zonal hierarchy: select a Division.")
-        if self.city_id and self.division_id:
-            raise ValidationError("A branch can belong to only one hierarchy: City OR Division, not both.")
+        if sum(bool(value) for value in (self.city_id, self.taluka_id, self.division_id)) != 1:
+            raise ValidationError("A branch must belong to exactly one parent: City, Taluka, or Division.")
 
 
 class Floor(models.Model):
@@ -603,7 +619,23 @@ class ACDevice(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ac_id = models.CharField(max_length=100, unique=True, db_index=True)
     device_name = models.CharField(max_length=255, blank=True)
-    site = models.ForeignKey(Site, on_delete=models.SET_NULL, null=True, blank=True, related_name="ac_devices")
+    # New direct hierarchy relationship. Keep nullable during migration so
+    # existing devices can be backfilled from their legacy Site.branch.
+    branch = models.ForeignKey(
+        "Branch",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ac_devices",
+    )
+    # Legacy compatibility only. Do not use this field in new workflows.
+    site = models.ForeignKey(
+        Site,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ac_devices",
+    )
     status = models.CharField(max_length=20, default="OFF")
     capacity_ton = models.FloatField(null=True, blank=True)
     installation_date = models.DateField(null=True, blank=True)

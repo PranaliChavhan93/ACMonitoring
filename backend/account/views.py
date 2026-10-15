@@ -2121,28 +2121,54 @@ def iter_branches(tree, hierarchy_type):
     hierarchy_type = hierarchy_type.upper()
 
     if hierarchy_type == "GEOGRAPHICAL":
-        for state in tree:
+        states = tree
+        if isinstance(tree, list):
+            country = next((n for n in tree if isinstance(n, dict) and isinstance(n.get("states"), list)), None)
+            if country:
+                states = country["states"]
+        for state in states:
             for district in state.get("districts", []):
                 for taluka in district.get("talukas", []):
+                    # New form: branch is a direct child of Taluka.
+                    for branch in taluka.get("branches", []):
+                        context = {
+                            "hierarchy_type": "GEOGRAPHICAL",
+                            "state_id": state.get("state_id", ""),
+                            "state_name": state.get("state_name", ""),
+                            "district_id": district.get("district_id", ""),
+                            "district_name": district.get("district_name", ""),
+                            "taluka_id": taluka.get("taluka_id", ""),
+                            "taluka_name": taluka.get("taluka_name", ""),
+                            "city_id": "", "city_name": "",
+                            "branch_id": branch.get("branch_id", ""),
+                            "branch_name": branch.get("branch_name", ""),
+                        }
+                        yield branch, context
+                    # Backward compatibility: old branches under City remain supported.
                     for city in taluka.get("cities", []):
                         for branch in city.get("branches", []):
                             context = {
                                 "hierarchy_type": "GEOGRAPHICAL",
-                                "state_id":       state.get("state_id", ""),
-                                "state_name":     state.get("state_name", ""),
-                                "district_id":    district.get("district_id", ""),
-                                "district_name":  district.get("district_name", ""),
-                                "taluka_id":      taluka.get("taluka_id", ""),
-                                "taluka_name":    taluka.get("taluka_name", ""),
-                                "city_id":        city.get("city_id", ""),
-                                "city_name":      city.get("city_name", ""),
-                                "branch_id":      branch.get("branch_id", ""),
-                                "branch_name":    branch.get("branch_name", ""),
+                                "state_id": state.get("state_id", ""),
+                                "state_name": state.get("state_name", ""),
+                                "district_id": district.get("district_id", ""),
+                                "district_name": district.get("district_name", ""),
+                                "taluka_id": taluka.get("taluka_id", ""),
+                                "taluka_name": taluka.get("taluka_name", ""),
+                                "city_id": city.get("city_id", ""),
+                                "city_name": city.get("city_name", ""),
+                                "branch_id": branch.get("branch_id", ""),
+                                "branch_name": branch.get("branch_name", ""),
                             }
                             yield branch, context
 
     elif hierarchy_type == "ZONAL":
-        for zone in tree:
+        zones = tree
+        if isinstance(tree, list):
+            country = next((n for n in tree if isinstance(n, dict) and isinstance(n.get("zones"), list)), None)
+            if country:
+                zones = country["zones"]
+        for zone in zones:
             for circle in zone.get("circles", []):
                 for region in circle.get("regions", []):
                     for division in region.get("divisions", []):
@@ -3213,14 +3239,24 @@ def _devices_impl(request):
         return devices
 
 
-# =====================================================================
 # LOCATIONS  (tree)
-# =====================================================================
+
 def _scoped_tree(location_file, user):
+    """
+    Load the shared hierarchy.
+
+    Organization Super Admins can view the complete hierarchy
+    when creating or assigning locations.
+
+    Other users retain their existing ownership-based restrictions.
+    """
     tree = load_location_tree(location_file)
+
+    if getattr(user, "role", None) == Role.ORG_SUPER_ADMIN:
+        return ownership.attach_owner_details(tree)
+
     tree = ownership.filter_tree_for_user(tree, user)
     return ownership.attach_owner_details(tree)
-
 
 def _locations_impl(request):
     if request.method == "GET":
@@ -7200,6 +7236,7 @@ from .cloud_sync import (
 
 
 from .access_scope import device_customer, site_customer
+from .hierarchy_tree_sync import sync_branch_to_tree
 from .models import (
     CustomerDeviceMapping,
     SiteDeviceMapping,
@@ -8459,6 +8496,49 @@ def create_branch_or_floor(request):
         status=201,
     )
 
+def _site_row(site):
+    """One site as the Sites / assignment pages expect it, with its full hierarchy path."""
+    ctx = resolve_site_hierarchy(site)
+    owner = site_customer(site)
+    branch = site.branch if site.branch_id else None
+    return {
+        "id": str(site.pk),
+        "local_site_id": str(site.pk),
+        "tpt_site_id": site.tpt_site_id or "",
+        # the assign call accepts either the 3TP id or the local id
+        "asset_id": site.tpt_site_id or str(site.pk),
+        "name": site.name,
+        "code": site.code,
+        "asset_type": "SITE",
+        "address": site.address or "",
+        "customer_id": str(owner.pk) if owner else "",
+        "customer_name": owner.company if owner else "",
+        "hierarchy_type": ctx.get("hierarchy_type", ""),
+        "state_name": ctx.get("state_name", ""),
+        "district_name": ctx.get("district_name", ""),
+        "taluka_name": ctx.get("taluka_name", ""),
+        "city_name": ctx.get("city_name", ""),
+        "zone_name": ctx.get("zone_name", ""),
+        "circle_name": ctx.get("circle_name", ""),
+        "region_name": ctx.get("region_name", ""),
+        "division_name": ctx.get("division_name", ""),
+        "branch_id": str(branch.pk) if branch else "",
+        "branch_code": branch.code if branch else "",
+        "branch_name": ctx.get("branch_name", ""),
+        "floor_id": str(site.floor_id) if site.floor_id else "",
+        "floor_name": ctx.get("floor_name", ""),
+        "sync_status": site.tpt_sync_status,
+        "acs": [
+            {
+                "ac_id": d.ac_id,
+                "device_name": d.device_name or d.ac_id,
+                "status": d.status,
+            }
+            for d in site.ac_devices.all()
+        ],
+    }
+
+
 def _local_site_list(request, customer_param=None):
     """Sites the user may see (optionally narrowed to one customer), with hierarchy."""
     user = request.user
@@ -8480,35 +8560,7 @@ def _local_site_list(request, customer_param=None):
                 customer_mappings__is_active=True)
         )
 
-    sites = []
-    for site in qs.distinct().order_by("name"):
-        ctx = resolve_site_hierarchy(site)
-        owner = site_customer(site)
-        sites.append({
-            "id": str(site.pk),
-            "local_site_id": str(site.pk),
-            "tpt_site_id": site.tpt_site_id or "",
-            # the assign call accepts either the 3TP id or the local id
-            "asset_id": site.tpt_site_id or str(site.pk),
-            "name": site.name,
-            "code": site.code,
-            "asset_type": "SITE",
-            "address": site.address or "",
-            "customer_id": str(owner.pk) if owner else "",
-            "customer_name": owner.company if owner else "",
-            "hierarchy_type": ctx.get("hierarchy_type", ""),
-            "state_name": ctx.get("state_name", ""),
-            "district_name": ctx.get("district_name", ""),
-            "taluka_name": ctx.get("taluka_name", ""),
-            "city_name": ctx.get("city_name", ""),
-            "zone_name": ctx.get("zone_name", ""),
-            "circle_name": ctx.get("circle_name", ""),
-            "region_name": ctx.get("region_name", ""),
-            "division_name": ctx.get("division_name", ""),
-            "branch_name": ctx.get("branch_name", ""),
-            "floor_name": ctx.get("floor_name", ""),
-            "acs": [],
-        })
+    sites = [_site_row(site) for site in qs.distinct().order_by("name")]
 
     return Response(
         {
@@ -8520,6 +8572,42 @@ def _local_site_list(request, customer_param=None):
         },
         status=status.HTTP_200_OK,
     )
+
+
+def _merge_local_site_details(user, cloud_sites, include_unsynced):
+    """
+    The 3TP asset list knows nothing about our hierarchy. Fill in every
+    site that exists locally (State..Branch/Floor, customer, ACs) and, on the
+    first page, append locally created sites that 3TP does not have yet.
+    """
+    local = {
+        s.tpt_site_id: s
+        for s in accessible_sites(user).filter(tpt_site_id__isnull=False).exclude(tpt_site_id="")
+    }
+
+    for row in cloud_sites:
+        site = local.get(row.get("tpt_site_id"))
+        if site is None:
+            continue
+        details = _site_row(site)
+        for key in ("id", "tpt_site_id", "asset_id", "name", "asset_type"):
+            details.pop(key, None)
+        # keep whatever 3TP already supplied for these when it is non-empty
+        for key in ("code", "address"):
+            if row.get(key):
+                details.pop(key, None)
+        row.update(details)
+
+    if include_unsynced:
+        for site in (
+            accessible_sites(user)
+            .filter(Q(tpt_site_id__isnull=True) | Q(tpt_site_id=""))
+            .distinct()
+            .order_by("name")
+        ):
+            cloud_sites.append(_site_row(site))
+
+    return cloud_sites
 
 
 @api_view(["GET"])
@@ -8666,6 +8754,10 @@ def three_tp_sites(request):
                     "acs": [],
                 }
             )
+
+        sites = _merge_local_site_details(
+            request.user, sites, include_unsynced=(page == 0)
+        )
 
         return Response(
             {
@@ -9230,28 +9322,54 @@ def iter_branches(tree, hierarchy_type):
     hierarchy_type = hierarchy_type.upper()
 
     if hierarchy_type == "GEOGRAPHICAL":
-        for state in tree:
+        states = tree
+        if isinstance(tree, list):
+            country = next((n for n in tree if isinstance(n, dict) and isinstance(n.get("states"), list)), None)
+            if country:
+                states = country["states"]
+        for state in states:
             for district in state.get("districts", []):
                 for taluka in district.get("talukas", []):
+                    # New form: branch is a direct child of Taluka.
+                    for branch in taluka.get("branches", []):
+                        context = {
+                            "hierarchy_type": "GEOGRAPHICAL",
+                            "state_id": state.get("state_id", ""),
+                            "state_name": state.get("state_name", ""),
+                            "district_id": district.get("district_id", ""),
+                            "district_name": district.get("district_name", ""),
+                            "taluka_id": taluka.get("taluka_id", ""),
+                            "taluka_name": taluka.get("taluka_name", ""),
+                            "city_id": "", "city_name": "",
+                            "branch_id": branch.get("branch_id", ""),
+                            "branch_name": branch.get("branch_name", ""),
+                        }
+                        yield branch, context
+                    # Backward compatibility: old branches under City remain supported.
                     for city in taluka.get("cities", []):
                         for branch in city.get("branches", []):
                             context = {
                                 "hierarchy_type": "GEOGRAPHICAL",
-                                "state_id":       state.get("state_id", ""),
-                                "state_name":     state.get("state_name", ""),
-                                "district_id":    district.get("district_id", ""),
-                                "district_name":  district.get("district_name", ""),
-                                "taluka_id":      taluka.get("taluka_id", ""),
-                                "taluka_name":    taluka.get("taluka_name", ""),
-                                "city_id":        city.get("city_id", ""),
-                                "city_name":      city.get("city_name", ""),
-                                "branch_id":      branch.get("branch_id", ""),
-                                "branch_name":    branch.get("branch_name", ""),
+                                "state_id": state.get("state_id", ""),
+                                "state_name": state.get("state_name", ""),
+                                "district_id": district.get("district_id", ""),
+                                "district_name": district.get("district_name", ""),
+                                "taluka_id": taluka.get("taluka_id", ""),
+                                "taluka_name": taluka.get("taluka_name", ""),
+                                "city_id": city.get("city_id", ""),
+                                "city_name": city.get("city_name", ""),
+                                "branch_id": branch.get("branch_id", ""),
+                                "branch_name": branch.get("branch_name", ""),
                             }
                             yield branch, context
 
     elif hierarchy_type == "ZONAL":
-        for zone in tree:
+        zones = tree
+        if isinstance(tree, list):
+            country = next((n for n in tree if isinstance(n, dict) and isinstance(n.get("zones"), list)), None)
+            if country:
+                zones = country["zones"]
+        for zone in zones:
             for circle in zone.get("circles", []):
                 for region in circle.get("regions", []):
                     for division in region.get("divisions", []):
@@ -9586,7 +9704,13 @@ def resolve_site_hierarchy(site):
     tree_branch_id = str(branch.id)
     try:
         tree = load_location_tree(ownership.tree_file(hierarchy))
-        node = ownership.find_branch_by_path(tree, hierarchy, body)
+        # Prefer the node written for this exact branch (id == branch code);
+        # fall back to matching by name for older, hand-made trees.
+        node = next(
+            (n for n, _ in iter_branches(tree, hierarchy)
+             if str(n.get("branch_id", "")) == str(branch.code)),
+            None,
+        ) or ownership.find_branch_by_path(tree, hierarchy, body)
         if node and node.get("branch_id"):
             tree_branch_id = node["branch_id"]
     except Exception:
@@ -9878,9 +10002,9 @@ _DEVICE_SELECT = (
 def _local_device_row(device, cloud_item=None):
     """One /devices/ row for a local ACDevice (customer comes from the mapping)."""
     cloud_item = cloud_item or {}
-    site = device.site if device.site_id else None
-    branch = site.branch if site and site.branch_id else None
-    customer = device_customer(device)
+    site = device.site if device.site_id else None  # legacy fallback only
+    branch = device.branch if device.branch_id else (site.branch if site and site.branch_id else None)
+    customer = branch.customer if branch and branch.customer_id else device_customer(device)
     profile = cloud_item.get("deviceProfileId") or {}
 
     return {
@@ -9901,7 +10025,7 @@ def _local_device_row(device, cloud_item=None):
         "tpt_customer_id": (customer.tpt_customer_id or "") if customer else "",
         "floor_id": str(site.floor_id) if site and site.floor_id else "",
         "floor_name": site.floor.name if site and site.floor_id else "",
-        "status": "ASSIGNED" if site else "UNASSIGNED",
+        "status": "ASSIGNED" if branch else "UNASSIGNED",
         "local_sync_status": device.tpt_sync_status,
         "local_sync_error": device.tpt_sync_error,
     }
@@ -10563,10 +10687,54 @@ def _devices_impl(request):
 # =====================================================================
 # LOCATIONS  (tree)
 # =====================================================================
-def _scoped_tree(location_file, user):
+def _scoped_tree(location_file, user, customer_id=None, hierarchy=None):
+    """
+    Location tree for the logged-in user.
+
+    * With ?customer_id= (the hierarchy PICKER used to create a branch or
+      assign a site): the full hierarchy catalogue is returned - never pruned -
+      with only that customer's branches (plus unowned ones) kept.  A customer
+      login always gets its own customer, whatever id is sent.  If the JSON
+      catalogue is empty, the customer's hierarchy is built from the database.
+    * Without it (dashboard filter): the user's ownership-scoped tree, as before.
+    """
     tree = load_location_tree(location_file)
+
+    picker_customer = None
+    if customer_id not in (None, ""):
+        if user.role == Role.CUSTOMER:
+            picker_customer = Customer.objects.filter(pk=user.customer_id).first()
+        elif user.role == Role.ORG_SUPER_ADMIN:
+            try:
+                picker_customer = Customer.objects.filter(
+                    pk=int(customer_id), organization_id=user.organization_id
+                ).first()
+            except (TypeError, ValueError):
+                picker_customer = None
+
+    if picker_customer is not None:
+        wanted = picker_customer.pk
+        tree = ownership.filter_branches_only(
+            tree, lambda n: n.get("customer_id") in (None, "", wanted)
+        )
+        if hierarchy and ownership.tree_has_no_locations(tree):
+            from .hierarchy_tree_sync import db_location_tree
+            tree = db_location_tree(hierarchy, picker_customer)
+        return ownership.attach_owner_details(tree)
+
     tree = ownership.filter_tree_for_user(tree, user)
     return ownership.attach_owner_details(tree)
+
+
+def _empty_picker_message(request, data):
+    """Explain an empty picker instead of leaving the page to guess."""
+    if data or not request.GET.get("customer_id"):
+        return ""
+    return (
+        "This customer has no hierarchy locations yet. Load them with: "
+        "python manage.py seed_location_hierarchy --customer <customer code> "
+        "--json <hierarchy file>"
+    )
 
 
 def _locations_impl(request):
@@ -10575,21 +10743,25 @@ def _locations_impl(request):
 
         try:
             if hierarchy == "GEOGRAPHICAL":
-                data = _scoped_tree(GEOGRAPHICAL_LOCATION_FILE, request.user)
+                data = _scoped_tree(GEOGRAPHICAL_LOCATION_FILE, request.user,
+                                    request.GET.get("customer_id"), "GEOGRAPHICAL")
                 return JsonResponse(
-                    {"success": True, "hierarchy_type": "GEOGRAPHICAL", "data": data},
+                    {"success": True, "hierarchy_type": "GEOGRAPHICAL", "data": data, "count": len(data), "message": _empty_picker_message(request, data)},
                     safe=True,
                 )
 
             if hierarchy == "ZONAL":
-                data = _scoped_tree(ZONAL_LOCATION_FILE, request.user)
+                data = _scoped_tree(ZONAL_LOCATION_FILE, request.user,
+                                    request.GET.get("customer_id"), "ZONAL")
                 return JsonResponse(
-                    {"success": True, "hierarchy_type": "ZONAL", "data": data},
+                    {"success": True, "hierarchy_type": "ZONAL", "data": data, "count": len(data), "message": _empty_picker_message(request, data)},
                     safe=True,
                 )
 
-            geographical_data = _scoped_tree(GEOGRAPHICAL_LOCATION_FILE, request.user)
-            zonal_data        = _scoped_tree(ZONAL_LOCATION_FILE, request.user)
+            geographical_data = _scoped_tree(GEOGRAPHICAL_LOCATION_FILE, request.user,
+                                             request.GET.get("customer_id"))
+            zonal_data        = _scoped_tree(ZONAL_LOCATION_FILE, request.user,
+                                             request.GET.get("customer_id"))
 
             return JsonResponse(
                 {
@@ -11132,8 +11304,8 @@ def login_view(request):
         if user is None:
             return Response(
                 {"status": "error",
-                 "message": ("Server Login Succeeded, but this user "
-                             "does not exist in the AC Monitoring system.")},
+                "message": ("Server Login Succeeded, but this user "
+                            "does not exist in the AC Monitoring system.")},
                 status=403,
             )
 
@@ -11143,12 +11315,35 @@ def login_view(request):
                 status=403,
             )
 
-        # if requested_role and user.role != requested_role:
-        #     return Response(
-        #         {"status": "error",
-        #          "message": f"This account belongs to '{user.get_role_display()}'."},
-        #         status=403,
-        #     )
+        # ---- NEW: enforce login page restriction ----
+        login_type = (request.data.get("login_type") or "").strip().lower()
+        SUPER_ADMIN_ROLE = "ORG_SUPER_ADMIN"   # adjust if your role value differs
+
+        if login_type == "superadmin" and user.role != SUPER_ADMIN_ROLE:
+            return Response(
+                {"status": "error",
+                "message": "Invalid Credentials"
+                },
+                status=403,
+            )
+
+        if login_type == "user" and user.role == SUPER_ADMIN_ROLE:
+            return Response(
+                {"status": "error",
+                "message": "Invalid Credentials"
+                # "message": "Super admins must use the super admin login page."
+                },
+                status=403,
+            )
+        # ---- END NEW ----
+
+        # ---- 3. Save login info ----
+        user.last_login    = timezone.now()
+        user.last_login_ip = get_client_ip(request)
+        user.save(update_fields=["last_login", "last_login_ip"])
+
+        django_login(request, user)
+        # ... rest of the view unchanged ...
 
         # ---- 3. Save login info ----
         user.last_login    = timezone.now()
@@ -12323,6 +12518,9 @@ class SiteListView(generics.ListCreateAPIView):
                 site=site,
                 defaults={"is_active": True},
             )
+
+        # Show the branch (+ floors) in the hierarchy filter straight away.
+        sync_branch_to_tree(branch)
 
         # Cloud sync is separate. Do not undo the local save if it fails.
         try:
@@ -14604,188 +14802,234 @@ Requirements:
         )
 
 
-# @api_view(["POST"])
-# @permission_classes([IsAuthenticated])
-# def ai_dashboard_analysis(request):
-#     """
-#     Generate one combined AI analysis for the AC dashboard.
 
-#     Request:
-#     {
-#         "dashboard_data": {
-#             "totalACs": 1,
-#             "activeACs": 1,
-#             "totalEnergy": 2652.0,
-#             "activeEnergy": 2652.0,
-#             "activePower": 1.5,
-#             "averageTemperature": 32.1,
-#             "averageHumidity": 43.4,
-#             "alerts": 0,
-#             "records": 1,
-#             "historyPoints": 3
-#         }
-#     }
-#     """
+@api_view(["POST"])
+def control_device_relay(request):
+    device_id = request.data.get("device_id")
+    params = request.data.get("params")
+    method = request.data.get("method", "Relay")
 
-#     dashboard_data = request.data.get("dashboard_data")
+    token = _raw_token(request)
 
-#     if not isinstance(dashboard_data, dict) or not dashboard_data:
-#         return Response(
-#             {
-#                 "status": "error",
-#                 "message": "dashboard_data must be a non-empty JSON object."
-#             },
-#             status=status.HTTP_400_BAD_REQUEST
-#         )
+    if not token:
+        return Response(
+            {"status": "error", "message": "Bearer token required."},
+            status=status.HTTP_401_UNAUTHORIZED,
+        )
 
-#     # Configure these environment variables for your installation.
-#     ollama_url = os.getenv(
-#         "OLLAMA_API_URL",
-#         "http://localhost:11434/api/generate"
-#     )
-#     # ollama_model = os.getenv("OLLAMA_MODEL", "llama3.2")
-#     ollama_model = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    if not device_id:
+        return Response(
+            {"status": "error", "message": "3TP device_id is required."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-#     required_keys = [
-#         "totalACs",
-#         "activeACs",
-#         "totalEnergy",
-#         "activeEnergy",
-#         "activePower",
-#         "averageTemperature",
-#         "averageHumidity",
-#         "alerts",
-#         "records",
-#         "historyPoints",
-#     ]
+    if method != "Relay" or type(params) is not int or params not in (0, 1):
+        return Response(
+            {
+                "status": "error",
+                "message": "Use method='Relay' and params=1 for ON or 0 for OFF.",
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
 
-#     # Keep only the dashboard fields expected by this endpoint.
-#     data = {
-#         key: dashboard_data[key]
-#         for key in required_keys
-#         if key in dashboard_data
-#     }
+    try:
+        response = requests.post(
+            f"{CLOUD_URL}/api/rpc/oneway/{device_id}",
+            json={
+                "method": "Relay",
+                "params": params,
+            },
+            headers=_tpt_user_headers(request),
+            timeout=15,
+        )
 
-#     prompt = f"""
-# You are an AC energy monitoring analyst.
+        if not response.ok:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Cloud rejected the relay command.",
+                    "details": response.text[:500],
+                },
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
-# Analyze the dashboard data below:
-# {json.dumps(data, ensure_ascii=False)}
+        return Response({
+            "status": "success",
+            "message": f"Relay {'ON' if params == 1 else 'OFF'} command sent.",
+            "device_id": device_id,
+            "params": params,
+        })
 
-# Return ONLY a valid JSON object with these exact keys:
-# totalEnergy, activeEnergy, totalACs, activeACs, activePower,
-# temperature, humidity, alerts, energyChart, healthChart,
-# humidityChart, powerChart, zoneChart, temperatureChart.
+    except requests.RequestException as exc:
+        return Response(
+            {
+                "status": "error",
+                "message": "Could not connect to 3TP.",
+                "details": str(exc),
+            },
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
-# Requirements:
-# 1. Each value must be a concise explanation, maximum two sentences.
-# 2. Explain actual values and meaningful changes using supplied data.
-# 3. Do not invent historical trends, causes, rankings, or thresholds.
-# 4. If historical or zone-level data is missing, say that a comparison
-#    cannot be determined from the supplied data.
-# 5. Do not claim an AC is healthy unless its health status is provided.
-# 6. Distinguish missing readings from actual zero readings.
-# 7. Keep the language simple and suitable for a dashboard summary.
-# 8. Return JSON only, without Markdown or additional commentary.
-# """
 
-#     try:
-#         ollama_response = requests.post(
-#             ollama_url,
-#             json={
-#                 "model": ollama_model,
-#                 "prompt": prompt,
-#                 "stream": False,
-#                 "format": "json",
-#                 "options": {
-#                     "temperature": 0.2
-#                 }
-#             },
-#             timeout=60
-#         )
+# ============================================================
+# DIRECT DEVICE -> BRANCH ASSIGNMENT (SITE-FREE WORKFLOW)
+# ============================================================
+@csrf_exempt
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def assign_device_to_branch(request):
+    """
+    Assign a local/3TP device directly to a Branch.
+    Payload: {"device_id": "<local UUID or 3TP device UUID or ac_id>",
+              "branch_id": "<local branch UUID or branch code>"}
+    This does not create or require a Site/Asset in 3TP.
+    """
+    user = request.user
+    if user.role not in (Role.ORG_SUPER_ADMIN, Role.CUSTOMER, Role.BR_ADMIN):
+        return JsonResponse({"error": "You are not allowed to assign devices to branches."}, status=403)
 
-#         ollama_response.raise_for_status()
-#         result = ollama_response.json()
+    device_ref = str(request.data.get("device_id") or "").strip()
+    branch_ref = str(request.data.get("branch_id") or "").strip()
+    if not device_ref or not branch_ref:
+        return JsonResponse({"error": "device_id and branch_id are required."}, status=400)
 
-#         generated_text = result.get("response", "").strip()
+    try:
+        device = _ensure_local_device(request, device_ref)
+        if device is None:
+            return JsonResponse({"error": "Device not found."}, status=404)
 
-#         if not generated_text:
-#             return Response(
-#                 {
-#                     "status": "error",
-#                     "message": "The AI model returned an empty response."
-#                 },
-#                 status=status.HTTP_502_BAD_GATEWAY
-#             )
+        branch_qs = Branch.objects.select_related(
+            "customer", "city", "taluka", "division",
+            "city__taluka__district__state",
+            "taluka__district__state",
+            "division__region__circle__zone",
+        )
+        branch = None
+        try:
+            branch = branch_qs.filter(pk=uuid.UUID(branch_ref)).first()
+        except (ValueError, TypeError):
+            branch = branch_qs.filter(code__iexact=branch_ref).first()
+        if branch is None:
+            return JsonResponse({"error": "Branch not found."}, status=404)
 
-#         insights = json.loads(generated_text)
+        if user.role == Role.CUSTOMER:
+            if not user.customer_id or branch.customer_id != user.customer_id:
+                return JsonResponse({"error": "This branch is outside your customer scope."}, status=403)
+            if not device_customer(device) or device_customer(device).pk != user.customer_id:
+                return JsonResponse({"error": "This device is not assigned to your customer."}, status=403)
+        elif user.role == Role.BR_ADMIN:
+            if not user.customer_id or branch.customer_id != user.customer_id:
+                return JsonResponse({"error": "This branch is outside your customer scope."}, status=403)
+            if not device_customer(device) or device_customer(device).pk != user.customer_id:
+                return JsonResponse({"error": "This device is not assigned to your customer."}, status=403)
+        elif user.role == Role.ORG_SUPER_ADMIN:
+            if not user.organization_id or branch.customer.organization_id != user.organization_id:
+                return JsonResponse({"error": "This branch is outside your organization."}, status=403)
 
-#         if not isinstance(insights, dict):
-#             raise ValueError("AI response must be a JSON object.")
+        with transaction.atomic():
+            device.branch = branch
+            device.assigned_by = user
+            device.save(update_fields=["branch", "assigned_by", "updated_at"])
 
-#         expected_keys = [
-#             "totalEnergy",
-#             "activeEnergy",
-#             "totalACs",
-#             "activeACs",
-#             "activePower",
-#             "temperature",
-#             "humidity",
-#             "alerts",
-#             "energyChart",
-#             "healthChart",
-#             "humidityChart",
-#             "powerChart",
-#             "zoneChart",
-#             "temperatureChart",
-#         ]
+            # Keep one active customer mapping for the device.
+            CustomerDeviceMapping.objects.filter(device=device, is_active=True).exclude(
+                customer=branch.customer
+            ).update(is_active=False)
+            CustomerDeviceMapping.objects.update_or_create(
+                customer=branch.customer,
+                device=device,
+                defaults={"is_active": True},
+            )
 
-#         # Validate and normalize the model output.
-#         clean_insights = {}
+        # Update the location map used by telemetry/dashboard filters.
+        # Never fail the assignment just because a JSON cache cannot be written.
+        try:
+            mapping = build_device_location_map()
+            item = mapping.get(device.ac_id, {})
+            item.update({
+                "ac_id": device.ac_id,
+                "device_name": device.device_name or device.ac_id,
+                "customer_id": str(branch.customer_id),
+                "customer_name": branch.customer.company,
+                "branch_id": str(branch.pk),
+                "branch_name": branch.name,
+                "hierarchy_type": branch.customer.hierarchy_type or "",
+                "location_type": "DIRECT_BRANCH",
+            })
+            if branch.customer.hierarchy_type == "GEOGRAPHICAL":
+                parent = branch.taluka or (branch.city.taluka if branch.city_id else None)
+                if parent:
+                    district = parent.district
+                    state = district.state
+                    item.update({
+                        "state_id": str(state.pk), "state_name": state.name,
+                        "district_id": str(district.pk), "district_name": district.name,
+                        "taluka_id": str(parent.pk), "taluka_name": parent.name,
+                    })
+                if branch.city_id:
+                    item.update({"city_id": str(branch.city_id), "city_name": branch.city.name})
+            elif branch.customer.hierarchy_type == "ZONAL" and branch.division_id:
+                division = branch.division
+                region, circle, zone = division.region, division.region.circle, division.region.circle.zone
+                item.update({
+                    "zone_id": str(zone.pk), "zone_name": zone.name,
+                    "circle_id": str(circle.pk), "circle_name": circle.name,
+                    "region_id": str(region.pk), "region_name": region.name,
+                    "division_id": str(division.pk), "division_name": division.name,
+                })
+            mapping[device.ac_id] = item
+            save_device_location_map(mapping)
+        except Exception:
+            traceback.print_exc()
 
-#         for key in expected_keys:
-#             value = insights.get(key, "")
+        # Best-effort 3TP mappings: customer -> device and branch ASSET -> device.
+        # Local assignment remains saved if either cloud relation fails.
+        cloud_sync_errors = []
+        try:
+            if not branch.customer.tpt_customer_id or not device.tpt_device_id:
+                raise ThreeTPError("Customer or device is missing its 3TP ID.")
+            map_3tp_customer_to_device(
+                request, branch.customer.tpt_customer_id, device.tpt_device_id
+            )
+        except Exception as exc:
+            cloud_sync_errors.append("Customer-device mapping: " + _one_line(exc, 500))
+        try:
+            if not branch.tpt_asset_id:
+                raise ThreeTPError("Branch has no 3TP ASSET ID. Synchronize the branch before assigning devices.")
+            if not device.tpt_device_id:
+                raise ThreeTPError("Device has no 3TP DEVICE ID.")
+            _tpt_request(
+                "POST", "/api/relation",
+                payload={
+                    "from": {"entityType": "ASSET", "id": branch.tpt_asset_id},
+                    "to": {"entityType": "DEVICE", "id": device.tpt_device_id},
+                    "type": "Contains", "typeGroup": "COMMON",
+                },
+            )
+        except Exception as exc:
+            cloud_sync_errors.append("Branch-asset/device relation: " + _one_line(exc, 500))
+        cloud_sync_error = "; ".join(cloud_sync_errors)
 
-#             clean_insights[key] = (
-#                 value.strip()
-#                 if isinstance(value, str)
-#                 else ""
-#             )
+        return JsonResponse({
+            "status": "success",
+            "message": (
+                "Device assigned to branch locally, but one or more 3TP mappings need retry."
+                if cloud_sync_error else "Device assigned to branch and linked to its 3TP ASSET successfully."
+            ),
+            "data": {
+                "device_id": str(device.pk),
+                "tpt_device_id": device.tpt_device_id or "",
+                "ac_id": device.ac_id,
+                "branch_id": str(branch.pk),
+                "branch_name": branch.name,
+                "customer_id": branch.customer_id,
+                "customer_name": branch.customer.company,
+                "assignment_status": "ASSIGNED",
+                "tpt_mapping_status": "FAILED" if cloud_sync_error else "SYNCED",
+                "tpt_mapping_error": cloud_sync_error,
+            },
+        }, status=200)
+    except Exception as exc:
+        return JsonResponse({"status": "error", "message": str(exc)}, status=500)
 
-#         return Response(
-#             {
-#                 "status": "success",
-#                 "insights": clean_insights
-#             },
-#             status=status.HTTP_200_OK
-#         )
 
-#     except requests.exceptions.Timeout:
-#         return Response(
-#             {
-#                 "status": "error",
-#                 "message": "The AI model timed out. Please try again."
-#             },
-#             status=status.HTTP_504_GATEWAY_TIMEOUT
-#         )
-
-#     except requests.exceptions.RequestException:
-#         return Response(
-#             {
-#                 "status": "error",
-#                 "message": (
-#                     "Unable to connect to Ollama. "
-#                     "Check that Ollama is running and the model is available."
-#                 )
-#             },
-#             status=status.HTTP_503_SERVICE_UNAVAILABLE
-#         )
-
-#     except (json.JSONDecodeError, ValueError):
-#         return Response(
-#             {
-#                 "status": "error",
-#                 "message": "The AI model returned an invalid JSON response."
-#             },
-#             status=status.HTTP_502_BAD_GATEWAY
-#         )

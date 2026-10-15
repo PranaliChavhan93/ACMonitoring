@@ -267,3 +267,25 @@
     flex-direction: column;
   }
 }
+
+
+.ai-view-toggle {
+    display: flex;
+    gap: 8px;
+    margin: 12px 0 16px;
+}
+
+.ai-view-toggle button {
+    padding: 7px 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.ai-view-toggle button.active {
+    background: #1f2937;
+    color: #ffffff;
+    border-color: #1f2937;
+}
+

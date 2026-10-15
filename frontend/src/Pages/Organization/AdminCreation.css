@@ -355,3 +355,94 @@
     font-size: 12px;
     font-weight: 600;
 }
+
+
+.relay-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.relay-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.relay-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.relay-slider {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  background: #9ca3af;
+  border-radius: 24px;
+  transition: 0.25s;
+}
+
+.relay-slider::before {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  left: 3px;
+  top: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: 0.25s;
+}
+
+.relay-switch input:checked + .relay-slider {
+  background: #16a34a;
+}
+
+.relay-switch input:checked + .relay-slider::before {
+  transform: translateX(20px);
+}
+
+.relay-switch input:disabled + .relay-slider {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.relay-status {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.relay-status.on {
+  color: #16a34a;
+}
+
+.relay-status.off {
+  color: #dc2626;
+}
+
+.relay-error {
+  width: 100%;
+  font-size: 11px;
+  color: #dc2626;
+}
+
+
+.assignment-unassigned {
+  color: #dc2626;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.admins-table td .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  white-space: nowrap;
+}

@@ -592,79 +592,58 @@ class CitySerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-# class BranchSerializer(serializers.ModelSerializer):
-#     # ----- Geographical ancestors -----
-#     city_name     = serializers.CharField(source="city.name",                         read_only=True, default=None)
-#     taluka_name   = serializers.CharField(source="city.taluka.name",                  read_only=True, default=None)
-#     district_name = serializers.CharField(source="city.taluka.district.name",         read_only=True, default=None)
-#     state_name    = serializers.CharField(source="city.taluka.district.state.name",   read_only=True, default=None)
-
-#     # ----- Zonal ancestors -----
-#     division_name = serializers.CharField(source="division.name",                          read_only=True, default=None)
-#     region_name   = serializers.CharField(source="division.region.name",                   read_only=True, default=None)
-#     circle_name   = serializers.CharField(source="division.region.circle.name",            read_only=True, default=None)
-#     zone_name     = serializers.CharField(source="division.region.circle.zone.name",       read_only=True, default=None)
-
-#     customer_name = serializers.CharField(source="customer.company", read_only=True, default=None)
-
-#     class Meta:
-#         model  = Branch
-#         fields = "__all__"
-
 class BranchSerializer(serializers.ModelSerializer):
-
     city_name = serializers.CharField(
         source="city.name",
         read_only=True,
         default=None
     )
-
     taluka_name = serializers.CharField(
         source="city.taluka.name",
         read_only=True,
         default=None
     )
-
     district_name = serializers.CharField(
         source="city.taluka.district.name",
         read_only=True,
         default=None
     )
-
     state_name = serializers.CharField(
         source="city.taluka.district.state.name",
         read_only=True,
         default=None
     )
-
     division_name = serializers.CharField(
         source="division.name",
         read_only=True,
         default=None
     )
-
     region_name = serializers.CharField(
         source="division.region.name",
         read_only=True,
         default=None
     )
-
     circle_name = serializers.CharField(
         source="division.region.circle.name",
         read_only=True,
         default=None
     )
-
     zone_name = serializers.CharField(
         source="division.region.circle.zone.name",
         read_only=True,
         default=None
     )
-
     customer_name = serializers.CharField(
         source="customer.company",
         read_only=True,
         default=None
+    )
+
+    ifsc_code = serializers.CharField(
+        max_length=11,
+        required=False,
+        allow_blank=True,
+        trim_whitespace=True,
     )
 
     class Meta:
@@ -689,26 +668,27 @@ class BranchSerializer(serializers.ModelSerializer):
             attrs.get("customer")
             or getattr(self.instance, "customer", None)
         )
-
         city = (
             attrs.get("city")
             or getattr(self.instance, "city", None)
         )
-
+        taluka = (
+            attrs.get("taluka")
+            or getattr(self.instance, "taluka", None)
+        )
         division = (
             attrs.get("division")
             or getattr(self.instance, "division", None)
         )
-
         if not customer:
             raise serializers.ValidationError({
                 "customer": "Customer is required."
             })
 
-        # Exactly one parent
-        if bool(city) == bool(division):
+        # Exactly one parent: old City, new direct Taluka, or Zonal Division.
+        if sum((bool(city), bool(taluka), bool(division))) != 1:
             raise serializers.ValidationError(
-                "A branch must belong to either City OR Division."
+                "A branch must belong to exactly one parent: City, Taluka, or Division."
             )
 
         hierarchy = customer.hierarchy_type
@@ -716,11 +696,11 @@ class BranchSerializer(serializers.ModelSerializer):
         # GEOGRAPHICAL
         if hierarchy == "GEOGRAPHICAL":
 
-            if not city:
+            if not (city or taluka):
                 raise serializers.ValidationError({
-                    "city": (
+                    "taluka": (
                         "This customer uses GEOGRAPHICAL hierarchy. "
-                        "Select City."
+                        "Select a Taluka or City."
                     )
                 })
 
@@ -731,11 +711,8 @@ class BranchSerializer(serializers.ModelSerializer):
                     )
                 })
 
-            # Make sure city belongs to this customer
-            if city.taluka.district.state.customer_id != customer.id:
-                raise serializers.ValidationError({
-                    "city": "Selected city does not belong to this customer."
-                })
+            # The hierarchy type selects the location pattern; shared location
+            # catalogue records do not have to be owned by the customer.
         # ZONAL
         elif hierarchy == "ZONAL":
 
@@ -747,20 +724,13 @@ class BranchSerializer(serializers.ModelSerializer):
                     )
                 })
 
-            if city:
+            if city or taluka:
                 raise serializers.ValidationError({
-                    "city": (
-                        "Zonal branch cannot have City."
-                    )
+                    "city": "Zonal branch cannot have City or Taluka."
                 })
 
-            # Make sure division belongs to this customer
-            if division.region.circle.zone.customer_id != customer.id:
-                raise serializers.ValidationError({
-                    "division": (
-                        "Selected division does not belong to this customer."
-                    )
-                })
+            # Customer hierarchy type selects the pattern; the shared location
+            # catalogue is not owned by an individual customer.
             
         else:
             raise serializers.ValidationError({
@@ -910,119 +880,55 @@ class SiteSerializer(serializers.ModelSerializer):
         return attrs
 
 class ACDeviceSerializer(serializers.ModelSerializer):
-    site_name = serializers.CharField(
-        source="site.name",
-        read_only=True,
-        allow_null=True
-    )
-
-    branch_id = serializers.UUIDField(
-        source="site.branch_id",
-        read_only=True,
-        allow_null=True
-    )
-
-    branch_name = serializers.CharField(
-        source="site.branch.name",
-        read_only=True,
-        allow_null=True
-    )
-
-    customer_id = serializers.UUIDField(
-        source="site.branch.customer_id",
-        read_only=True,
-        allow_null=True
-    )
-
-    customer_name = serializers.CharField(
-        source="site.branch.customer.company",
-        read_only=True,
-        allow_null=True
-    )
+    branch_id = serializers.UUIDField(source="branch.id", read_only=True, allow_null=True)
+    branch_name = serializers.CharField(source="branch.name", read_only=True, allow_null=True)
+    customer_id = serializers.IntegerField(source="branch.customer_id", read_only=True, allow_null=True)
+    customer_name = serializers.CharField(source="branch.customer.company", read_only=True, allow_null=True)
+    assignment_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ACDevice
-
         fields = [
-            "id",
-            "ac_id",
-            "device_name",
-
-            "site",
-            "site_name",
-
-            "branch_id",
-            "branch_name",
-
-            "customer_id",
-            "customer_name",
-
-            "status",
-            "capacity_ton",
-            "installation_date",
-            "last_maintenance_date",
-
-            "assigned_by",
-
-            "tpt_device_id",
-            "tpt_sync_status",
-            "tpt_sync_error",
-
-            "created_at",
-            "updated_at",
+            "id", "ac_id", "device_name",
+            "branch", "branch_id", "branch_name",
+            "customer_id", "customer_name", "assignment_status",
+            "status", "capacity_ton", "installation_date",
+            "last_maintenance_date", "assigned_by",
+            "tpt_device_id", "tpt_sync_status", "tpt_sync_error",
+            "created_at", "updated_at",
         ]
-
         read_only_fields = [
-            "id",
-
-            "site_name",
-            "branch_id",
-            "branch_name",
-            "customer_id",
-            "customer_name",
-
-            "assigned_by",
-
-            "tpt_device_id",
-            "tpt_sync_status",
-            "tpt_sync_error",
-
-            "created_at",
-            "updated_at",
+            "id", "branch_id", "branch_name", "customer_id", "customer_name",
+            "assignment_status", "assigned_by", "tpt_device_id",
+            "tpt_sync_status", "tpt_sync_error", "created_at", "updated_at",
         ]
 
-    def validate_ac_id(self, value):
-        value = value.strip()
-
-        if not value:
-            raise serializers.ValidationError(
-                "AC ID is required."
-            )
-
-        return value
+    def get_assignment_status(self, obj):
+        return "ASSIGNED" if obj.branch_id else "UNASSIGNED"
 
     def validate(self, attrs):
+        branch = attrs.get("branch", getattr(self.instance, "branch", None))
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if branch and user and getattr(user, "is_authenticated", False):
+            if getattr(user, "role", None) == Role.CUSTOMER:
+                if branch.customer_id != user.customer_id:
+                    raise serializers.ValidationError({
+                        "branch": "You can only assign a device to a branch belonging to your customer."
+                    })
+            elif getattr(user, "role", None) == Role.ORG_SUPER_ADMIN:
+                if branch.customer.organization_id != user.organization_id:
+                    raise serializers.ValidationError({
+                        "branch": "This branch is outside your organization."
+                    })
+        return attrs
 
-        # Site is intentionally NOT required.
-        #
-        # Device can be created independently.
-        #
-        # If site is supplied in a future operation,
-        # normal validation can happen there.
 
-        return attrs# ============================================================
-# CUSTOMER → SITE
-# ============================================================
-
-class CustomerSiteMappingSerializer(
-    serializers.ModelSerializer
-):
-
+class CustomerSiteMappingSerializer(serializers.ModelSerializer):
     customer_name = serializers.CharField(
         source="customer.company",
         read_only=True
     )
-
     site_name = serializers.CharField(
         source="site.name",
         read_only=True

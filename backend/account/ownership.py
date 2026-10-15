@@ -24,8 +24,8 @@ import copy
 from .models import Customer, Role, User, State, Zone
 
 CHILD_KEYS = (
-    "districts", "talukas", "cities",      # geographical
-    "circles", "regions", "divisions",     # zonal
+    "states", "districts", "talukas", "cities",      # geographical
+    "zones", "circles", "regions", "divisions",      # zonal
     "branches",
 )
 
@@ -135,6 +135,16 @@ def can_see_branch(user, node):
     if not customer:
         return False
 
+    # Each customer has its own hierarchy: a branch stamped with another
+    # customer is never visible, even if the State/Zone name is the same.
+    node_customer = node.get("customer_id")
+    if node_customer not in (None, "") and str(node_customer) != str(user.customer_id):
+        return False
+
+    # A branch stamped with this customer is theirs, whatever the tree shape.
+    if role == Role.CUSTOMER and node_customer not in (None, ""):
+        return True
+
     customer_hierarchy = customer.hierarchy_type
     if customer_hierarchy != hierarchy:
         return False
@@ -211,6 +221,41 @@ def filter_tree_for_user(tree, user):
     if user.role == Role.ORG_SUPER_ADMIN:
         return tree
     return _prune_list(copy.deepcopy(tree), lambda n: can_see_branch(user, n))
+
+
+def tree_has_no_locations(tree):
+    """True when the tree contains no location node at all (empty / missing file)."""
+    return not any(isinstance(n, dict) for n in (tree or []))
+
+
+def filter_branches_only(tree, visible):
+    """
+    For the hierarchy PICKER (create a branch / assign a site).
+
+    Keeps the whole location catalogue - every State/District/Taluka/City or
+    Zone/Circle/Region/Division - and removes only the branches `visible()`
+    rejects.  `filter_tree_for_user` drops every level that has no visible
+    branch under it, which is right for a dashboard filter but leaves a
+    customer with no branches yet an empty picker, so it must not be used
+    for the picker.
+    """
+    tree = copy.deepcopy(tree)
+
+    def walk(nodes):
+        for node in nodes:
+            if not isinstance(node, dict):
+                continue
+            for key in CHILD_KEYS:
+                children = node.get(key)
+                if not isinstance(children, list):
+                    continue
+                if key == "branches":
+                    node[key] = [b for b in children if visible(b)]
+                else:
+                    walk(children)
+
+    walk(tree if isinstance(tree, list) else [])
+    return tree
 
 
 def _iter_branches_in(nodes):

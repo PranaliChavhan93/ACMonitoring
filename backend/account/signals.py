@@ -101,135 +101,135 @@ def _table_ready(model) -> bool:
     return model._meta.db_table in connection.introspection.table_names()
 
 
-@receiver(post_migrate)
-def seed_demo_data(sender, **kwargs):
-    if sender.name != "account":
-        return
-    if not all(
-        _table_ready(m)
-        for m in (Organization, Customer, User, Zone, Circle, Region, Division, Branch, Site)
-    ):
-        return
+# @receiver(post_migrate)
+# def seed_demo_data(sender, **kwargs):
+#     if sender.name != "account":
+#         return
+#     if not all(
+#         _table_ready(m)
+#         for m in (Organization, Customer, User, Zone, Circle, Region, Division, Branch, Site)
+#     ):
+#         return
 
-    try:
-        org, _ = Organization.objects.get_or_create(
-            code="DEMO-ORG",
-            defaults={"name": "Demo Organization", "is_active": True},
-        )
+#     try:
+#         org, _ = Organization.objects.get_or_create(
+#             code="DEMO-ORG",
+#             defaults={"name": "Demo Organization", "is_active": True},
+#         )
 
-        customer, _ = Customer.objects.get_or_create(
-            organization=org,
-            code="CUST-01",
-            defaults={
-                "company": "TowerLink Infra",
-                "company_email": "contact@towerlink.com",
-                "contact_person": "Demo Contact",
-                "contact_person_email": "contact@towerlink.com",
-                "phone": "+91-9123456789",
-                "hierarchy_type": HierarchyType.ZONAL,
-                "is_active": True,
-            },
-        )
+#         customer, _ = Customer.objects.get_or_create(
+#             organization=org,
+#             code="CUST-01",
+#             defaults={
+#                 "company": "TowerLink Infra",
+#                 "company_email": "contact@towerlink.com",
+#                 "contact_person": "Demo Contact",
+#                 "contact_person_email": "contact@towerlink.com",
+#                 "phone": "+91-9123456789",
+#                 "hierarchy_type": HierarchyType.ZONAL,
+#                 "is_active": True,
+#             },
+#         )
 
-        zone, _ = Zone.objects.get_or_create(
-            code="ZONE-NORTH",
-            defaults={"customer": customer, "name": "North Zone"},
-        )
+#         zone, _ = Zone.objects.get_or_create(
+#             code="ZONE-NORTH",
+#             defaults={"customer": customer, "name": "North Zone"},
+#         )
 
-        circle, _ = Circle.objects.get_or_create(
-            code="CIR-DELHI",
-            defaults={"zone": zone, "name": "Delhi Circle"},
-        )
+#         circle, _ = Circle.objects.get_or_create(
+#             code="CIR-DELHI",
+#             defaults={"zone": zone, "name": "Delhi Circle"},
+#         )
 
-        region, _ = Region.objects.get_or_create(
-            code="REG-DELHI-C",
-            defaults={"circle": circle, "name": "Delhi Central Region"},
-        )
+#         region, _ = Region.objects.get_or_create(
+#             code="REG-DELHI-C",
+#             defaults={"circle": circle, "name": "Delhi Central Region"},
+#         )
 
-        division, _ = Division.objects.get_or_create(
-            code="DIV-KB",
-            defaults={"region": region, "name": "Karol Bagh Division"},
-        )
+#         division, _ = Division.objects.get_or_create(
+#             code="DIV-KB",
+#             defaults={"region": region, "name": "Karol Bagh Division"},
+#         )
 
-        branch, _ = Branch.objects.get_or_create(
-            code="BR-101",
-            defaults={"customer": customer, "division": division, "name": "Karol Bagh Branch"},
-        )
+#         branch, _ = Branch.objects.get_or_create(
+#             code="BR-101",
+#             defaults={"customer": customer, "division": division, "name": "Karol Bagh Branch"},
+#         )
 
-        floor, _ = Floor.objects.get_or_create(
-            code="BR-101-F1",
-            defaults={"branch": branch, "name": "Floor 1"},
-        )
+#         floor, _ = Floor.objects.get_or_create(
+#             code="BR-101-F1",
+#             defaults={"branch": branch, "name": "Floor 1"},
+#         )
 
-        # Direct-under-branch AC (no floor)
-        site, _ = Site.objects.get_or_create(
-            code="SITE-9001",
-            defaults={
-                "branch": branch,
-                "floor": None,
-                "name": "SITE-9001",
-                "address": "Rooftop, Karol Bagh, New Delhi",
-                "latitude": 28.6519,
-                "longitude": 77.1909,
-            },
-        )
+#         # Direct-under-branch AC (no floor)
+#         site, _ = Site.objects.get_or_create(
+#             code="SITE-9001",
+#             defaults={
+#                 "branch": branch,
+#                 "floor": None,
+#                 "name": "SITE-9001",
+#                 "address": "Rooftop, Karol Bagh, New Delhi",
+#                 "latitude": 28.6519,
+#                 "longitude": 77.1909,
+#             },
+#         )
 
-        # AC under a specific floor
-        Site.objects.get_or_create(
-            code="SITE-9002",
-            defaults={
-                "branch": branch,
-                "floor": floor,
-                "name": "SITE-9002",
-                "address": "Floor 1, Karol Bagh, New Delhi",
-                "latitude": 28.6519,
-                "longitude": 77.1909,
-            },
-        )
+#         # AC under a specific floor
+#         Site.objects.get_or_create(
+#             code="SITE-9002",
+#             defaults={
+#                 "branch": branch,
+#                 "floor": floor,
+#                 "name": "SITE-9002",
+#                 "address": "Floor 1, Karol Bagh, New Delhi",
+#                 "latitude": 28.6519,
+#                 "longitude": 77.1909,
+#             },
+#         )
 
-        users = [
-            dict(
-                email="superadmin@org.com",
-                name="Ravi Menon",
-                role=Role.ORG_SUPER_ADMIN,
-                organization=org,
-                is_staff=True,
-                is_superuser=True,
-            ),
-            dict(
-                email="custadmin@customer.com",
-                name="Priya Sharma",
-                role=Role.CUSTOMER,
-                customer=customer,
-            ),
-            dict(
-                email="branch@customer.com",
-                name="Mohit Raj",
-                role=Role.BR_ADMIN,
-                branch=branch,
-            ),
-            dict(
-                email="engineer@customer.com",
-                name="Kiran Das",
-                role=Role.ENGINEER,
-                site=site,
-            ),
-        ]
+#         users = [
+#             dict(
+#                 email="superadmin@org.com",
+#                 name="Ravi Menon",
+#                 role=Role.ORG_SUPER_ADMIN,
+#                 organization=org,
+#                 is_staff=True,
+#                 is_superuser=True,
+#             ),
+#             dict(
+#                 email="custadmin@customer.com",
+#                 name="Priya Sharma",
+#                 role=Role.CUSTOMER,
+#                 customer=customer,
+#             ),
+#             dict(
+#                 email="branch@customer.com",
+#                 name="Mohit Raj",
+#                 role=Role.BR_ADMIN,
+#                 branch=branch,
+#             ),
+#             dict(
+#                 email="engineer@customer.com",
+#                 name="Kiran Das",
+#                 role=Role.ENGINEER,
+#                 site=site,
+#             ),
+#         ]
 
-        for data in users:
-            email = data.pop("email")
-            user, created = User.objects.get_or_create(email=email, defaults=data)
+#         for data in users:
+#             email = data.pop("email")
+#             user, created = User.objects.get_or_create(email=email, defaults=data)
 
-            # Always (re)apply scope + password
-            for k, v in data.items():
-                setattr(user, k, v)
-            user.set_password(DEMO_PASSWORD)
-            user.save()
+#             # Always (re)apply scope + password
+#             for k, v in data.items():
+#                 setattr(user, k, v)
+#             user.set_password(DEMO_PASSWORD)
+#             user.save()
 
 
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).warning("seed_demo_data skipped: %s", exc)
+#     except Exception as exc:
+#         import logging
+#         logging.getLogger(__name__).warning("seed_demo_data skipped: %s", exc)
 
 
 import json

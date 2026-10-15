@@ -1,1307 +1,3 @@
-
-// import React, { useCallback, useEffect, useMemo, useState } from "react";
-// import {
-//   FiCheckCircle,
-//   FiCpu,
-//   FiRefreshCw,
-//   FiSearch,
-//   FiUserPlus,
-//   FiMapPin,
-//   FiX,
-// } from "react-icons/fi";
-// import "./AdminCreation.css";
-
-// const API_BASE = "http://localhost:8000/api";
-// const DEVICES_URL = `${API_BASE}/devices/`;
-// const CREATE_DEVICE_URL = `${API_BASE}/devices/create/`;
-// const ASSIGN_CUSTOMER_URL = `${API_BASE}/devices/assign/customer/`;
-// const ASSIGN_SITE_URL = `${API_BASE}/devices/assign/site/`;
-// const CUSTOMERS_URL = `${API_BASE}/customers/`;
-// const CLOUD_CUSTOMERS_URL = `${API_BASE}/cloud/customers/`;
-// // const SITES_URL = `${API_BASE}/sites/`;
-// const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
-
-// const getToken = () =>
-//   localStorage.getItem("token") ||
-//   localStorage.getItem("authToken") ||
-//   localStorage.getItem("access_token") ||
-//   localStorage.getItem("accessToken") ||
-//   "";
-
-// const authHeaders = () => {
-//   const token = getToken();
-//   return {
-//     "Content-Type": "application/json",
-//     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-//   };
-// };
-
-// const normalizeList = (response) =>
-//   Array.isArray(response)
-//     ? response
-//     : Array.isArray(response?.data)
-//     ? response.data
-//     : Array.isArray(response?.results)
-//     ? response.results
-//     : [];
-
-// const customerLabel = (customer) =>
-//   customer
-//     ? customer.company ||
-//       customer.name ||
-//       customer.code ||
-//       `Customer #${customer.id}`
-//     : "—";
-
-// const siteLabel = (site) =>
-//   site ? site.name || site.code || `Site #${site.id}` : "—";
-
-// const emptyForm = {
-//   ac_id: "",
-//   device_name: "",
-//   status: "OFF",
-//   capacity_ton: "",
-//   installation_date: "",
-//   last_maintenance_date: "",
-//   clientid: "",
-//   username: "",
-//   password: "",
-// };
-
-// function ACCreation() {
-//   const [view, setView] = useState("list");
-//   const [devices, setDevices] = useState([]);
-//   const [customers, setCustomers] = useState([]);
-//   const [sites, setSites] = useState([]);
-//   const [form, setForm] = useState(emptyForm);
-//   const [search, setSearch] = useState("");
-//   const [loading, setLoading] = useState(true);
-//   const [customersLoading, setCustomersLoading] = useState(false);
-//   const [sitesLoading, setSitesLoading] = useState(false);
-//   const [saving, setSaving] = useState(false);
-//   const [error, setError] = useState("");
-//   const [formError, setFormError] = useState("");
-
-//   const [showCustomerModal, setShowCustomerModal] = useState(false);
-//   const [showSiteModal, setShowSiteModal] = useState(false);
-//   const [selectedDevice, setSelectedDevice] = useState(null);
-//   const [customerSearch, setCustomerSearch] = useState("");
-//   const [siteSearch, setSiteSearch] = useState("");
-//   const [assigning, setAssigning] = useState(false);
-//   const [assignmentError, setAssignmentError] = useState("");
-
-//   /* =====================================================
-//      FETCH DEVICES
-//   ===================================================== */
-
-//   const fetchDevices = useCallback(async () => {
-//     try {
-//       setLoading(true);
-//       setError("");
-
-//       const response = await fetch(DEVICES_URL, {
-//         method: "GET",
-//         headers: authHeaders(),
-//         cache: "no-store",
-//       });
-
-//       const result = await response.json().catch(() => ({}));
-
-//       if (!response.ok) {
-//         throw new Error(
-//           result?.message || result?.detail || `HTTP ${response.status}`
-//         );
-//       }
-
-//       setDevices(normalizeList(result));
-//     } catch (err) {
-//       setError(err.message || "Unable to load AC devices.");
-//     } finally {
-//       setLoading(false);
-//     }
-//   }, []);
-
-//   /* =====================================================
-//      FETCH CUSTOMERS
-//   ===================================================== */
-
-//   const fetchCustomers = useCallback(async () => {
-//     try {
-//       setCustomersLoading(true);
-
-//       const response = await fetch(CUSTOMERS_URL, {
-//         method: "GET",
-//         headers: authHeaders(),
-//         cache: "no-store",
-//       });
-
-//       const result = await response.json().catch(() => ({}));
-
-//       if (!response.ok) {
-//         throw new Error(
-//           result?.message || result?.detail || `HTTP ${response.status}`
-//         );
-//       }
-
-//       setCustomers(normalizeList(result));
-//     } catch (err) {
-//       console.error("Customer fetch error:", err);
-//     } finally {
-//       setCustomersLoading(false);
-//     }
-//   }, []);
-
-
-// //   const fetchSites = useCallback(async () => {
-// //     try {
-// //       setSitesLoading(true);
-
-// //       const response = await fetch(SITES_URL, {
-// //         method: "GET",
-// //         headers: authHeaders(),
-// //         cache: "no-store",
-// //       });
-
-// //       const result = await response.json().catch(() => ({}));
-
-// //       if (!response.ok) {
-// //         throw new Error(
-// //           result?.message || result?.detail || `HTTP ${response.status}`
-// //         );
-// //       }
-
-// //       setSites(normalizeList(result));
-// //     } catch (err) {
-// //       console.error("Site fetch error:", err);
-// //     } finally {
-// //       setSitesLoading(false);
-// //     }
-// //   }, []);
-
-//     const fetchSites = useCallback(async () => {
-//         try {
-//             setSitesLoading(true);
-//             setAssignmentError("");
-
-//             const response = await fetch(SITES_URL, {
-//                 method: "GET",
-//                 headers: authHeaders(),
-//                 cache: "no-store",
-//             });
-
-//             const result = await response.json().catch(() => ({}));
-
-//             if (!response.ok) {
-//                 throw new Error(
-//                     result?.message ||
-//                     result?.detail ||
-//                     result?.error ||
-//                     `HTTP ${response.status}`
-//                 );
-//             }
-
-//             const rawSites = Array.isArray(result?.sites)
-//                 ? result.sites
-//                 : normalizeList(result);
-
-//             const normalizedSites = rawSites
-//                 .map((site) => ({
-//                     ...site,
-
-//                     // 3TP site ID
-//                     asset_id:
-//                         site?.asset_id ||
-//                         site?.tpt_site_id ||
-//                         site?.id?.id ||
-//                         site?.id,
-
-//                     // Site display name
-//                     name:
-//                         site?.name ||
-//                         site?.title ||
-//                         site?.label ||
-//                         "Unnamed Site",
-
-//                     code:
-//                         site?.code ||
-//                         site?.label ||
-//                         "",
-
-//                     hierarchy_type:
-//                         site?.hierarchy_type ||
-//                         site?.hierarchyType ||
-//                         "",
-
-//                     state_name: site?.state_name || "",
-//                     district_name: site?.district_name || "",
-//                     taluka_name: site?.taluka_name || "",
-//                     city_name: site?.city_name || "",
-//                     zone_name: site?.zone_name || "",
-//                     circle_name: site?.circle_name || "",
-//                     region_name: site?.region_name || "",
-//                     division_name: site?.division_name || "",
-//                     branch_name: site?.branch_name || "",
-//                     floor_name: site?.floor_name || "",
-//                 }))
-//                 .filter((site) => site.asset_id);
-
-//             console.log("SITES FOR ASSIGNMENT:", normalizedSites);
-
-//             setSites(normalizedSites);
-//         } catch (err) {
-//             console.error("SITE FETCH ERROR:", err);
-
-//             setAssignmentError(
-//                 err.message || "Unable to load sites from cloud."
-//             );
-
-//             setSites([]);
-//         } finally {
-//             setSitesLoading(false);
-//         }
-//     }, []);
-
-
-//   useEffect(() => {
-//     fetchDevices();
-//     fetchCustomers();
-//     fetchSites();
-//   }, [fetchDevices, fetchCustomers, fetchSites]);
-
-//   /* =====================================================
-//      CREATE DEVICE
-//   ===================================================== */
-
-//   const openCreate = () => {
-//     setForm(emptyForm);
-//     setFormError("");
-//     setView("form");
-//   };
-
-//   const backToList = () => {
-//     setView("list");
-//     setForm(emptyForm);
-//     setFormError("");
-//   };
-
-//   const handleSubmit = async (event) => {
-//     event.preventDefault();
-//     setFormError("");
-
-//     if (!form.ac_id.trim()) return setFormError("AC ID is required.");
-//     if (!form.device_name.trim())
-//       return setFormError("Device name is required.");
-
-//     const capacity = Number(form.capacity_ton);
-
-//     if (
-//       form.capacity_ton !== "" &&
-//       (!Number.isFinite(capacity) || capacity <= 0)
-//     ) {
-//       return setFormError("Capacity must be greater than 0 Ton.");
-//     }
-
-//     if (
-//       form.last_maintenance_date &&
-//       form.installation_date &&
-//       form.last_maintenance_date < form.installation_date
-//     ) {
-//       return setFormError(
-//         "Last maintenance date cannot be before the installation date."
-//       );
-//     }
-
-//     setSaving(true);
-
-//     try {
-//       const payload = {
-//         ac_id: form.ac_id.trim(),
-//         device_name: form.device_name.trim(),
-//         status: form.status,
-//       };
-
-//       if (form.capacity_ton !== "") payload.capacity_ton = capacity;
-//       if (form.installation_date)
-//         payload.installation_date = form.installation_date;
-//       if (form.last_maintenance_date)
-//         payload.last_maintenance_date = form.last_maintenance_date;
-
-//       const response = await fetch(CREATE_DEVICE_URL, {
-//         method: "POST",
-//         headers: authHeaders(),
-//         body: JSON.stringify(payload),
-//       });
-
-//       const result = await response.json().catch(() => ({}));
-
-//       if (!response.ok) {
-//         let message =
-//           result?.message || result?.detail || `HTTP ${response.status}`;
-
-//         if (
-//           typeof result === "object" &&
-//           result !== null &&
-//           !result.message &&
-//           !result.detail
-//         ) {
-//           const errors = Object.entries(result)
-//             .map(
-//               ([key, value]) =>
-//                 `${key}: ${Array.isArray(value) ? value.join(", ") : value}`
-//             )
-//             .join(" | ");
-
-//           if (errors) message = errors;
-//         }
-
-//         throw new Error(message);
-//       }
-
-//       await fetchDevices();
-//       setView("list");
-//       setForm(emptyForm);
-
-//       alert(
-//         "Device created successfully. You can now assign a customer and site."
-//       );
-//     } catch (err) {
-//       setFormError(err.message || "Unable to create device.");
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-
-//   /* =====================================================
-//      ASSIGNMENT HELPERS
-//   ===================================================== */
-
-//   const fetchCustomersForAssignment = useCallback(async () => {
-//     try {
-//       setCustomersLoading(true);
-
-//       const response = await fetch(CLOUD_CUSTOMERS_URL, {
-//         method: "GET",
-//         headers: authHeaders(),
-//         cache: "no-store",
-//       });
-
-//       const result = await response.json().catch(() => ({}));
-
-//       if (!response.ok) {
-//         throw new Error(
-//           result?.message || result?.detail || `HTTP ${response.status}`
-//         );
-//       }
-
-//       setCustomers(normalizeList(result));
-//     } catch (err) {
-//       setAssignmentError(err.message || "Unable to load customers.");
-//     } finally {
-//       setCustomersLoading(false);
-//     }
-//   }, []);
-
-//   const assignCustomer = async (customer) => {
-//     if (!selectedDevice) return;
-
-//     const customerId =
-//       customer?.tpt_customer_id ||
-//       customer?.cloud_customer_id ||
-//       customer?.id?.id ||
-//       customer?.id;
-
-//     const deviceId = selectedDevice?.tpt_device_id || selectedDevice?.id;
-
-//     if (!customerId)
-//       return setAssignmentError("Customer ID is missing.");
-//     if (!deviceId) return setAssignmentError("Device ID is missing.");
-
-//     setAssigning(true);
-//     setAssignmentError("");
-
-//     try {
-//       const response = await fetch(ASSIGN_CUSTOMER_URL, {
-//         method: "POST",
-//         headers: authHeaders(),
-//         body: JSON.stringify({
-//           customer_id: customerId,
-//           device_id: deviceId,
-//         }),
-//       });
-
-//       const result = await response.json().catch(() => ({}));
-
-//       if (!response.ok) {
-//         throw new Error(
-//           result?.message ||
-//             result?.error ||
-//             result?.detail ||
-//             `HTTP ${response.status}`
-//         );
-//       }
-
-//       setShowCustomerModal(false);
-//       setSelectedDevice(null);
-//       setCustomerSearch("");
-
-//       await fetchDevices();
-//       alert("Device assigned to customer successfully.");
-//     } catch (err) {
-//       setAssignmentError(
-//         err.message || "Unable to assign device to customer."
-//       );
-//     } finally {
-//       setAssigning(false);
-//     }
-//   };
-
-//   const assignSite = async (site) => {
-//     if (!selectedDevice) return;
-
-//     const assetId = site?.asset_id || site?.tpt_site_id;
-//     const deviceId = selectedDevice?.tpt_device_id || selectedDevice?.id;
-
-//     if (!assetId) return setAssignmentError("Site asset ID is missing.");
-//     if (!deviceId) return setAssignmentError("Device ID is missing.");
-
-//     setAssigning(true);
-//     setAssignmentError("");
-
-//     try {
-//       const response = await fetch(ASSIGN_SITE_URL, {
-//         method: "POST",
-//         headers: authHeaders(),
-//         body: JSON.stringify({
-//           asset_id: assetId,
-//           device_id: deviceId,
-//         }),
-//       });
-
-//       const result = await response.json().catch(() => ({}));
-
-//       if (!response.ok) {
-//         throw new Error(
-//           result?.message ||
-//             result?.error ||
-//             result?.detail ||
-//             `HTTP ${response.status}`
-//         );
-//       }
-
-//       setShowSiteModal(false);
-//       setSelectedDevice(null);
-//       setSiteSearch("");
-
-//       await fetchDevices();
-//       alert("Device assigned to site successfully.");
-//     } catch (err) {
-//       setAssignmentError(err.message || "Unable to assign device to site.");
-//     } finally {
-//       setAssigning(false);
-//     }
-//   };
-
-//   const openCustomerAssignment = async (device) => {
-//     setSelectedDevice(device);
-//     setAssignmentError("");
-//     setCustomerSearch("");
-//     setShowCustomerModal(true);
-
-//     if (!customers.length) await fetchCustomersForAssignment();
-//   };
-
-//   const openSiteAssignment = async (device) => {
-//     setSelectedDevice(device);
-//     setAssignmentError("");
-//     setSiteSearch("");
-//     setShowSiteModal(true);
-
-//     if (!sites.length) await fetchSites();
-//   };
-
-//   const closeCustomerModal = () => {
-//     setShowCustomerModal(false);
-//     setSelectedDevice(null);
-//     setCustomerSearch("");
-//     setAssignmentError("");
-//   };
-
-//   const closeSiteModal = () => {
-//     setShowSiteModal(false);
-//     setSelectedDevice(null);
-//     setSiteSearch("");
-//     setAssignmentError("");
-//   };
-
-//   /* =====================================================
-//      FILTERS
-//   ===================================================== */
-
-//   const filteredDevices = useMemo(() => {
-//     const query = search.trim().toLowerCase();
-//     if (!query) return devices;
-
-//     return devices.filter((device) =>
-//       [
-//         device.ac_id,
-//         device.device_name,
-//         device.label,
-//         device.status,
-//         device.customer_name,
-//         device.site_name,
-//         device.site_code,
-//         device.branch_name,
-//         device.floor_name,
-//         device.state_name,
-//         device.district_name,
-//         device.zone_name,
-//         device.circle_name,
-//         device.tpt_device_id,
-//       ]
-//         .filter(Boolean)
-//         .some((value) => String(value).toLowerCase().includes(query))
-//     );
-//   }, [devices, search]);
-
-//   const filteredCustomers = useMemo(() => {
-//     const query = customerSearch.trim().toLowerCase();
-//     if (!query) return customers;
-
-//     return customers.filter((customer) =>
-//       [customer.company, customer.name, customer.code, customer.id]
-//         .filter(Boolean)
-//         .some((value) => String(value).toLowerCase().includes(query))
-//     );
-//   }, [customers, customerSearch]);
-
-// //   const filteredSites = useMemo(() => {
-// //     const query = siteSearch.trim().toLowerCase();
-// //     if (!query) return sites;
-
-// //     return sites.filter((site) =>
-// //       [site.name, site.code, site.asset_id, site.tpt_site_id, site.id]
-// //         .filter(Boolean)
-// //         .some((value) => String(value).toLowerCase().includes(query))
-// //     );
-// //   }, [sites, siteSearch]);
-
-//     const filteredSites = useMemo(() => {
-//         const query = siteSearch.trim().toLowerCase();
-
-//         if (!query) {
-//             return sites;
-//         }
-
-//         return sites.filter((site) =>
-//             [
-//                 site.name,
-//                 site.code,
-//                 site.asset_id,
-//                 site.tpt_site_id,
-//                 site.id,
-
-//                 site.state_name,
-//                 site.district_name,
-//                 site.taluka_name,
-//                 site.city_name,
-//                 site.zone_name,
-//                 site.circle_name,
-//                 site.region_name,
-//                 site.division_name,
-//                 site.branch_name,
-//                 site.floor_name,
-//             ]
-//                 .filter(Boolean)
-//                 .some((value) =>
-//                     String(value)
-//                         .toLowerCase()
-//                         .includes(query)
-//                 )
-//         );
-//     }, [sites, siteSearch]);
-
-//   return (
-//     <div className="admins-page">
-//       <ol className="admins-stepper">
-//         <li className={view === "list" ? "active" : "done"}>
-//           <button type="button" className="step-btn" onClick={backToList}>
-//             <span className="step-num">1</span>
-//             Devices
-//           </button>
-//         </li>
-
-//         <li className={view === "form" ? "active" : ""}>
-//           <button type="button" className="step-btn" onClick={openCreate}>
-//             <span className="step-num">2</span>
-//             Add Device
-//           </button>
-//         </li>
-//       </ol>
-
-//       {/* =================================================
-//           DEVICE LIST
-//       ================================================= */}
-
-//       {view === "list" ? (
-//         <>
-//           <div className="admins-header">
-//             <div>
-//               <h1>AC Devices</h1>
-//               <p>
-//                 Create devices independently and assign customer or site
-//                 separately.
-//               </p>
-//             </div>
-//           </div>
-
-//           <div className="admins-toolbar">
-//             <div style={{ position: "relative", flex: 1 }}>
-//               <FiSearch
-//                 style={{
-//                   position: "absolute",
-//                   left: 12,
-//                   top: 12,
-//                   color: "#9ca3af",
-//                 }}
-//               />
-
-//               <input
-//                 className="admins-search"
-//                 style={{ paddingLeft: 36, width: "100%" }}
-//                 placeholder="Search by AC ID, device, customer or site..."
-//                 value={search}
-//                 onChange={(event) => setSearch(event.target.value)}
-//               />
-//             </div>
-
-//             <span className="admins-count">
-//               {filteredDevices.length} of {devices.length} devices
-//             </span>
-
-//             <button
-//               type="button"
-//               className="btn-secondary"
-//               onClick={() => {
-//                 fetchDevices();
-//                 fetchCustomers();
-//                 fetchSites();
-//               }}
-//             >
-//               <FiRefreshCw />
-//               Refresh
-//             </button>
-//           </div>
-
-//           {error && <div className="admins-error">{error}</div>}
-
-//           <div className="admins-table-card">
-//             {loading ? (
-//               <div className="admins-loading">Loading devices...</div>
-//             ) : filteredDevices.length === 0 ? (
-//               <div className="admins-empty">No AC devices found.</div>
-//             ) : (
-//               <table
-//                 className="admins-table"
-//                 style={{ tableLayout: "fixed", width: "100%" }}
-//               >
-//                 <thead>
-//                   <tr>
-//                     <th>AC ID</th>
-//                     <th>Device</th>
-//                     <th>Customer</th>
-//                     <th>Site</th>
-//                     <th>Status</th>
-//                     <th>Actions</th>
-//                   </tr>
-//                 </thead>
-
-//                 <tbody>
-//                   {filteredDevices.map((device) => {
-//                     const customer =
-//                       device.customer_name ||
-//                       (device.customer_id
-//                         ? `Customer #${device.customer_id}`
-//                         : "Unassigned");
-
-//                     const site = device.site_name || "Unassigned";
-
-//                     return (
-//                       <tr key={device.id || device.ac_id}>
-//                         <td>
-//                           <strong>{device.ac_id}</strong>
-//                         </td>
-
-//                         <td>{device.device_name || "—"}</td>
-
-//                         <td>
-//                           <strong>{customer}</strong>
-//                           <div
-//                             style={{
-//                               fontSize: 11,
-//                               color: device.customer_id ? "#6b7280" : "#9ca3af",
-//                             }}
-//                           >
-//                             {device.customer_id ? "Assigned" : "Not assigned"}
-//                           </div>
-//                         </td>
-
-//                         <td>
-//                           <strong>{site}</strong>
-//                           <div
-//                             style={{
-//                               fontSize: 11,
-//                               color: device.site_id ? "#6b7280" : "#9ca3af",
-//                             }}
-//                           >
-//                             {device.site_id ? "Assigned" : "Not assigned"}
-//                           </div>
-//                         </td>
-
-//                         <td>
-//                           <span
-//                             className={
-//                               device.status === "ON"
-//                                 ? "status-active"
-//                                 : "status-inactive"
-//                             }
-//                           >
-//                             ● {device.status || "OFF"}
-//                           </span>
-//                         </td>
-
-//                         <td>
-//                           <div
-//                             style={{
-//                               display: "flex",
-//                               gap: 6,
-//                               flexWrap: "wrap",
-//                             }}
-//                           >
-//                             <button
-//                               type="button"
-//                               className="btn-secondary"
-//                               onClick={() => openCustomerAssignment(device)}
-//                             >
-//                               <FiUserPlus />
-//                               Customer
-//                             </button>
-
-//                             <button
-//                               type="button"
-//                               className="btn-secondary"
-//                               onClick={() => openSiteAssignment(device)}
-//                             >
-//                               <FiMapPin />
-//                               Site
-//                             </button>
-//                           </div>
-//                         </td>
-//                       </tr>
-//                     );
-//                   })}
-//                 </tbody>
-//               </table>
-//             )}
-//           </div>
-//         </>
-//       ) : (
-//         /* =================================================
-//            CREATE DEVICE
-//         ================================================= */
-
-//         <div className="admins-panel">
-//           <div className="admins-panel-header">
-//             <FiCpu size={22} />
-//             <div>
-//               <h2>Add AC Device</h2>
-//               <p>
-//                 Create the device independently. Customer and Site can be
-//                 assigned later.
-//               </p>
-//             </div>
-//           </div>
-
-//           <form className="admins-form" onSubmit={handleSubmit}>
-//             <div className="form-grid">
-//               <label>
-//                 AC ID *
-//                 <input
-//                   value={form.ac_id}
-//                   onChange={(event) =>
-//                     setForm((previous) => ({
-//                       ...previous,
-//                       ac_id: event.target.value,
-//                     }))
-//                   }
-//                   placeholder="AC-MH-PUN-001"
-//                   required
-//                 />
-//               </label>
-
-//               <label>
-//                 Device Name *
-//                 <input
-//                   value={form.device_name}
-//                   onChange={(event) =>
-//                     setForm((previous) => ({
-//                       ...previous,
-//                       device_name: event.target.value,
-//                     }))
-//                   }
-//                   placeholder="Pune Office AC 01"
-//                   required
-//                 />
-//               </label>
-
-//               <label>
-//                 Status *
-//                 <select
-//                   value={form.status}
-//                   onChange={(event) =>
-//                     setForm((previous) => ({
-//                       ...previous,
-//                       status: event.target.value,
-//                     }))
-//                   }
-//                 >
-//                   <option value="OFF">OFF</option>
-//                   <option value="ON">ON</option>
-//                 </select>
-//               </label>
-
-//               <label>
-//                 Capacity (Ton) *
-//                 <input
-//                   type="number"
-//                   min="0.1"
-//                   step="0.1"
-//                   value={form.capacity_ton}
-//                   onChange={(event) =>
-//                     setForm((previous) => ({
-//                       ...previous,
-//                       capacity_ton: event.target.value,
-//                     }))
-//                   }
-//                   placeholder="1.5"
-//                   required
-//                 />
-//               </label>
-
-//               <label>
-//                 Installation Date *
-//                 <input
-//                   type="date"
-//                   value={form.installation_date}
-//                   onChange={(event) =>
-//                     setForm((previous) => ({
-//                       ...previous,
-//                       installation_date: event.target.value,
-//                     }))
-//                   }
-//                   required
-//                 />
-//               </label>
-
-//               <label>
-//                 Last Maintenance Date
-//                 <input
-//                   type="date"
-//                   value={form.last_maintenance_date}
-//                   min={form.installation_date || undefined}
-//                   onChange={(event) =>
-//                     setForm((previous) => ({
-//                       ...previous,
-//                       last_maintenance_date: event.target.value,
-//                     }))
-//                   }
-//                 />
-//               </label>
-//             </div>
-
-//             <div className="assign-card" style={{ marginTop: 20 }}>
-//               <div className="admins-panel-header">
-//                 <FiCheckCircle />
-//                 <div>
-//                   {/* <h3>Independent Device</h3> */}
-//                   <p> This operation only creates the device. Customer and Site are assigned separately from the device list. </p>
-//                 </div>
-//               </div>
-//             </div>
-
-
-//             <form className="admins-form" onSubmit={handleSubmit}>
-//               <div className="admins-panel-header">
-//                 <div>
-//                   <p>MQTT Credentials</p>
-//                 </div>
-//               </div>
-
-//               <div className="form-grid">
-            
-//                 <label>
-//                   MQTT Client ID *
-//                   <input
-//                     type="text"
-//                     value={form.clientid}
-//                     onChange={(event) =>
-//                       setForm((previous) => ({
-//                         ...previous,
-//                         clientid: event.target.value,
-//                       }))
-//                     }
-//                     placeholder="AC-MH-PUN-001"
-//                     autoComplete="off"
-//                     required
-//                   />
-//                 </label>
-
-//                 <label>
-//                   MQTT Username *
-//                   <input
-//                     type="text"
-//                     value={form.username}
-//                     onChange={(event) =>
-//                       setForm((previous) => ({
-//                         ...previous,
-//                         username: event.target.value,
-//                       }))
-//                     }
-//                     placeholder="Enter MQTT username"
-//                     autoComplete="off"
-//                     required
-//                   />
-//                 </label>
-
-//                 <label>
-//                   MQTT Password *
-//                   <input
-//                     type="password"
-//                     value={form.password}
-//                     onChange={(event) =>
-//                       setForm((previous) => ({
-//                         ...previous,
-//                         password: event.target.value,
-//                       }))
-//                     }
-//                     placeholder="Enter MQTT password"
-//                     autoComplete="new-password"
-//                     required
-//                   />
-//                 </label>
-//               </div>
-//             </form>
-
-//             {formError && <div className="form-error">{formError}</div>}
-
-//             <div className="panel-actions">
-//               <button
-//                 type="button"
-//                 className="btn-secondary"
-//                 onClick={backToList}
-//                 disabled={saving}
-//               >
-//                 Cancel
-//               </button>
-
-//               <button type="submit" className="btn-primary" disabled={saving}>
-//                 {saving ? "Creating..." : "Create Device"}
-//               </button>
-//             </div>
-//           </form>
-//         </div>
-//       )}
-
-//       {/* =====================================================
-//           CUSTOMER ASSIGNMENT MODAL
-//       ===================================================== */}
-
-//       {showCustomerModal && selectedDevice && (
-//         <div className="assignment-modal-overlay" onClick={closeCustomerModal}>
-//           <div
-//             className="assignment-modal"
-//             onClick={(event) => event.stopPropagation()}
-//           >
-//             <div
-//               className="admins-panel-header"
-//               style={{ justifyContent: "space-between" }}
-//             >
-//               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-//                 <FiUserPlus />
-//                 <div>
-//                   <h2>Assign Customer</h2>
-//                   <p>
-//                     Device: <strong>{selectedDevice.ac_id}</strong>
-//                   </p>
-//                 </div>
-//               </div>
-
-//               <button
-//                 type="button"
-//                 className="btn-secondary"
-//                 onClick={closeCustomerModal}
-//               >
-//                 <FiX />
-//               </button>
-//             </div>
-
-//             <div className="assign-card" style={{ marginTop: 18 }}>
-//               <div className="assign-row">
-//                 <span className="assign-label">AC ID</span>
-//                 <span className="assign-value">{selectedDevice.ac_id}</span>
-//               </div>
-
-//               <div className="assign-row">
-//                 <span className="assign-label">Device</span>
-//                 <span className="assign-value">
-//                   {selectedDevice.device_name || "—"}
-//                 </span>
-//               </div>
-
-//               <div className="assign-row">
-//                 <span className="assign-label">Customer</span>
-//                 <span className="assign-value">
-//                   {selectedDevice.customer_name || "Not assigned"}
-//                 </span>
-//               </div>
-
-//               <div className="assign-row">
-//                 <span className="assign-label">Site</span>
-//                 <span className="assign-value">
-//                   {selectedDevice.site_name || "Not assigned"}
-//                 </span>
-//               </div>
-//             </div>
-
-//             <div style={{ marginTop: 20 }}>
-//               <label>
-//                 Search Customer
-//                 <input
-//                   value={customerSearch}
-//                   onChange={(event) => setCustomerSearch(event.target.value)}
-//                   placeholder="Search customer..."
-//                 />
-//               </label>
-
-//               <div style={{ marginTop: 12, maxHeight: 260, overflowY: "auto" }}>
-//                 {customersLoading ? (
-//                   <div className="admins-loading">Loading customers...</div>
-//                 ) : filteredCustomers.length === 0 ? (
-//                   <div className="admins-empty">No customers found.</div>
-//                 ) : (
-//                   filteredCustomers.map((customer) => (
-//                     <button
-//                       key={
-//                         customer.tpt_customer_id ||
-//                         customer.cloud_customer_id ||
-//                         customer.id?.id ||
-//                         customerLabel(customer)
-//                       }
-//                       type="button"
-//                       className="btn-secondary"
-//                       style={{
-//                         width: "100%",
-//                         justifyContent: "space-between",
-//                         marginBottom: 8,
-//                       }}
-//                       onClick={() => assignCustomer(customer)}
-//                       disabled={assigning}
-//                     >
-//                       <span>{customerLabel(customer)}</span>
-//                       <FiUserPlus />
-//                     </button>
-//                   ))
-//                 )}
-//               </div>
-//             </div>
-
-//             {assignmentError && (
-//               <div className="form-error" style={{ marginTop: 15 }}>
-//                 {assignmentError}
-//               </div>
-//             )}
-
-//             <div className="panel-actions">
-//               <button
-//                 type="button"
-//                 className="btn-secondary"
-//                 onClick={closeCustomerModal}
-//                 disabled={assigning}
-//               >
-//                 Cancel
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-
-//       {/* =====================================================
-//           SITE ASSIGNMENT MODAL
-//       ===================================================== */}
-
-//       {showSiteModal && selectedDevice && (
-//         <div className="assignment-modal-overlay" onClick={closeSiteModal}>
-//           <div
-//             className="assignment-modal"
-//             onClick={(event) => event.stopPropagation()}
-//           >
-//             <div
-//               className="admins-panel-header"
-//               style={{ justifyContent: "space-between" }}
-//             >
-//               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-//                 <FiMapPin />
-//                 <div>
-//                   <h2>Assign Site</h2>
-//                   <p>
-//                     Device: <strong>{selectedDevice.ac_id}</strong>
-//                   </p>
-//                 </div>
-//               </div>
-
-//               <button
-//                 type="button"
-//                 className="btn-secondary"
-//                 onClick={closeSiteModal}
-//               >
-//                 <FiX />
-//               </button>
-//             </div>
-
-//             <div className="assign-card" style={{ marginTop: 18 }}>
-//               <div className="assign-row">
-//                 <span className="assign-label">AC ID</span>
-//                 <span className="assign-value">{selectedDevice.ac_id}</span>
-//               </div>
-
-//               <div className="assign-row">
-//                 <span className="assign-label">Device</span>
-//                 <span className="assign-value">
-//                   {selectedDevice.device_name || "—"}
-//                 </span>
-//               </div>
-
-//               <div className="assign-row">
-//                 <span className="assign-label">Customer</span>
-//                 <span className="assign-value">
-//                   {selectedDevice.customer_name || "Not assigned"}
-//                 </span>
-//               </div>
-
-//               <div className="assign-row">
-//                 <span className="assign-label">Site</span>
-//                 <span className="assign-value">
-//                   {selectedDevice.site_name || "Not assigned"}
-//                 </span>
-//               </div>
-//             </div>
-
-//             <div style={{ marginTop: 20 }}>
-//               <label>
-//                 Search Site
-//                 <input
-//                   value={siteSearch}
-//                   onChange={(event) => setSiteSearch(event.target.value)}
-//                   placeholder="Search site..."
-//                 />
-//               </label>
-
-//                 <div className="site-assignment-list">
-//                     {sitesLoading ? (
-//                         <div className="admins-loading">
-//                             Loading sites...
-//                         </div>
-//                     ) : filteredSites.length === 0 ? (
-//                         <div className="admins-empty">
-//                             No sites found.
-//                         </div>
-//                     ) : (
-//                         filteredSites.map((site) => {
-//                             const siteId =
-//                                 site.asset_id ||
-//                                 site.tpt_site_id ||
-//                                 site.id?.id ||
-//                                 site.id;
-
-//                             const hierarchy =
-//                                 site.hierarchy_type || "—";
-
-//                             const location = [
-//                                 site.state_name,
-//                                 site.district_name,
-//                                 site.taluka_name,
-//                                 site.city_name,
-//                                 site.branch_name,
-//                                 site.floor_name,
-//                             ]
-//                                 .filter(Boolean)
-//                                 .join(" › ");
-
-//                             return (
-//                                 <button
-//                                     key={siteId}
-//                                     type="button"
-//                                     className="site-assignment-item"
-//                                     onClick={() => assignSite(site)}
-//                                     disabled={assigning}
-//                                 >
-//                                     <div className="site-assignment-info">
-//                                         <strong>
-//                                             {site.name || "Unnamed Site"}
-//                                         </strong>
-
-//                                         <span>
-//                                             {site.code || "No code"}
-//                                         </span>
-
-//                                         {location && (
-//                                             <small>
-//                                                 {location}
-//                                             </small>
-//                                         )}
-
-//                                         <small>
-//                                             ID: {siteId}
-//                                         </small>
-//                                     </div>
-
-//                                     <div className="site-assignment-action">
-//                                         <FiMapPin />
-//                                         Assign
-//                                     </div>
-//                                 </button>
-//                             );
-//                         })
-//                     )}
-//                 </div>
-//             </div>
-
-//             {assignmentError && (
-//               <div className="form-error" style={{ marginTop: 15 }}>
-//                 {assignmentError}
-//               </div>
-//             )}
-
-//             <div className="panel-actions">
-//               <button
-//                 type="button"
-//                 className="btn-secondary"
-//                 onClick={closeSiteModal}
-//                 disabled={assigning}
-//               >
-//                 Cancel
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-// export default ACCreation;
-
-
-
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FiCheckCircle,
@@ -1311,23 +7,40 @@ import {
   FiUserPlus,
   FiMapPin,
   FiX,
+  FiEdit2,
+  FiTrash2,
 } from "react-icons/fi";
 import { useAuth } from "../Layout/AuthContext";
 import "./AdminCreation.css";
 
+/* =====================================================
+   API ENDPOINTS
+===================================================== */
+
 const API_BASE = "http://localhost:8000/api";
-const DEVICES_URL = `${API_BASE}/devices/`;
-const CREATE_DEVICE_URL = `${API_BASE}/devices/create/`;
-const ASSIGN_CUSTOMER_URL = `${API_BASE}/devices/assign/customer/`;
-const ASSIGN_SITE_URL = `${API_BASE}/devices/assign/site/`;
-const CUSTOMERS_URL = `${API_BASE}/customers/`;
-const CLOUD_CUSTOMERS_URL = `${API_BASE}/cloud/customers/`;
-// const SITES_URL = `${API_BASE}/sites/`;
-const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
-// When the device already belongs to a customer, only that customer's sites
-// (its own hierarchy) are offered.
+
+const DEVICES_URL          = `${API_BASE}/devices/`;
+const CREATE_DEVICE_URL    = `${API_BASE}/devices/create/`;
+const ASSIGN_CUSTOMER_URL  = `${API_BASE}/devices/assign/customer/`;
+const ASSIGN_SITE_URL      = `${API_BASE}/devices/assign/site/`;
+const RELAY_CONTROL_URL    = `${API_BASE}/devices/relay/`;
+const CUSTOMERS_URL        = `${API_BASE}/customers/`;
+const CLOUD_CUSTOMERS_URL  = `${API_BASE}/cloud/customers/`;
+const SITES_URL            = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
+
+// Standard REST detail URL — used for edit (PATCH) and delete (DELETE).
+const deviceDetailUrl = (deviceId) =>
+  `${API_BASE}/devices/${encodeURIComponent(deviceId)}/`;
+
+// When a device belongs to a customer, only that customer's sites are offered.
 const sitesUrlFor = (customerId) =>
-  customerId ? `${SITES_URL}&customer=${encodeURIComponent(customerId)}` : SITES_URL;
+  customerId
+    ? `${SITES_URL}&customer=${encodeURIComponent(customerId)}`
+    : SITES_URL;
+
+/* =====================================================
+   HELPERS
+===================================================== */
 
 const getToken = () =>
   localStorage.getItem("token") ||
@@ -1362,9 +75,6 @@ const customerLabel = (customer) =>
       `Customer #${customer.id}`
     : "—";
 
-const siteLabel = (site) =>
-  site ? site.name || site.code || `Site #${site.id}` : "—";
-
 const emptyForm = {
   ac_id: "",
   device_name: "",
@@ -1377,22 +87,30 @@ const emptyForm = {
   password: "",
 };
 
+/* =====================================================
+   COMPONENT
+===================================================== */
+
 function ACCreation() {
   const { user } = useAuth();
-  // Only the Super Admin hands devices to customers; a customer / admin
-  // only places their own devices on their own sites.
   const canAssignCustomer = user?.role === "ORG_SUPER_ADMIN";
 
+  /* ---------- state ---------- */
   const [view, setView] = useState("list");
   const [devices, setDevices] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [sites, setSites] = useState([]);
+
   const [form, setForm] = useState(emptyForm);
+  const [editingDevice, setEditingDevice] = useState(null); // null = create mode
   const [search, setSearch] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [customersLoading, setCustomersLoading] = useState(false);
   const [sitesLoading, setSitesLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingKey, setDeletingKey] = useState(null); // row key while deleting
+
   const [error, setError] = useState("");
   const [formError, setFormError] = useState("");
 
@@ -1404,8 +122,11 @@ function ACCreation() {
   const [assigning, setAssigning] = useState(false);
   const [assignmentError, setAssignmentError] = useState("");
 
+  const [relayLoading, setRelayLoading] = useState({});
+  const [relayErrors, setRelayErrors] = useState({});
+
   /* =====================================================
-     FETCH DEVICES
+     FETCHERS
   ===================================================== */
 
   const fetchDevices = useCallback(async () => {
@@ -1435,10 +156,6 @@ function ACCreation() {
     }
   }, []);
 
-  /* =====================================================
-     FETCH CUSTOMERS
-  ===================================================== */
-
   const fetchCustomers = useCallback(async () => {
     try {
       setCustomersLoading(true);
@@ -1465,129 +182,95 @@ function ACCreation() {
     }
   }, []);
 
+  const fetchSites = useCallback(async (customerId) => {
+    try {
+      setSitesLoading(true);
+      setAssignmentError("");
 
-//   const fetchSites = useCallback(async () => {
-//     try {
-//       setSitesLoading(true);
+      const response = await fetch(sitesUrlFor(customerId), {
+        method: "GET",
+        headers: authHeaders(),
+        cache: "no-store",
+      });
 
-//       const response = await fetch(SITES_URL, {
-//         method: "GET",
-//         headers: authHeaders(),
-//         cache: "no-store",
-//       });
+      const result = await response.json().catch(() => ({}));
 
-//       const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          result?.message ||
+            result?.detail ||
+            result?.error ||
+            `HTTP ${response.status}`
+        );
+      }
 
-//       if (!response.ok) {
-//         throw new Error(
-//           result?.message || result?.detail || `HTTP ${response.status}`
-//         );
-//       }
+      const rawSites = Array.isArray(result?.sites)
+        ? result.sites
+        : normalizeList(result);
 
-//       setSites(normalizeList(result));
-//     } catch (err) {
-//       console.error("Site fetch error:", err);
-//     } finally {
-//       setSitesLoading(false);
-//     }
-//   }, []);
+      const normalizedSites = rawSites
+        .map((site) => ({
+          ...site,
+          asset_id:
+            site?.asset_id || site?.tpt_site_id || site?.id?.id || site?.id,
+          name: site?.name || site?.title || site?.label || "Unnamed Site",
+          code: site?.code || site?.label || "",
+          hierarchy_type: site?.hierarchy_type || site?.hierarchyType || "",
+          state_name: site?.state_name || "",
+          district_name: site?.district_name || "",
+          taluka_name: site?.taluka_name || "",
+          city_name: site?.city_name || "",
+          zone_name: site?.zone_name || "",
+          circle_name: site?.circle_name || "",
+          region_name: site?.region_name || "",
+          division_name: site?.division_name || "",
+          branch_name: site?.branch_name || "",
+          floor_name: site?.floor_name || "",
+        }))
+        .filter((site) => site.asset_id);
 
-    const fetchSites = useCallback(async (customerId) => {
-        try {
-            setSitesLoading(true);
-            setAssignmentError("");
-
-            const response = await fetch(sitesUrlFor(customerId), {
-                method: "GET",
-                headers: authHeaders(),
-                cache: "no-store",
-            });
-
-            const result = await response.json().catch(() => ({}));
-
-            if (!response.ok) {
-                throw new Error(
-                    result?.message ||
-                    result?.detail ||
-                    result?.error ||
-                    `HTTP ${response.status}`
-                );
-            }
-
-            const rawSites = Array.isArray(result?.sites)
-                ? result.sites
-                : normalizeList(result);
-
-            const normalizedSites = rawSites
-                .map((site) => ({
-                    ...site,
-
-                    // 3TP site ID
-                    asset_id:
-                        site?.asset_id ||
-                        site?.tpt_site_id ||
-                        site?.id?.id ||
-                        site?.id,
-
-                    // Site display name
-                    name:
-                        site?.name ||
-                        site?.title ||
-                        site?.label ||
-                        "Unnamed Site",
-
-                    code:
-                        site?.code ||
-                        site?.label ||
-                        "",
-
-                    hierarchy_type:
-                        site?.hierarchy_type ||
-                        site?.hierarchyType ||
-                        "",
-
-                    state_name: site?.state_name || "",
-                    district_name: site?.district_name || "",
-                    taluka_name: site?.taluka_name || "",
-                    city_name: site?.city_name || "",
-                    zone_name: site?.zone_name || "",
-                    circle_name: site?.circle_name || "",
-                    region_name: site?.region_name || "",
-                    division_name: site?.division_name || "",
-                    branch_name: site?.branch_name || "",
-                    floor_name: site?.floor_name || "",
-                }))
-                .filter((site) => site.asset_id);
-
-            console.log("SITES FOR ASSIGNMENT:", normalizedSites);
-
-            setSites(normalizedSites);
-        } catch (err) {
-            console.error("SITE FETCH ERROR:", err);
-
-            setAssignmentError(
-                err.message || "Unable to load sites from cloud."
-            );
-
-            setSites([]);
-        } finally {
-            setSitesLoading(false);
-        }
-    }, []);
-
+      setSites(normalizedSites);
+    } catch (err) {
+      console.error("SITE FETCH ERROR:", err);
+      setAssignmentError(err.message || "Unable to load sites from cloud.");
+      setSites([]);
+    } finally {
+      setSitesLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetchDevices();
     fetchCustomers();
-    fetchSites();
-  }, [fetchDevices, fetchCustomers, fetchSites]);
+  }, [fetchDevices, fetchCustomers]);
 
   /* =====================================================
-     CREATE DEVICE
+     CREATE / EDIT DEVICE
   ===================================================== */
 
   const openCreate = () => {
+    setEditingDevice(null);
     setForm(emptyForm);
+    setFormError("");
+    setView("form");
+  };
+
+  const openEdit = (device) => {
+    setEditingDevice(device);
+    setForm({
+      ac_id: device.ac_id || "",
+      device_name: device.device_name || "",
+      status: device.status || "OFF",
+      capacity_ton:
+        device.capacity_ton === null || device.capacity_ton === undefined
+          ? ""
+          : String(device.capacity_ton),
+      installation_date: device.installation_date || "",
+      last_maintenance_date: device.last_maintenance_date || "",
+      clientid: device.clientid || "",
+      username: device.username || "",
+      password: "", // never prefill passwords
+    });
     setFormError("");
     setView("form");
   };
@@ -1595,6 +278,7 @@ function ACCreation() {
   const backToList = () => {
     setView("list");
     setForm(emptyForm);
+    setEditingDevice(null);
     setFormError("");
   };
 
@@ -1607,7 +291,6 @@ function ACCreation() {
       return setFormError("Device name is required.");
 
     const capacity = Number(form.capacity_ton);
-
     if (
       form.capacity_ton !== "" &&
       (!Number.isFinite(capacity) || capacity <= 0)
@@ -1625,6 +308,16 @@ function ACCreation() {
       );
     }
 
+    // MQTT credentials required only on create.
+    if (!editingDevice) {
+      if (!form.clientid.trim())
+        return setFormError("MQTT Client ID is required.");
+      if (!form.username.trim())
+        return setFormError("MQTT Username is required.");
+      if (!form.password)
+        return setFormError("MQTT Password is required.");
+    }
+
     setSaving(true);
 
     try {
@@ -1640,8 +333,23 @@ function ACCreation() {
       if (form.last_maintenance_date)
         payload.last_maintenance_date = form.last_maintenance_date;
 
-      const response = await fetch(CREATE_DEVICE_URL, {
-        method: "POST",
+      if (form.clientid.trim()) payload.clientid = form.clientid.trim();
+      if (form.username.trim()) payload.username = form.username.trim();
+      // Only send password if the user entered a new one.
+      if (form.password) payload.password = form.password;
+
+      const isEdit = Boolean(editingDevice);
+      const deviceId = editingDevice?.tpt_device_id || editingDevice?.id;
+
+      if (isEdit && !deviceId) {
+        throw new Error("Device ID is missing — cannot update.");
+      }
+
+      const url = isEdit ? deviceDetailUrl(deviceId) : CREATE_DEVICE_URL;
+      const method = isEdit ? "PATCH" : "POST";
+
+      const response = await fetch(url, {
+        method,
         headers: authHeaders(),
         body: JSON.stringify(payload),
       });
@@ -1674,19 +382,70 @@ function ACCreation() {
       await fetchDevices();
       setView("list");
       setForm(emptyForm);
+      setEditingDevice(null);
 
       alert(
-        "Device created successfully. You can now assign a customer and site."
+        isEdit
+          ? "Device updated successfully."
+          : "Device created successfully. You can now assign a customer and site."
       );
     } catch (err) {
-      setFormError(err.message || "Unable to create device.");
+      setFormError(err.message || "Unable to save device.");
     } finally {
       setSaving(false);
     }
   };
 
   /* =====================================================
-     ASSIGNMENT HELPERS
+     DELETE DEVICE
+  ===================================================== */
+
+  const handleDelete = async (device) => {
+    const deviceId = device.tpt_device_id || device.id;
+
+    if (!deviceId) {
+      alert("Device ID is missing — cannot delete.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete device "${device.ac_id}"${
+        device.device_name ? ` (${device.device_name})` : ""
+      }?\n\nThis action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    const key = device.id || device.ac_id;
+    setDeletingKey(key);
+
+    try {
+      const response = await fetch(deviceDetailUrl(deviceId), {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+
+      // 204 No Content is the norm; anything 2xx is fine.
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(
+          result?.message ||
+            result?.detail ||
+            result?.error ||
+            `HTTP ${response.status}`
+        );
+      }
+
+      await fetchDevices();
+      alert("Device deleted successfully.");
+    } catch (err) {
+      alert(err.message || "Unable to delete device.");
+    } finally {
+      setDeletingKey(null);
+    }
+  };
+
+  /* =====================================================
+     ASSIGNMENT
   ===================================================== */
 
   const fetchCustomersForAssignment = useCallback(async () => {
@@ -1727,8 +486,7 @@ function ACCreation() {
 
     const deviceId = selectedDevice?.tpt_device_id || selectedDevice?.id;
 
-    if (!customerId)
-      return setAssignmentError("Customer ID is missing.");
+    if (!customerId) return setAssignmentError("Customer ID is missing.");
     if (!deviceId) return setAssignmentError("Device ID is missing.");
 
     setAssigning(true);
@@ -1755,6 +513,8 @@ function ACCreation() {
         );
       }
 
+      const wasReassign = Boolean(selectedDevice?.customer_id);
+
       setShowCustomerModal(false);
       setSelectedDevice(null);
       setCustomerSearch("");
@@ -1762,8 +522,8 @@ function ACCreation() {
       await fetchDevices();
       alert(
         result?.data?.sync_error
-          ? "Device assigned to customer and saved locally. Cloud sync is pending."
-          : "Device assigned to customer successfully."
+          ? `Device ${wasReassign ? "reassigned" : "assigned"} to customer and saved locally. Cloud sync is pending.`
+          : `Device ${wasReassign ? "reassigned" : "assigned"} to customer successfully.`
       );
     } catch (err) {
       setAssignmentError(
@@ -1807,6 +567,8 @@ function ACCreation() {
         );
       }
 
+      const wasReassign = Boolean(selectedDevice?.site_id);
+
       setShowSiteModal(false);
       setSelectedDevice(null);
       setSiteSearch("");
@@ -1814,8 +576,8 @@ function ACCreation() {
       await fetchDevices();
       alert(
         result?.data?.sync_error
-          ? "Device assigned to site and saved locally. Cloud sync is pending."
-          : "Device assigned to site successfully."
+          ? `Device ${wasReassign ? "reassigned" : "assigned"} to site and saved locally. Cloud sync is pending.`
+          : `Device ${wasReassign ? "reassigned" : "assigned"} to site successfully.`
       );
     } catch (err) {
       setAssignmentError(err.message || "Unable to assign device to site.");
@@ -1839,7 +601,6 @@ function ACCreation() {
     setSiteSearch("");
     setShowSiteModal(true);
 
-    // Always reload: the list depends on which customer owns this device.
     await fetchSites(device.customer_id);
   };
 
@@ -1855,6 +616,55 @@ function ACCreation() {
     setSelectedDevice(null);
     setSiteSearch("");
     setAssignmentError("");
+  };
+
+  /* =====================================================
+     RELAY CONTROL
+  ===================================================== */
+
+  const handleRelayControl = async (device, turnOn) => {
+    const key = device.id || device.ac_id;
+    const deviceId = device.tpt_device_id;
+
+    if (!deviceId) {
+      setRelayErrors((prev) => ({
+        ...prev,
+        [key]: "3TP device ID is missing.",
+      }));
+      return;
+    }
+
+    setRelayLoading((prev) => ({ ...prev, [key]: true }));
+    setRelayErrors((prev) => ({ ...prev, [key]: "" }));
+
+    try {
+      const response = await fetch(RELAY_CONTROL_URL, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          device_id: deviceId,
+          method: "Relay",
+          params: turnOn ? 1 : 0,
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          result.message || result.detail || `HTTP ${response.status}`
+        );
+      }
+
+      await fetchDevices();
+    } catch (err) {
+      setRelayErrors((prev) => ({
+        ...prev,
+        [key]: err.message || "Relay command failed.",
+      }));
+    } finally {
+      setRelayLoading((prev) => ({ ...prev, [key]: false }));
+    }
   };
 
   /* =====================================================
@@ -1898,51 +708,66 @@ function ACCreation() {
     );
   }, [customers, customerSearch]);
 
-//   const filteredSites = useMemo(() => {
-//     const query = siteSearch.trim().toLowerCase();
-//     if (!query) return sites;
+  const filteredSites = useMemo(() => {
+    const query = siteSearch.trim().toLowerCase();
+    if (!query) return sites;
 
-//     return sites.filter((site) =>
-//       [site.name, site.code, site.asset_id, site.tpt_site_id, site.id]
-//         .filter(Boolean)
-//         .some((value) => String(value).toLowerCase().includes(query))
-//     );
-//   }, [sites, siteSearch]);
+    return sites.filter((site) =>
+      [
+        site.name,
+        site.code,
+        site.asset_id,
+        site.tpt_site_id,
+        site.id,
+        site.state_name,
+        site.district_name,
+        site.taluka_name,
+        site.city_name,
+        site.zone_name,
+        site.circle_name,
+        site.region_name,
+        site.division_name,
+        site.branch_name,
+        site.floor_name,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [sites, siteSearch]);
 
-    const filteredSites = useMemo(() => {
-        const query = siteSearch.trim().toLowerCase();
+  /* =====================================================
+     INLINE ACTION BUTTON STYLES
+  ===================================================== */
 
-        if (!query) {
-            return sites;
-        }
+  const iconBtnStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 30,
+    height: 30,
+    padding: 0,
+    borderRadius: 6,
+    border: "1px solid #e5e7eb",
+    background: "#fff",
+    cursor: "pointer",
+    marginLeft: 6,
+    transition: "background .15s, border-color .15s",
+  };
 
-        return sites.filter((site) =>
-            [
-                site.name,
-                site.code,
-                site.asset_id,
-                site.tpt_site_id,
-                site.id,
+  const editBtnStyle = { ...iconBtnStyle, color: "#2563eb" };
+  const deleteBtnStyle = { ...iconBtnStyle, color: "#dc2626" };
+  const smallEditBtnStyle = {
+    ...iconBtnStyle,
+    width: 24,
+    height: 24,
+    marginLeft: 8,
+    borderColor: "transparent",
+    background: "transparent",
+  };
 
-                site.state_name,
-                site.district_name,
-                site.taluka_name,
-                site.city_name,
-                site.zone_name,
-                site.circle_name,
-                site.region_name,
-                site.division_name,
-                site.branch_name,
-                site.floor_name,
-            ]
-                .filter(Boolean)
-                .some((value) =>
-                    String(value)
-                        .toLowerCase()
-                        .includes(query)
-                )
-        );
-    }, [sites, siteSearch]);
+  /* =====================================================
+     RENDER
+  ===================================================== */
 
   return (
     <div className="admins-page">
@@ -1955,15 +780,19 @@ function ACCreation() {
         </li>
 
         <li className={view === "form" ? "active" : ""}>
-          <button type="button" className="step-btn" onClick={openCreate}>
+          <button
+            type="button"
+            className="step-btn"
+            onClick={() => (editingDevice ? null : openCreate())}
+          >
             <span className="step-num">2</span>
-            Add Device
+            {editingDevice ? "Edit Device" : "Add Device"}
           </button>
         </li>
       </ol>
 
       {/* =================================================
-          DEVICE LIST
+          DEVICE LIST VIEW
       ================================================= */}
 
       {view === "list" ? (
@@ -2008,7 +837,6 @@ function ACCreation() {
               onClick={() => {
                 fetchDevices();
                 fetchCustomers();
-                fetchSites();
               }}
             >
               <FiRefreshCw />
@@ -2035,52 +863,109 @@ function ACCreation() {
                     <th>Customer</th>
                     <th>Site</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th>Relay Control</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {filteredDevices.map((device) => {
+                    const key = device.id || device.ac_id;
+
                     const customer =
                       device.customer_name ||
                       (device.customer_id
                         ? `Customer #${device.customer_id}`
-                        : "Unassigned");
+                        : null);
 
-                    const site = device.site_name || "Unassigned";
+                    const site =
+                      device.site_name ||
+                      (device.site_id ? `Site #${device.site_id}` : null);
+
+                    const hasCustomer = Boolean(customer);
+                    const hasSite = Boolean(site);
+                    const isDeleting = deletingKey === key;
 
                     return (
-                      <tr key={device.id || device.ac_id}>
+                      <tr key={key}>
                         <td>
                           <strong>{device.ac_id}</strong>
                         </td>
 
                         <td>{device.device_name || "—"}</td>
 
+                        {/* ---------- CUSTOMER ---------- */}
                         <td>
-                          <strong>{customer}</strong>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: device.customer_id ? "#6b7280" : "#9ca3af",
-                            }}
-                          >
-                            {device.customer_id ? "Assigned" : "Not assigned"}
-                          </div>
+                          {hasCustomer ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              <strong>{customer}</strong>
+                              {canAssignCustomer && (
+                                <button
+                                  type="button"
+                                  title="Change customer"
+                                  aria-label="Change customer"
+                                  style={smallEditBtnStyle}
+                                  onClick={() =>
+                                    openCustomerAssignment(device)
+                                  }
+                                >
+                                  <FiEdit2 size={14} />
+                                </button>
+                              )}
+                            </span>
+                          ) : canAssignCustomer ? (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => openCustomerAssignment(device)}
+                            >
+                              <FiUserPlus />
+                              Unassigned
+                            </button>
+                          ) : (
+                            <span className="assignment-unassigned">
+                              Unassigned
+                            </span>
+                          )}
                         </td>
 
+                        {/* ---------- SITE ---------- */}
                         <td>
-                          <strong>{site}</strong>
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: device.site_id ? "#6b7280" : "#9ca3af",
-                            }}
-                          >
-                            {device.site_id ? "Assigned" : "Not assigned"}
-                          </div>
+                          {hasSite ? (
+                            <span
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                              }}
+                            >
+                              <strong>{site}</strong>
+                              <button
+                                type="button"
+                                title="Change site"
+                                aria-label="Change site"
+                                style={smallEditBtnStyle}
+                                onClick={() => openSiteAssignment(device)}
+                              >
+                                <FiEdit2 size={14} />
+                              </button>
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => openSiteAssignment(device)}
+                            >
+                              <FiMapPin />
+                              Unassigned
+                            </button>
+                          )}
                         </td>
 
+                        {/* ---------- STATUS ---------- */}
                         <td>
                           <span
                             className={
@@ -2093,33 +978,78 @@ function ACCreation() {
                           </span>
                         </td>
 
+                        {/* ---------- RELAY + EDIT + DELETE ---------- */}
                         <td>
                           <div
+                            className="relay-control"
                             style={{
                               display: "flex",
-                              gap: 6,
+                              alignItems: "center",
                               flexWrap: "wrap",
+                              gap: 6,
                             }}
                           >
-                            {canAssignCustomer && (
-                              <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={() => openCustomerAssignment(device)}
-                              >
-                                <FiUserPlus />
-                                Customer
-                              </button>
-                            )}
+                            {/* <span
+                              className={
+                                device.status === "ON"
+                                  ? "relay-status on"
+                                  : "relay-status off"
+                              }
+                            >
+                              {relayLoading[key]
+                                ? "Sending..."
+                                : device.status === "ON"
+                                ? "ON"
+                                : "OFF"}
+                            </span> */}
 
+                            {/* EDIT */}
                             <button
                               type="button"
-                              className="btn-secondary"
-                              onClick={() => openSiteAssignment(device)}
+                              title="Edit device"
+                              aria-label="Edit device"
+                              style={editBtnStyle}
+                              onClick={() => openEdit(device)}
+                              disabled={isDeleting}
                             >
-                              <FiMapPin />
-                              Site
+                              <FiEdit2 size={15} />
                             </button>
+
+                            {/* DELETE */}
+                            <button
+                              type="button"
+                              title="Delete device"
+                              aria-label="Delete device"
+                              style={{
+                                ...deleteBtnStyle,
+                                opacity: isDeleting ? 0.5 : 1,
+                              }}
+                              onClick={() => handleDelete(device)}
+                              disabled={isDeleting}
+                            >
+                              <FiTrash2 size={15} />
+                            </button>
+
+                            <label className="relay-switch">
+                              <input
+                                type="checkbox"
+                                checked={device.status === "ON"}
+                                disabled={!!relayLoading[key]}
+                                onChange={(event) =>
+                                  handleRelayControl(
+                                    device,
+                                    event.target.checked
+                                  )
+                                }
+                              />
+                              <span className="relay-slider" />
+                            </label>
+
+                            {relayErrors[key] && (
+                              <div className="relay-error">
+                                {relayErrors[key]}
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -2132,17 +1062,18 @@ function ACCreation() {
         </>
       ) : (
         /* =================================================
-           CREATE DEVICE
+           CREATE / EDIT DEVICE VIEW
         ================================================= */
 
         <div className="admins-panel">
           <div className="admins-panel-header">
             <FiCpu size={22} />
             <div>
-              <h2>Add AC Device</h2>
+              <h2>{editingDevice ? "Edit AC Device" : "Add AC Device"}</h2>
               <p>
-                Create the device independently. Customer and Site can be
-                assigned later.
+                {editingDevice
+                  ? `Updating ${editingDevice.ac_id}. Leave MQTT password blank to keep the current one.`
+                  : "Create the device independently. Customer and Site can be assigned later."}
               </p>
             </div>
           </div>
@@ -2248,74 +1179,79 @@ function ACCreation() {
               <div className="admins-panel-header">
                 <FiCheckCircle />
                 <div>
-                  {/* <h3>Independent Device</h3> */}
-                  <p> This operation only creates the device. Customer and Site are assigned separately from the device list. </p>
+                  <p>
+                    {editingDevice
+                      ? "Customer and Site assignments are edited from the device list."
+                      : "This operation only creates the device. Customer and Site are assigned separately from the device list."}
+                  </p>
                 </div>
               </div>
             </div>
 
-
-            <form className="admins-form" onSubmit={handleSubmit}>
-              <div className="admins-panel-header">
-                <div>
-                  <p>MQTT Credentials</p>
-                </div>
+            {/* ---- MQTT Credentials ---- */}
+            <div className="admins-panel-header" style={{ marginTop: 20 }}>
+              <div>
+                <p>MQTT Credentials</p>
               </div>
+            </div>
 
-              <div className="form-grid">
-            
-                <label>
-                  MQTT Client ID *
-                  <input
-                    type="text"
-                    value={form.clientid}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        clientid: event.target.value,
-                      }))
-                    }
-                    placeholder="AC-MH-PUN-001"
-                    autoComplete="off"
-                    required
-                  />
-                </label>
+            <div className="form-grid">
+              <label>
+                MQTT Client ID {editingDevice ? "" : "*"}
+                <input
+                  type="text"
+                  value={form.clientid}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      clientid: event.target.value,
+                    }))
+                  }
+                  placeholder="AC-MH-PUN-001"
+                  autoComplete="off"
+                  required={!editingDevice}
+                />
+              </label>
 
-                <label>
-                  MQTT Username *
-                  <input
-                    type="text"
-                    value={form.username}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        username: event.target.value,
-                      }))
-                    }
-                    placeholder="Enter MQTT username"
-                    autoComplete="off"
-                    required
-                  />
-                </label>
+              <label>
+                MQTT Username {editingDevice ? "" : "*"}
+                <input
+                  type="text"
+                  value={form.username}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      username: event.target.value,
+                    }))
+                  }
+                  placeholder="Enter MQTT username"
+                  autoComplete="off"
+                  required={!editingDevice}
+                />
+              </label>
 
-                <label>
-                  MQTT Password *
-                  <input
-                    type="password"
-                    value={form.password}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        password: event.target.value,
-                      }))
-                    }
-                    placeholder="Enter MQTT password"
-                    autoComplete="new-password"
-                    required
-                  />
-                </label>
-              </div>
-            </form>
+              <label>
+                MQTT Password{" "}
+                {editingDevice ? "(leave blank to keep)" : "*"}
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(event) =>
+                    setForm((previous) => ({
+                      ...previous,
+                      password: event.target.value,
+                    }))
+                  }
+                  placeholder={
+                    editingDevice
+                      ? "Leave blank to keep current password"
+                      : "Enter MQTT password"
+                  }
+                  autoComplete="new-password"
+                  required={!editingDevice}
+                />
+              </label>
+            </div>
 
             {formError && <div className="form-error">{formError}</div>}
 
@@ -2329,8 +1265,18 @@ function ACCreation() {
                 Cancel
               </button>
 
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? "Creating..." : "Create Device"}
+              <button
+                type="submit"
+                className="btn-primary"
+                disabled={saving}
+              >
+                {saving
+                  ? editingDevice
+                    ? "Updating..."
+                    : "Creating..."
+                  : editingDevice
+                  ? "Update Device"
+                  : "Create Device"}
               </button>
             </div>
           </form>
@@ -2354,7 +1300,11 @@ function ACCreation() {
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <FiUserPlus />
                 <div>
-                  <h2>Assign Customer</h2>
+                  <h2>
+                    {selectedDevice.customer_id
+                      ? "Change Customer"
+                      : "Assign Customer"}
+                  </h2>
                   <p>
                     Device: <strong>{selectedDevice.ac_id}</strong>
                   </p>
@@ -2408,7 +1358,9 @@ function ACCreation() {
                 />
               </label>
 
-              <div style={{ marginTop: 12, maxHeight: 260, overflowY: "auto" }}>
+              <div
+                style={{ marginTop: 12, maxHeight: 260, overflowY: "auto" }}
+              >
                 {customersLoading ? (
                   <div className="admins-loading">Loading customers...</div>
                 ) : filteredCustomers.length === 0 ? (
@@ -2477,7 +1429,9 @@ function ACCreation() {
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <FiMapPin />
                 <div>
-                  <h2>Assign Site</h2>
+                  <h2>
+                    {selectedDevice.site_id ? "Change Site" : "Assign Site"}
+                  </h2>
                   <p>
                     Device: <strong>{selectedDevice.ac_id}</strong>
                   </p>
@@ -2531,74 +1485,54 @@ function ACCreation() {
                 />
               </label>
 
-                <div className="site-assignment-list">
-                    {sitesLoading ? (
-                        <div className="admins-loading">
-                            Loading sites...
+              <div className="site-assignment-list">
+                {sitesLoading ? (
+                  <div className="admins-loading">Loading sites...</div>
+                ) : filteredSites.length === 0 ? (
+                  <div className="admins-empty">No sites found.</div>
+                ) : (
+                  filteredSites.map((site) => {
+                    const siteId =
+                      site.asset_id ||
+                      site.tpt_site_id ||
+                      site.id?.id ||
+                      site.id;
+
+                    const location = [
+                      site.state_name,
+                      site.district_name,
+                      site.taluka_name,
+                      site.city_name,
+                      site.branch_name,
+                      site.floor_name,
+                    ]
+                      .filter(Boolean)
+                      .join(" › ");
+
+                    return (
+                      <button
+                        key={siteId}
+                        type="button"
+                        className="site-assignment-item"
+                        onClick={() => assignSite(site)}
+                        disabled={assigning}
+                      >
+                        <div className="site-assignment-info">
+                          <strong>{site.name || "Unnamed Site"}</strong>
+                          <span>{site.code || "No code"}</span>
+                          {location && <small>{location}</small>}
+                          <small>ID: {siteId}</small>
                         </div>
-                    ) : filteredSites.length === 0 ? (
-                        <div className="admins-empty">
-                            No sites found.
+
+                        <div className="site-assignment-action">
+                          <FiMapPin />
+                          Assign
                         </div>
-                    ) : (
-                        filteredSites.map((site) => {
-                            const siteId =
-                                site.asset_id ||
-                                site.tpt_site_id ||
-                                site.id?.id ||
-                                site.id;
-
-                            const hierarchy =
-                                site.hierarchy_type || "—";
-
-                            const location = [
-                                site.state_name,
-                                site.district_name,
-                                site.taluka_name,
-                                site.city_name,
-                                site.branch_name,
-                                site.floor_name,
-                            ]
-                                .filter(Boolean)
-                                .join(" › ");
-
-                            return (
-                                <button
-                                    key={siteId}
-                                    type="button"
-                                    className="site-assignment-item"
-                                    onClick={() => assignSite(site)}
-                                    disabled={assigning}
-                                >
-                                    <div className="site-assignment-info">
-                                        <strong>
-                                            {site.name || "Unnamed Site"}
-                                        </strong>
-
-                                        <span>
-                                            {site.code || "No code"}
-                                        </span>
-
-                                        {location && (
-                                            <small>
-                                                {location}
-                                            </small>
-                                        )}
-
-                                        <small>
-                                            ID: {siteId}
-                                        </small>
-                                    </div>
-
-                                    <div className="site-assignment-action">
-                                        <FiMapPin />
-                                        Assign
-                                    </div>
-                                </button>
-                            );
-                        })
-                    )}
-                </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
             {assignmentError && (

@@ -23,7 +23,9 @@ from .models import (
     Branch,
     Floor,
     Site,
+    CustomerSiteMapping,
 )
+from .hierarchy_tree_sync import sync_branch_to_tree
 
 
 def _error(message, http_status=status.HTTP_400_BAD_REQUEST):
@@ -222,6 +224,14 @@ def _validate_location(customer, data):
         "The selected customer has no valid hierarchy configured."
     )
 
+def _hierarchy_path(site):
+    from .views import resolve_site_hierarchy
+    try:
+        return resolve_site_hierarchy(site)
+    except Exception:
+        return {}
+
+
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
 def create_hierarchy_site(request):
@@ -402,6 +412,17 @@ def create_hierarchy_site(request):
             status.HTTP_409_CONFLICT,
         )
 
+    # Customer -> Site assignment is saved locally as well.
+    CustomerSiteMapping.objects.update_or_create(
+        customer=customer,
+        site=site,
+        defaults={"is_active": True},
+    )
+
+    # Put the branch (+ floors) into the location tree so the hierarchy
+    # filter and the branch picker show it right away.
+    sync_branch_to_tree(branch)
+
     sync_message = ""
     try:
         from .views import sync_site
@@ -446,7 +467,141 @@ def create_hierarchy_site(request):
                 "tpt_site_id": site.tpt_site_id,
                 "tpt_sync_status": site.tpt_sync_status,
                 "sync_message": sync_message,
+                "hierarchy_path": _hierarchy_path(site),
             },
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def create_hierarchy_branch(request):
+    """Create a branch directly under a selected Taluka (geographical) or
+    Division (zonal), without creating a Site or requiring a City node."""
+    data = request.data
+    # console.log(data);
+
+    try:
+        customer = _customer_for_request(request, data.get("customer_id"))
+        hierarchy = str(customer.hierarchy_type or "").upper()
+        name = str(data.get("name") or data.get("branch_name") or "").strip()
+        code = str(data.get("code") or data.get("branch_code") or "").strip().upper()
+        address = str(data.get("address") or "").strip()
+        pincode = str(data.get("pincode") or "").strip()
+
+        if not name or not code:
+            return _error("Branch name and branch code are required.")
+        if len(pincode) not in (0, 6) or (pincode and not pincode.isdigit()):
+            return _error("Pincode must be empty or contain exactly 6 digits.")
+        if Branch.objects.filter(code__iexact=code).exists():
+            return _error("This branch code already exists.")
+
+        if hierarchy == "GEOGRAPHICAL":
+            state = _resolve_location(State, data.get("state_id"), is_active=True)
+            if not state:
+                return _error("Select a valid state.")
+            district = _resolve_location(District, data.get("district_id"), state=state, is_active=True)
+            if not district:
+                return _error("The selected district does not belong to the selected state.")
+            taluka = _resolve_location(Taluka, data.get("taluka_id"), district=district, is_active=True)
+            if not taluka:
+                return _error("The selected taluka does not belong to the selected district.")
+            if Branch.objects.filter(customer=customer, taluka=taluka, name__iexact=name).exists():
+                return _error("A branch with this name already exists under this taluka.")
+            branch = Branch.objects.create(
+                customer=customer, taluka=taluka, city=None, division=None,
+                name=name, code=code, pincode=pincode, address=address,
+            )
+        elif hierarchy == "ZONAL":
+            zone = _resolve_location(Zone, data.get("zone_id"), is_active=True)
+            if not zone:
+                return _error("Select a valid zone.")
+            circle = _resolve_location(Circle, data.get("circle_id"), zone=zone, is_active=True)
+            if not circle:
+                return _error("The selected circle does not belong to the selected zone.")
+            region = _resolve_location(Region, data.get("region_id"), circle=circle, is_active=True)
+            if not region:
+                return _error("The selected region does not belong to the selected circle.")
+            division = _resolve_location(Division, data.get("division_id"), region=region, is_active=True)
+            if not division:
+                return _error("The selected division does not belong to the selected region.")
+            if Branch.objects.filter(customer=customer, division=division, name__iexact=name).exists():
+                return _error("A branch with this name already exists under this division.")
+            branch = Branch.objects.create(
+                customer=customer, city=None, taluka=None, division=division,
+                name=name, code=code, pincode=pincode, address=address,
+            )
+        else:
+            return _error("The selected customer has no valid hierarchy configured.")
+
+        # The local Branch is also represented as an ASSET in 3TP.
+        # Import at runtime to avoid a module import cycle (views imports shared models).
+        cloud_error = ""
+        try:
+            from .views import _tpt_enabled, _tpt_request, _tpt_extract_id, sync_customer
+
+            if _tpt_enabled():
+                if not getattr(customer, "tpt_customer_id", ""):
+                    sync_customer(customer)
+                    customer.refresh_from_db()
+                if not getattr(customer, "tpt_customer_id", ""):
+                    raise RuntimeError("Customer has no 3TP customer ID; could not link branch asset.")
+
+                # Existing Site creation used /api/asset. Reuse the same 3TP asset API,
+                # but name the asset for this Branch and do not create a Site record.
+                _, asset_data = _tpt_request(
+                    "POST", "site", payload={"name": branch.name, "type": "default"}
+                )
+                asset_id = _tpt_extract_id(asset_data)
+                if not asset_id:
+                    raise RuntimeError("3TP did not return an asset ID for the branch.")
+
+                # Persist the returned ID immediately so a customer-link failure can
+                # be retried without creating a duplicate ASSET.
+                branch.tpt_asset_id = asset_id
+                branch.tpt_sync_status = "PENDING"
+                branch.tpt_sync_error = ""
+                branch.save(update_fields=["tpt_asset_id", "tpt_sync_status", "tpt_sync_error"])
+
+                # Link the branch asset to the 3TP customer using the same endpoint
+                # previously used by Site creation.
+                _tpt_request(
+                    "POST",
+                    f"/api/customer/{customer.tpt_customer_id}/asset/{asset_id}",
+                )
+                branch.tpt_sync_status = "SYNCED"
+                branch.tpt_sync_error = ""
+                branch.save(update_fields=["tpt_sync_status", "tpt_sync_error"])
+        except Exception as exc:
+            cloud_error = str(exc)[:1000]
+            branch.tpt_sync_status = "FAILED"
+            branch.tpt_sync_error = cloud_error
+            branch.save(update_fields=["tpt_sync_status", "tpt_sync_error"])
+
+        sync_branch_to_tree(branch)
+        is_cloud_synced = bool(branch.tpt_asset_id and branch.tpt_sync_status == "SYNCED")
+        return Response({
+            "status": "success" if is_cloud_synced else "partial_success",
+            "message": (
+                "Branch created locally and synchronized to 3TP as an ASSET."
+                if is_cloud_synced else
+                ("Branch created locally, but 3TP ASSET synchronization failed. Retry synchronization before assigning devices."
+                 if cloud_error else "Branch created locally. 3TP integration is disabled or synchronization is pending.")
+            ),
+            "data": {
+                "id": str(branch.pk), "name": branch.name, "code": branch.code,
+                "address": branch.address, "pincode": branch.pincode,
+                "customer_id": str(branch.customer_id),
+                "hierarchy_type": hierarchy,
+                "taluka_id": str(branch.taluka_id) if branch.taluka_id else None,
+                "division_id": str(branch.division_id) if branch.division_id else None,
+                "tpt_asset_id": branch.tpt_asset_id or "",
+                "tpt_sync_status": branch.tpt_sync_status,
+                "tpt_sync_error": branch.tpt_sync_error or "",
+            },
+        }, status=status.HTTP_201_CREATED)
+    except PermissionError as exc:
+        return _error(str(exc), status.HTTP_403_FORBIDDEN)
+    except (ValueError, DjangoValidationError, IntegrityError) as exc:
+        return _error(str(exc))

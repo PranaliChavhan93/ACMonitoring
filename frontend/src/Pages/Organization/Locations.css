@@ -675,18 +675,14 @@
 ========================================================= */
 
 .sites-card-footer {
-    display: flex;
+    /* display: flex; */
     align-items: center;
     justify-content: space-between;
 
     padding: 13px 22px;
-
     background: #fafafa;
-
     border-top: 1px solid #e5e7eb;
-
     color: #6b7280;
-
     font-size: 12px;
 }
 
@@ -704,24 +700,14 @@
     color: #047857;
 }
 
-
-/* =========================================================
-   LOADING
-========================================================= */
-
 .locations-loading {
-    min-height: 400px;
-
+    min-height: 200px;
     display: flex;
     flex-direction: column;
-
     align-items: center;
     justify-content: center;
-
     gap: 12px;
-
     color: #6b7280;
-
     font-size: 14px;
 }
 
@@ -1433,4 +1419,35 @@
         margin-right: 17px;
         margin-left: 17px;
     }
+}
+
+.floor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.floor-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.floor-index {
+  flex: 0 0 auto;
+  min-width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #eef2ff;
+  color: #3730a3;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.floor-row input {
+  flex: 1;
 }

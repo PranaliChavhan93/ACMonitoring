@@ -39,40 +39,69 @@ async function apiRequest(path, options = {}) {
     return result;
 }
 
-function parseAnalysis(text = "") {
+
+function parseAnalysis(data = "") {
+    // New backend format:
+    // { short: { Energy: "..." }, descriptive: { Energy: "..." } }
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+        const shortData = data.short;
+
+        if (
+            shortData &&
+            typeof shortData === "object" &&
+            !Array.isArray(shortData)
+        ) {
+            return shortData;
+        }
+
+        // Also accept a legacy object containing section values.
+        return data;
+    }
+
+    // Old backend format: a string containing "Energy: ..."
+    if (typeof data !== "string") {
+        return {};
+    }
+
     const sections = {};
     let current = "";
 
-    for (const line of text.split("\n")) {
+    for (const line of data.split("\n")) {
         const trimmed = line.trim();
 
         const match = ANALYSIS_SECTIONS.find((section) =>
-        trimmed.startsWith(`${section}:`)
+            trimmed.startsWith(`${section}:`)
         );
 
         if (match) {
-        current = match;
-        sections[current] = trimmed.slice(match.length + 1).trim();
+            current = match;
+            sections[current] = trimmed.slice(match.length + 1).trim();
         } else if (current && trimmed) {
-        sections[current] += ` ${trimmed}`;
+            sections[current] += ` ${trimmed}`;
         }
     }
 
     return sections;
 }
 
+
 function AIAssistantPanel({
     dashboardData = {},
 }) {
     const [activeTab, setActiveTab] = useState("analysis");
-    const [analysis, setAnalysis] = useState("");
+    // const [analysis, setAnalysis] = useState("");
+    const [analysis, setAnalysis] = useState(null);
     const [model, setModel] = useState("");
     const [loadingAnalysis, setLoadingAnalysis] = useState(false);
     const [error, setError] = useState("");
 
     const [question, setQuestion] = useState("");
     const [answer, setAnswer] = useState("");
+    
     const [asking, setAsking] = useState(false);
+
+    // const [analysisMode, setAnalysisMode] = useState("short");
+    // const [answerMode, setAnswerMode] = useState("short");
 
     const [maintenanceForm, setMaintenanceForm] = useState({
         ac_id: "",
@@ -104,7 +133,8 @@ function AIAssistantPanel({
                 }),
             });
 
-            setAnalysis(result.analysis || "");
+            setAnalysis(result.analysis || null);
+            // setAnalysisMode("short");
             setModel(result.model || "");
             } catch (err) {
                 setError(err.message || "Could not analyze the dashboard.");
@@ -131,7 +161,11 @@ function AIAssistantPanel({
                 }),
             });
 
-                setAnswer(result.answer || "No answer returned.");
+                setAnswer(result.answer || {
+                    short: "No answer returned.",
+                    descriptive: "No answer returned.",
+                });
+                // setAnswerMode("short");
                 setModel(result.model || "");
             } catch (err) {
                 setError(err.message || "Could not answer the question.");
@@ -196,6 +230,9 @@ function AIAssistantPanel({
     };
 
     const sections = parseAnalysis(analysis);
+    const descriptiveSections = parseAnalysis(
+        analysis?.descriptive || {}
+    );
 
     return (
         <section className="ai-panel">
@@ -255,14 +292,36 @@ function AIAssistantPanel({
                     <span>Generated analysis</span>
                     {model && <span>Model: {model}</span>}
                 </div>
+                
+                {/* <div className="ai-view-toggle">
+                    <button
+                        type="button"
+                        className={analysisMode === "short" ? "active" : ""}
+                        onClick={() => setAnalysisMode("short")}
+                    >
+                        Short
+                    </button>
+
+                    <button
+                        type="button"
+                        className={analysisMode === "descriptive" ? "active" : ""}
+                        onClick={() => setAnalysisMode("descriptive")}
+                    >
+                        Descriptive
+                    </button>
+                </div> */}
 
                 <div className="ai-analysis-grid">
                     {ANALYSIS_SECTIONS.map((section) => (
                     <article className="ai-insight-card" key={section}>
                         <h3>{section}</h3>
                         <p>
-                        {sections[section] ||
-                            "No information returned for this section."}
+                            {/* {analysisMode === "short"
+                                ? sections[section] || "No information available."
+                                : descriptiveSections[section] ||
+                                "No descriptive information available."} */}
+
+                            {sections[section] || "No information available."}
                         </p>
                     </article>
                     ))}
@@ -270,7 +329,15 @@ function AIAssistantPanel({
 
                 <details className="ai-raw-result">
                     <summary>View complete AI response</summary>
-                    <pre>{analysis}</pre>
+                    <pre>
+                        {typeof analysis === "string"
+                            ? analysis
+                            : JSON.stringify(
+                                analysis?.descriptive || analysis,
+                                null,
+                                2
+                            )}
+                    </pre>
                 </details>
                 </>
             )}
@@ -298,13 +365,18 @@ function AIAssistantPanel({
                     {asking ? "Thinking..." : "Ask AI"}
                 </button>
             </form>
-
+            
             {answer && (
                 <article className="ai-answer">
                     <h3>AI Answer</h3>
-                    <p>{answer}</p>
+                    <p>
+                        {typeof answer === "string"
+                            ? answer
+                            : answer?.short || "No short answer returned."}
+                    </p>
                 </article>
             )}
+
             </div>
         )}
 

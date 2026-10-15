@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from "react";
 
-const API_BASE = "http://192.168.1.8:8000/api";
+const API_BASE = "http://192.168.1.18:8000/api";
 
 const token = () =>
   localStorage.getItem("token") ||

@@ -358,7 +358,8 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "./AuthContext";
-import { ROLES, ROLE_LABELS, ROLE_DASHBOARD } from "./MenuConfig";
+// import { ROLES, ROLE_LABELS, ROLE_DASHBOARD } from "./MenuConfig";
+import { ROLE_DASHBOARD } from "./MenuConfig";
 
 import "./login.css";
 
@@ -457,7 +458,7 @@ function Login({ mode = "user" }) {
   const [form, setForm] = useState({
     email: "",
     password: "",
-    role: ROLES.ORG_SUPER_ADMIN,
+    // role: ROLES.ORG_SUPER_ADMIN,
   });
 
   const [showPwd, setShowPwd] = useState(false);
@@ -507,7 +508,8 @@ function Login({ mode = "user" }) {
         body: JSON.stringify({
           email: form.email.trim(),
           password: form.password,
-          role: form.role,
+          // role: form.role,
+          login_type: mode, 
         }),
       });
 

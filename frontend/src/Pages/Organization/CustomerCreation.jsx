@@ -17,7 +17,7 @@ import "./CustomerCreation.css";
 // const CUSTOMERS_URL = `${API_BASE}/customers/`;
 // const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
 
-const API_BASE = "http://192.168.1.8:8000/api";
+const API_BASE = "http://192.168.1.18:8000/api";
 const CUSTOMERS_URL = `${API_BASE}/customers/`;
 const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
 
@@ -78,7 +78,6 @@ const emptyForm = {
 
   bank_short_name: "",
   bank_type: "",
-  ifsc_code: "",
   website: "",
 
   address_line_1: "",
@@ -344,7 +343,6 @@ function CustomerCreation() {
       is_active: customer.is_active ?? true,
       bank_short_name: customer.bank_short_name || "",
       bank_type: customer.bank_type || "",
-      ifsc_code: customer.ifsc_code || "",
       website: customer.website || "",
       address_line_1: customer.address_line_1 || "",
       state: customer.state || "",
@@ -460,7 +458,6 @@ function CustomerCreation() {
       phone: form.admin_mobile.trim() || form.phone.trim(),
       hierarchy_type: selectedHierarchy || form.hierarchy_type,
       is_active: form.is_active,
-      ifsc_code: form.ifsc_code.trim().toUpperCase(),
     };
 
     if (form.password.trim()) {
@@ -826,24 +823,6 @@ function CustomerCreation() {
                     ))}
                   </select>
                 </label>
-                
-                <label>
-                  IFSC Code
-                  <input
-                    type="text"
-                    value={form.ifsc_code}
-                    onChange={(e) =>
-                      handleFieldChange("ifsc_code", e.target.value.toUpperCase())
-                    }
-                    placeholder="SBIN0001234"
-                    maxLength={11}
-                    autoCapitalize="characters"
-                  />
-                  <small className="field-hint">
-                    Enter the 11-character IFSC code of the bank branch.
-                  </small>
-                </label>
-
 
                 <label>
                   Email *
@@ -965,19 +944,6 @@ function CustomerCreation() {
                     required
                   />
                 </label>
-
-                {/* <label>
-                  Designation *
-                  <input
-                    type="text"
-                    value={form.designation}
-                    onChange={(e) =>
-                      handleFieldChange("designation", e.target.value)
-                    }
-                    placeholder="IT Manager"
-                    required
-                  />
-                </label> */}
 
                 <label>
                   Email *

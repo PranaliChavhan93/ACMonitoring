@@ -1530,6 +1530,80 @@
                         ]
                     }
                 ]
+            },
+            {
+                "zone_id": "ZONE-NORTH",
+                "zone_name": "North Zone",
+                "circles": [
+                    {
+                        "circle_id": "CIR-DELHI",
+                        "circle_name": "Delhi Circle",
+                        "regions": [
+                            {
+                                "region_id": "REG-DELHI-C",
+                                "region_name": "Delhi Central Region",
+                                "divisions": [
+                                    {
+                                        "division_id": "DIV-KB",
+                                        "division_name": "Karol Bagh Division",
+                                        "branches": [
+                                            {
+                                                "branch_id": "BR-101",
+                                                "branch_name": "Karol Bagh Branch",
+                                                "floors": [
+                                                    {
+                                                        "floor_id": "BR-101-F1",
+                                                        "floor_name": "Floor 1",
+                                                        "sites": [],
+                                                        "physical_sites": [
+                                                            {
+                                                                "site_id": "01b54c82-8da2-4ddf-8555-4089640e471c",
+                                                                "site_code": "SITE-9002",
+                                                                "site_name": "SITE-9002",
+                                                                "branch_id": "BR-101",
+                                                                "branch_name": "Karol Bagh Branch",
+                                                                "floor_id": "BR-101-F1",
+                                                                "floor_name": "Floor 1",
+                                                                "address": "Floor 1, Karol Bagh, New Delhi",
+                                                                "pincode": ""
+                                                            }
+                                                        ]
+                                                    }
+                                                ],
+                                                "sites": [],
+                                                "hierarchy_type": "ZONAL",
+                                                "zone_id": "ZONE-NORTH",
+                                                "zone_name": "North Zone",
+                                                "circle_id": "CIR-DELHI",
+                                                "circle_name": "Delhi Circle",
+                                                "region_id": "REG-DELHI-C",
+                                                "region_name": "Delhi Central Region",
+                                                "division_id": "DIV-KB",
+                                                "division_name": "Karol Bagh Division",
+                                                "customer_id": 1,
+                                                "admin_ids": [],
+                                                "engineer_ids": [],
+                                                "physical_sites": [
+                                                    {
+                                                        "site_id": "2ddc9241-343c-4cc7-8fe7-fd2d5eed1d8e",
+                                                        "site_code": "SITE-9001",
+                                                        "site_name": "SITE-9001",
+                                                        "branch_id": "BR-101",
+                                                        "branch_name": "Karol Bagh Branch",
+                                                        "floor_id": "",
+                                                        "floor_name": "",
+                                                        "address": "Rooftop, Karol Bagh, New Delhi",
+                                                        "pincode": ""
+                                                    }
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
             }
         ]
     }

@@ -11,7 +11,7 @@ import FilterDashboard from "./FilterDashboard";
 import ACDashboard from "../../Second_Person/Forntend/ACDashboard";
 import { useAuth } from "../Layout/AuthContext";
 
-const API_BASE = "http://192.168.1.8:8000/api";
+const API_BASE = "http://192.168.1.18:8000/api";
 const API_URL = `${API_BASE}/ac-data/`;
 const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 
@@ -103,10 +103,8 @@ const normalizeFilters = (input = {}) => ({
 });
 
 function Org_Dashboard() {
-    // IMPORTANT: hooks must run inside the component body.
     const { user: currentUser } = useAuth();
 
-    // Restrict hierarchy/filter scope based on the logged-in user.
     const filterAccess = useMemo(() => {
         const role = currentUser?.role;
         const hierarchy = currentUser?.customer_hierarchy_type;
@@ -120,7 +118,6 @@ function Org_Dashboard() {
 
             const lockedValues = {};
 
-            // Admin/engineer can only work inside their assigned top-level scope.
             if (role === "BR_ADMIN" || role === "ENGINEER") {
                 if (hierarchy === "ZONAL" && currentUser?.zone_name) {
                     lockedValues.zone = currentUser.zone_name;
