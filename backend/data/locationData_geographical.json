@@ -30196,16 +30196,7 @@
                                                 "branch_id": "KN-01",
                                                 "branch_name": "Karve Nagar",
                                                 "floors": [],
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-002",
-                                                        "device_name": "AC-002",
-                                                        "status": "OFF",
-                                                        "capacity_ton": null,
-                                                        "installation_date": "",
-                                                        "last_maintenance_date": ""
-                                                    }
-                                                ],
+                                                "sites": [],
                                                 "hierarchy_type": "GEOGRAPHICAL",
                                                 "state_id": "MH",
                                                 "state_name": "Maharashtra",
@@ -30236,16 +30227,7 @@
                                                 "branch_id": "KO-01",
                                                 "branch_name": "Kothrud",
                                                 "floors": [],
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-001",
-                                                        "device_name": "AC-001",
-                                                        "status": "OFF",
-                                                        "capacity_ton": null,
-                                                        "installation_date": "",
-                                                        "last_maintenance_date": ""
-                                                    }
-                                                ],
+                                                "sites": [],
                                                 "hierarchy_type": "GEOGRAPHICAL",
                                                 "state_id": "MH",
                                                 "state_name": "Maharashtra",
@@ -30340,6 +30322,42 @@
                                         "taluka_id": "MH-D01-T01",
                                         "taluka_name": "Pune Taluka",
                                         "customer_id": 10,
+                                        "admin_ids": [],
+                                        "engineer_ids": []
+                                    },
+                                    {
+                                        "branch_id": "SHIPOO",
+                                        "branch_name": "Shivaji Nagar",
+                                        "address": "Jangli Maharaj Road, Shivajinagar, Pune",
+                                        "pincode": "411005",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T01",
+                                        "taluka_name": "Pune Taluka",
+                                        "customer_id": 10,
+                                        "admin_ids": [],
+                                        "engineer_ids": []
+                                    },
+                                    {
+                                        "branch_id": "008752",
+                                        "branch_name": "Katraj",
+                                        "address": "atara Rd, near Bharati Vidhyapeeth, Shridharnagar, Vivek Nagar, Katraj",
+                                        "pincode": "411043",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T01",
+                                        "taluka_name": "Pune Taluka",
+                                        "customer_id": 5,
                                         "admin_ids": [],
                                         "engineer_ids": []
                                     }

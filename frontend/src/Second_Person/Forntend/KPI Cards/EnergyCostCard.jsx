@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
-import "./EnergyCostCard.css";
+// import "./EnergyCostCard.css";
 
 // Illustrative variable tariff for MSEDCL LT-II commercial consumers (FY 2026-27).
 // Configure other states only after confirming the applicable DISCOM and category.
@@ -22,7 +22,7 @@ const numberValue = (value) => {
   return Number.isFinite(number) && number >= 0 ? number : 0;
 };
 
-export default function EnergyCostCard({ stateName, energyKwh = 0 }) {
+function EnergyCostCard({ stateName, energyKwh = 0 }) {
   const tariff = useMemo(() => {
     const key = String(stateName || "").trim().toLowerCase();
     return STATE_TARIFFS[key] || null;
@@ -48,7 +48,7 @@ export default function EnergyCostCard({ stateName, energyKwh = 0 }) {
         <p>Estimated Cost</p>
         <h2>{tariff ? `₹${money(estimatedCost)}` : "Rate unavailable"}</h2>
         <span>{tariff ? `₹${unitRate.toFixed(2)} / kWh` : (stateName ? "Tariff not configured" : "Select a state")}</span>
-        {tariff && (
+        {/* {tariff && (
           <a
             className="energy-cost-kpi__source"
             href={tariff.sourceUrl}
@@ -59,8 +59,10 @@ export default function EnergyCostCard({ stateName, energyKwh = 0 }) {
           >
             {tariff.state} tariff <ExternalLink size={10} />
           </a>
-        )}
+        )} */}
       </div>
     </div>
   );
 }
+
+export default EnergyCostCard;

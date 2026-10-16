@@ -31,12 +31,6 @@ export const HIERARCHY_CONFIG = {
         name: "taluka",
         label: "Taluka",
         field: "taluka_name",
-        childrenKey: "cities",
-      },
-      {
-        name: "city",
-        label: "City",
-        field: "city_name",
         childrenKey: "branches",
       },
       {
@@ -376,10 +370,12 @@ const FilterDashboard = ({
    * Build dropdown options based on the selected
    * parent hierarchy.
    */
+  
   const optionsByLevel = useMemo(() => {
     const result = {};
     let current = filteredTree;
 
+    // Build the normal nested hierarchy first.
     levels.forEach((level, index) => {
       const values = [];
       const seen = new Set();
@@ -403,14 +399,9 @@ const FilterDashboard = ({
       const selectedValue = selected[level.name];
 
       if (!selectedValue || !level.childrenKey) {
-        for (
-          let i = index + 1;
-          i < levels.length;
-          i++
-        ) {
+        for (let i = index + 1; i < levels.length; i++) {
           result[levels[i].name] = [];
         }
-
         return;
       }
 
@@ -423,8 +414,100 @@ const FilterDashboard = ({
       current = match?.[level.childrenKey] || [];
     });
 
+    // Special handling for branches created directly
+    // under a Taluka in the geographical hierarchy.
+    if (hierarchy === "GEOGRAPHICAL") {
+      let nodes = filteredTree;
+      let talukaNode = null;
+
+      const parentLevels = [
+        { name: "country", field: "country_name", key: "states" },
+        { name: "state", field: "state_name", key: "districts" },
+        { name: "district", field: "district_name", key: "talukas" },
+      ];
+
+      for (const parent of parentLevels) {
+        const match = (nodes || []).find(
+          (item) =>
+            String(item?.[parent.field] || "") ===
+            String(selected[parent.name] || "")
+        );
+
+        nodes = match?.[parent.key] || [];
+      }
+
+      talukaNode = (nodes || []).find(
+        (item) =>
+          String(item?.taluka_name || "") ===
+          String(selected.taluka || "")
+      );
+
+      if (talukaNode) {
+        const cities = Array.isArray(talukaNode.cities)
+          ? talukaNode.cities
+          : [];
+
+        const directBranches = Array.isArray(talukaNode.branches)
+          ? talukaNode.branches
+          : [];
+
+        const selectedCity = cities.find(
+          (city) =>
+            String(city?.city_name || "") ===
+            String(selected.city || "")
+        );
+
+        const cityBranches = Array.isArray(selectedCity?.branches)
+          ? selectedCity.branches
+          : [];
+
+        // Without a selected City, show branches directly
+        // under the Taluka. With a City selected, include
+        // its branches as well.
+        const branches = [
+          ...directBranches,
+          ...cityBranches,
+        ];
+
+        const uniqueBranches = [];
+        const seenBranches = new Set();
+
+        branches.forEach((branch) => {
+          const name = String(branch?.branch_name || "").trim();
+
+          if (name && !seenBranches.has(name)) {
+            seenBranches.add(name);
+            uniqueBranches.push(branch);
+          }
+        });
+
+        result.branch = uniqueBranches.map(
+          (branch) => String(branch.branch_name)
+        );
+
+        const selectedBranch = uniqueBranches.find(
+          (branch) =>
+            String(branch?.branch_name || "") ===
+            String(selected.branch || "")
+        );
+
+        result.floor = selectedBranch
+          ? [
+              ...new Set(
+                (selectedBranch.floors || [])
+                  .map((floor) =>
+                    String(floor?.floor_name || "").trim()
+                  )
+                  .filter(Boolean)
+              ),
+            ]
+          : [];
+      }
+    }
+
     return result;
-  }, [filteredTree, levels, selected]);
+  }, [filteredTree, levels, selected, hierarchy]);
+
 
   /*
    * Send the current filter to the parent component.
@@ -566,11 +649,17 @@ const FilterDashboard = ({
         const parent =
           index > 0 ? levels[index - 1] : null;
 
+        const isDirectTalukaBranch =
+          hierarchy === "GEOGRAPHICAL" &&
+          level.name === "branch" &&
+          Boolean(selected.taluka);
+
         const disabled =
           Boolean(locked) ||
           (index === 0
             ? loading
-            : !selected[parent.name]);
+            : !selected[parent.name] &&
+              !isDirectTalukaBranch);
 
         const options = locked
           ? [locked]

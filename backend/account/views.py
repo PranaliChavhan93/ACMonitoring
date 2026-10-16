@@ -11056,40 +11056,197 @@ ZONAL_FIELDS = [
 ]
 
 
+# def resolve_ac_location(ac_id, device_map):
+#     mapping = device_map.get(ac_id, {})
+
+#     if not mapping:
+#         return {
+#             "geographical": {}, "zonal": {}, "site_id": "",
+#             "device_name": "", "location_type": "", "hierarchy_type": "",
+#         }
+
+#     if "geographical" in mapping or "zonal" in mapping:
+#         geo = mapping.get("geographical") or {}
+#         zon = mapping.get("zonal") or {}
+#         hierarchy_type = str(mapping.get("hierarchy_type", "")).upper()
+#         return {
+#             "geographical": geo, "zonal": zon,
+#             "site_id": mapping.get("site_id", ""),
+#             "device_name": mapping.get("device_name", ""),
+#             "location_type": mapping.get("location_type", ""),
+#             "hierarchy_type": hierarchy_type,
+#         }
+
+#     hierarchy_type = str(mapping.get("hierarchy_type", "")).upper()
+#     geo, zon = {}, {}
+#     if hierarchy_type == "GEOGRAPHICAL":
+#         geo = {f: mapping.get(f, "") for f in GEOGRAPHICAL_FIELDS}
+#     elif hierarchy_type == "ZONAL":
+#         zon = {f: mapping.get(f, "") for f in ZONAL_FIELDS}
+
+#     return {
+#         "geographical": geo, "zonal": zon,
+#         "site_id": mapping.get("site_id", ""),
+#         "device_name": mapping.get("device_name", ""),
+#         "location_type": mapping.get("location_type", ""),
+#         "hierarchy_type": hierarchy_type,
+#     }
+
+
+
 def resolve_ac_location(ac_id, device_map):
+    # Prefer the actual database relationships over a stale JSON map.
+    try:
+        device = (
+            ACDevice.objects
+            .select_related(
+                "branch__taluka__district__state",
+                "branch__city__taluka__district__state",
+                "branch__division__region__circle__zone",
+                "site__branch__taluka__district__state",
+                "site__branch__city__taluka__district__state",
+                "site__branch__division__region__circle__zone",
+                "site__floor",
+            )
+            .filter(ac_id=ac_id)
+            .first()
+        )
+
+        if device:
+            branch = device.branch
+            site = device.site
+
+            if branch is None and site is not None:
+                branch = site.branch
+
+            if branch is not None:
+                geo, zon = {}, {}
+                hierarchy_type = ""
+
+                if branch.city_id or branch.taluka_id:
+                    if branch.city_id:
+                        city = branch.city
+                        taluka = city.taluka
+                        city_id = str(city.id)
+                        city_name = city.name
+                    else:
+                        taluka = branch.taluka
+                        city_id = ""
+                        city_name = ""
+
+                    district = taluka.district
+                    state = district.state
+
+                    geo = {
+                        "state_id": str(state.id),
+                        "state_name": state.name,
+                        "district_id": str(district.id),
+                        "district_name": district.name,
+                        "taluka_id": str(taluka.id),
+                        "taluka_name": taluka.name,
+                        "city_id": city_id,
+                        "city_name": city_name,
+                        "branch_id": str(branch.id),
+                        "branch_name": branch.name,
+                        "floor_id": (
+                            str(site.floor_id)
+                            if site and site.floor_id else ""
+                        ),
+                        "floor_name": (
+                            site.floor.name
+                            if site and site.floor_id else ""
+                        ),
+                    }
+                    hierarchy_type = "GEOGRAPHICAL"
+
+                elif branch.division_id:
+                    division = branch.division
+                    region = division.region
+                    circle = region.circle
+                    zone = circle.zone
+
+                    zon = {
+                        "zone_id": str(zone.id),
+                        "zone_name": zone.name,
+                        "circle_id": str(circle.id),
+                        "circle_name": circle.name,
+                        "region_id": str(region.id),
+                        "region_name": region.name,
+                        "division_id": str(division.id),
+                        "division_name": division.name,
+                        "branch_id": str(branch.id),
+                        "branch_name": branch.name,
+                        "floor_id": (
+                            str(site.floor_id)
+                            if site and site.floor_id else ""
+                        ),
+                        "floor_name": (
+                            site.floor.name
+                            if site and site.floor_id else ""
+                        ),
+                    }
+                    hierarchy_type = "ZONAL"
+
+                if hierarchy_type:
+                    return {
+                        "geographical": geo,
+                        "zonal": zon,
+                        "site_id": str(site.id) if site else "",
+                        "device_name": device.device_name or device.ac_id,
+                        "location_type": (
+                            "FLOOR"
+                            if site and site.floor_id
+                            else "BRANCH"
+                        ),
+                        "hierarchy_type": hierarchy_type,
+                    }
+
+    except Exception:
+        # Preserve legacy JSON fallback if DB resolution fails.
+        import logging
+        logging.getLogger(__name__).exception(
+            "Database location resolution failed for AC %s", ac_id
+        )
+
+    # Legacy mapping fallback.
     mapping = device_map.get(ac_id, {})
 
     if not mapping:
         return {
-            "geographical": {}, "zonal": {}, "site_id": "",
-            "device_name": "", "location_type": "", "hierarchy_type": "",
+            "geographical": {},
+            "zonal": {},
+            "site_id": "",
+            "device_name": "",
+            "location_type": "",
+            "hierarchy_type": "",
         }
 
     if "geographical" in mapping or "zonal" in mapping:
         geo = mapping.get("geographical") or {}
         zon = mapping.get("zonal") or {}
-        hierarchy_type = str(mapping.get("hierarchy_type", "")).upper()
-        return {
-            "geographical": geo, "zonal": zon,
-            "site_id": mapping.get("site_id", ""),
-            "device_name": mapping.get("device_name", ""),
-            "location_type": mapping.get("location_type", ""),
-            "hierarchy_type": hierarchy_type,
-        }
+    else:
+        hierarchy_type = str(
+            mapping.get("hierarchy_type", "")
+        ).upper()
 
-    hierarchy_type = str(mapping.get("hierarchy_type", "")).upper()
-    geo, zon = {}, {}
-    if hierarchy_type == "GEOGRAPHICAL":
-        geo = {f: mapping.get(f, "") for f in GEOGRAPHICAL_FIELDS}
-    elif hierarchy_type == "ZONAL":
-        zon = {f: mapping.get(f, "") for f in ZONAL_FIELDS}
+        geo = (
+            {f: mapping.get(f, "") for f in GEOGRAPHICAL_FIELDS}
+            if hierarchy_type == "GEOGRAPHICAL" else {}
+        )
+        zon = (
+            {f: mapping.get(f, "") for f in ZONAL_FIELDS}
+            if hierarchy_type == "ZONAL" else {}
+        )
 
     return {
-        "geographical": geo, "zonal": zon,
+        "geographical": geo,
+        "zonal": zon,
         "site_id": mapping.get("site_id", ""),
         "device_name": mapping.get("device_name", ""),
         "location_type": mapping.get("location_type", ""),
-        "hierarchy_type": hierarchy_type,
+        "hierarchy_type": str(
+            mapping.get("hierarchy_type", "")
+        ).upper(),
     }
 
 

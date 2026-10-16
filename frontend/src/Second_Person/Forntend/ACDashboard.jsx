@@ -22,7 +22,7 @@ import CurrentFluctuationChart from "./CurrentFluctuationChart";
 import ACTable from "./ACTable/ACTable";
 import ACDeviceTable from "./ACDeviceTable";
 import EnergyMap from "./EnergyMap/EnergyMap";
-import EnergyCostCard from "./EnergyCostCard";
+import EnergyCostCard from "./KPI Cards/EnergyCostCard";
 
 import AIAssistantPanel from "./AIAssistantPanel";
 
