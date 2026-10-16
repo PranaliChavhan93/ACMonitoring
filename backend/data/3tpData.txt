@@ -47,3 +47,10 @@ latitude -
 longitude -
 
 
+-----------------------------------------------------------------------------
+
+https://3tp.tapasyatech.in/api/plugins/telemetry/DEVICE/fdf8b310-c3d9-11f1-9fbd-e7ab598bb869/values/timeseries?keys=data&startTs=1791810000000&endTs=1792134307000
+
+with par - 
+accept - fault,fault_type,reason,recommendation,severity
+

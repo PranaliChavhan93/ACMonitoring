@@ -23,7 +23,8 @@ from .views import (
     StateListView, 
     DistrictListView, 
     SiteListView,
-    DeviceCreateView, 
+    DeviceCreateView,
+    ac_faults_from_3tp, 
     
     ai_dashboard_analysis, 
     assign_customer_to_site,
@@ -67,6 +68,8 @@ urlpatterns = [
     path("ac-data/latest/", latest_ac_data),
     path("ac-data/status/", telemetry_status),
     path("ac-data/with-location/", ac_data_with_location),
+    path("ac-faults/", ac_faults_from_3tp),
+
     path("dashboard/summary/", dashboard_summary_view),
     path("dashboard/preferences/", dashboard_preferences),
     path("dashboard/preferences/<uuid:pk>/", dashboard_preference_detail),

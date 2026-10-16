@@ -437,7 +437,8 @@ function Org_Dashboard() {
 
                     <span className="filter-last-updated">
                         <span className="last-updated-dot" />
-                        Last updated: <strong>{lastUpdatedText}</strong>
+                        LIVE
+                        {/* <strong>{lastUpdatedText}</strong> */}
                     </span>
                 </div>
             </div>

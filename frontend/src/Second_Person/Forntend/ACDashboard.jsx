@@ -25,6 +25,7 @@ import EnergyMap from "./EnergyMap/EnergyMap";
 import EnergyCostCard from "./KPI Cards/EnergyCostCard";
 
 import AIAssistantPanel from "./AIAssistantPanel";
+import FaultDetectionPanel from "./FaultDetectionPanel"
 
 import "./dashboard.css";
 import "./dashboard-insight.css";
@@ -151,13 +152,9 @@ function ACDashboard({
     const metrics = useMemo(() => {
         const totalACs = filteredData.length;
         const activeRecords = filteredData.filter(isActive);
-
         const totalEnergy = filteredData.reduce( (sum, item) => sum + getEnergy(item), 0 );
-
         const activeEnergy = activeRecords.reduce( (sum, item) => sum + getEnergy(item), 0 );
-
         const totalPower = filteredData.reduce( (sum, item) => sum + getPower(item), 0 );
-
         const temperatures = filteredData
             .map(getTemperature)
             .filter((value) => value !== 0);
@@ -426,6 +423,17 @@ function ACDashboard({
                         </div>
                     )}
                 </section>
+                
+                <br />
+
+                {selectedLevel === "branch" && (
+                    <section className="dashboard-section">
+                        <FaultDetectionPanel
+                            data={filteredData}
+                            refreshMs={2000}
+                        />
+                    </section>
+                )}
                 
                 <br />
 

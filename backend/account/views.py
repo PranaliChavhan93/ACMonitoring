@@ -448,61 +448,13 @@ def fetch_3tp_customers(request):
         page += 1
     return out
 
-# def fetch_3tp_sites(request=None):
-#     """
-#     Fetch sites/assets directly from 3TP.
-
-#     3TP is the source of truth for site inventory.
-#     """
-
-#     sites = []
-
-#     page = 0
-#     total_pages = 1
-
-#     while page < total_pages:
-
-#         response, data = _tpt_request(
-#             "GET",
-#             "site",
-#             payload=None,
-#         )
-
-#         if response is None:
-#             raise ThreeTPError(
-#                 "Unable to fetch sites from 3TP."
-#             )
-
-#         if not isinstance(data, dict):
-#             raise ThreeTPError(
-#                 "Invalid site response received from 3TP.",
-#                 payload=data,
-#             )
-
-#         rows = data.get("data", [])
-
-#         if isinstance(rows, list):
-#             sites.extend(rows)
-
-#         total_pages = data.get(
-#             "totalPages",
-#             1
-#         )
-
-#         page += 1
-
-#     return sites
-
 
 def fetch_3tp_sites(request=None):
-
     sites = []
-
     page = 0
     total_pages = 1
 
     while page < total_pages:
-
         response, data = _tpt_request(
             "GET",
             "site",
@@ -515,7 +467,6 @@ def fetch_3tp_sites(request=None):
         )
 
         if not isinstance(data, dict):
-
             raise ThreeTPError(
                 "Invalid sites response from 3TP.",
                 payload=data,
@@ -538,10 +489,7 @@ def fetch_3tp_sites(request=None):
 
     return sites
 
-# =====================================================================
 # CREATE BRANCH / FLOOR FROM FULL HIERARCHY
-# =====================================================================
-
 @api_view(["POST"])
 def create_branch_or_floor(request):
     user = request.user
@@ -626,25 +574,6 @@ def create_branch_or_floor(request):
             status=400,
         )
 
-    return JsonResponse(
-        {
-            "success": True,
-            "message": (
-                "Branch created successfully."
-                if location_type == "BRANCH"
-                else "Floor created successfully."
-            ),
-            "hierarchy_type": hierarchy,
-            "location_type": location_type,
-            "data": {
-                "customer_id": str(customer.pk),
-                "customer_name": customer.company,
-                **path,
-            },
-        },
-        status=201,
-    )
-
     # CUSTOMER HIERARCHY VALIDATION
     if user.role == Role.CUSTOMER:
 
@@ -677,10 +606,26 @@ def create_branch_or_floor(request):
                 },
                 status=403,
             )
+        return JsonResponse(
+        {
+            "success": True,
+            "message": (
+                "Branch created successfully."
+                if location_type == "BRANCH"
+                else "Floor created successfully."
+            ),
+            "hierarchy_type": hierarchy,
+            "location_type": location_type,
+            "data": {
+                "customer_id": str(customer.pk),
+                "customer_name": customer.company,
+                **path,
+            },
+        },
+        status=201,
+    )
 
-    # ---------------------------------------------------------------
     # LOAD TREE
-    # ---------------------------------------------------------------
 
     location_file = (
         ZONAL_LOCATION_FILE
@@ -15227,3 +15172,90 @@ def assign_device_to_branch(request):
         return JsonResponse({"status": "error", "message": str(exc)}, status=500)
 
 
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def ac_faults_from_3tp(request):
+    """Return already-processed fault telemetry from 3TP for an authorized AC."""
+    from urllib.parse import urlencode
+    from .models import ACDevice
+
+    device_id = str(request.query_params.get("device_id", "")).strip()
+    if not device_id:
+        return Response({"status": "error", "message": "device_id is required."}, status=400)
+
+    # Only allow querying a device mapped in this application and visible to this user.
+    device = ACDevice.objects.filter(tpt_device_id=device_id).first()
+    if not device:
+        return Response({"status": "error", "message": "No local AC is mapped to this 3TP device ID."}, status=404)
+    visible = scope_ac_records([{"ac_id": device.ac_id}], request.user)
+    if not visible:
+        return Response({"status": "error", "message": "You do not have access to this AC."}, status=403)
+
+    now_ms = int(time.time() * 1000)
+    try:
+        start_ms = int(request.query_params.get("startTs", now_ms - 7 * 24 * 60 * 60 * 1000))
+        end_ms = int(request.query_params.get("endTs", now_ms))
+    except (TypeError, ValueError):
+        return Response({"status": "error", "message": "startTs and endTs must be Unix milliseconds."}, status=400)
+    if start_ms > end_ms:
+        return Response({"status": "error", "message": "startTs must be <= endTs."}, status=400)
+
+    keys = ["fault", "fault_type", "reason", "recommendation", "severity"]
+    cfg = telemetry._config()
+    base_url = cfg["base_url"]
+    url = (f"{base_url}/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries?"
+           + urlencode({"keys": ",".join(keys), "startTs": start_ms, "endTs": end_ms,
+                        "limit": 1000, "agg": "NONE", "orderBy": "DESC"}))
+    try:
+        if not telemetry._token.get("value"):
+            telemetry._login(cfg)
+        try:
+            raw = telemetry._request(url, headers={"X-Authorization": f"Bearer {telemetry._token['value']}"})
+        except Exception as exc:
+            import urllib.error
+            if isinstance(exc, urllib.error.HTTPError) and exc.code == 401:
+                telemetry._login(cfg)
+                raw = telemetry._request(url, headers={"X-Authorization": f"Bearer {telemetry._token['value']}"})
+            else:
+                raise
+    except Exception as exc:
+        log = __import__("logging").getLogger("telemetry")
+        log.exception("Failed to fetch processed AC faults from 3TP")
+        return Response({"status": "error", "message": "Could not fetch fault telemetry from 3TP.", "details": str(exc)}, status=502)
+
+    # ThingsBoard returns one timestamped array per telemetry key. Merge values by timestamp.
+    by_ts = {}
+    if isinstance(raw, dict):
+        for key in keys:
+            values = raw.get(key, [])
+            if not isinstance(values, list):
+                continue
+            for item in values:
+                if not isinstance(item, dict) or item.get("ts") is None:
+                    continue
+                try:
+                    ts = int(item["ts"])
+                except (TypeError, ValueError):
+                    continue
+                row = by_ts.setdefault(ts, {"timestamp": ts})
+                value = item.get("value")
+                if isinstance(value, str):
+                    stripped = value.strip()
+                    if stripped[:1] in ("{", "["):
+                        try:
+                            value = json.loads(stripped)
+                        except ValueError:
+                            pass
+                row[key] = value
+    # Sort newest first and return only the latest processed record.
+    results = sorted(
+        by_ts.values(),
+        key=lambda row: row["timestamp"],
+        reverse=True,
+    )
+
+    results = results[:1]
+    
+    return Response({"status": "success", "device_id": device_id, "ac_id": device.ac_id,
+                     "count": len(results), "data": results})
