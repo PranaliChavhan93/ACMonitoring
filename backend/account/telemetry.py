@@ -8,10 +8,12 @@ import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
+from .telemetry_aggregate import ingest_payload
 
 from django.conf import settings
 
 log = logging.getLogger("telemetry")
+
 
 DATA_DIR = os.path.join(settings.BASE_DIR, "data")
 DEVICES_FILE = os.path.join(DATA_DIR, "3tp_devices.json")
@@ -23,6 +25,8 @@ STALE_SEC = int(os.environ.get("TPT_STALE_SEC", "120"))
 TIMEOUT = float(os.environ.get("TPT_TIMEOUT", "8"))
 
 IST = timezone(timedelta(hours=5, minutes=30))
+
+STALE_SEC = 60
 
 class TelemetryError(Exception):
     pass
@@ -194,9 +198,21 @@ def _status(record_ts, relay):
 
 
 def to_record(device, ts_ms, p):
-    """3TP payload -> the record shape the dashboards already consume."""
+    """Convert 3TP telemetry and force relay OFF when telemetry is stale."""
     ts = datetime.fromtimestamp(ts_ms / 1000, IST)
     ac_id = device["ac_id"]
+
+    # The timestamp is the time of the latest reading reported by 3TP.
+    age_seconds = time.time() - ts.timestamp()
+    is_stale = age_seconds >= STALE_SEC
+
+    # Preserve the actual relay value while telemetry is fresh.
+    actual_relay = int(_num(p.get("relay"), 0))
+
+    # Treat a device as OFF after 60 seconds without fresh telemetry.
+    relay = 0 if is_stale else actual_relay
+    status = "OFFLINE" if is_stale else ("ON" if relay == 1 else "OFF")
+
     return {
         "ac_id": ac_id,
         "site_id": ac_id,
@@ -212,53 +228,25 @@ def to_record(device, ts_ms, p):
         "temperature": _num(p.get("indoor_temperature")),
         "humidity": _num(p.get("indoor_humidity")),
         "alarm_status": int(_num(p.get("alarm_status"), 0)),
-        "relay": int(_num(p.get("relay"), 0)),
-        "status": _status(ts.timestamp(), int(_num(p.get("relay"), 0)) == 1),
+        "relay": relay,
+        "status": status,
         "timestamp": ts.isoformat(timespec="seconds"),
         "source": "3tp",
     }
 
 
-# ───────────────────────── fetching ─────────────────────────
-# def _fetch_device(cfg, dev, start_ms, end_ms):
-#     resp = _get_history(cfg, dev["device_id"], start_ms, end_ms)
-#     ts, payload = _latest_reading(resp)
-#     if payload is None:
-#         return None
-#     return to_record(dev, ts, payload)
-
-
 def _fetch_device(cfg, dev, start_ms, end_ms):
-    print("\n========== 3TP DEVICE DEBUG ==========")
-    print("AC ID:", dev.get("ac_id"))
-    print("DEVICE ID:", dev.get("device_id"))
-
     resp = _get_history(
         cfg,
         dev["device_id"],
         start_ms,
         end_ms
     )
-
-    print("3TP RESPONSE TYPE:", type(resp))
-    print("3TP RESPONSE KEYS:",
-          resp.keys() if isinstance(resp, dict) else None)
-
     ts, payload = _latest_reading(resp)
-
-    print("LATEST TS:", ts)
-    print("LATEST PAYLOAD:", payload)
-
     if payload is None:
-        print("❌ PAYLOAD IS NONE")
         return None
 
     record = to_record(dev, ts, payload)
-
-    print("✅ FINAL RECORD:")
-    print(record)
-    print("======================================\n")
-
     return record
 
 def _refresh():
@@ -275,7 +263,52 @@ def _refresh():
             try:
                 rec = fut.result()
                 if rec:
+                    # Preserve the existing live dashboard cache.
                     _live[rec["ac_id"]] = rec
+
+                    # Store the fetched telemetry in the local 60-second aggregate table.
+                    try:
+                        age_seconds = (
+                            time.time()
+                            - datetime.fromisoformat(
+                                rec["timestamp"]
+                            ).timestamp()
+                        )
+
+                        if age_seconds < STALE_SEC:
+                            ingest_payload({
+                                "ac_id": rec["ac_id"],
+                                "ts": rec["timestamp"],
+                                "voltage": rec["voltage"],
+                                "current": rec["current"],
+                                "power": rec["active_power"],
+                                "energy": rec["energy_consumption"],
+                                "frequency": rec["frequency"],
+                                "power_factor": rec["power_factor"],
+                                "indoor_temperature": rec["temperature"],
+                                "indoor_humidity": rec["humidity"],
+                                "alarm_status": rec["alarm_status"],
+                                "relay": rec["relay"],
+                            })
+                        ingest_payload({
+                            "ac_id": rec["ac_id"],
+                            "ts": rec["timestamp"],
+                            "voltage": rec["voltage"],
+                            "current": rec["current"],
+                            "power": rec["active_power"],
+                            "energy": rec["energy_consumption"],
+                            "frequency": rec["frequency"],
+                            "power_factor": rec["power_factor"],
+                            "indoor_temperature": rec["temperature"],
+                            "indoor_humidity": rec["humidity"],
+                            "alarm_status": rec["alarm_status"],
+                            "relay": rec["relay"],
+                        })
+                    except Exception:
+                        log.exception(
+                            "Failed to aggregate telemetry for device %s",
+                            rec.get("ac_id"),
+                        )
             except Exception as e:
                 errors.append(f"{dev.get('ac_id') or dev.get('device_id')}: {e}")
 
@@ -287,32 +320,28 @@ def _refresh():
         _state["last_ok"] = time.time()
         _state["last_error"] = None
 
-
 def get_records():
     with _lock:
-
         if not _live:
             raise TelemetryError(
                 _state["last_error"] or
                 "No telemetry data available yet"
             )
-
         out = []
+        now = time.time()
 
         for rec in _live.values():
             r = dict(rec)
-
-            if r["status"] != "OFFLINE":
-                age = (
-                    time.time()
-                    - datetime.fromisoformat(
-                        r["timestamp"]
-                    ).timestamp()
-                )
-
-                if age > STALE_SEC:
-                    r["status"] = "OFFLINE"
-
+            try:
+                last_timestamp = datetime.fromisoformat(
+                    r["timestamp"]
+                ).timestamp()
+                age_seconds = now - last_timestamp
+            except (KeyError, TypeError, ValueError):
+                age_seconds = STALE_SEC
+            if age_seconds >= STALE_SEC:
+                r["relay"] = 0
+                r["status"] = "OFFLINE"
             out.append(r)
 
         return out

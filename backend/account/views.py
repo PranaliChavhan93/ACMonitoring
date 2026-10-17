@@ -115,6 +115,7 @@ from django.db.models import Q
 
 from . import ownership
 from . import telemetry
+from .telemetry_aggregate import get_telemetry_records
 # from backend.account import serializers
 
 class ReadOnlyOrAuthenticated(BasePermission):
@@ -3646,7 +3647,7 @@ def attach_location(record, device_map):
 @api_view(["GET"])
 def ac_data_with_location(request):
     try:
-        data = telemetry.get_records()
+        data = get_telemetry_records()
         data = scope_ac_records(data, request.user)
         data = filter_by_location(data, request)
 
@@ -3667,7 +3668,7 @@ def ac_data_with_location(request):
 @permission_classes([IsAuthenticated])
 def ac_data(request):
     try:
-        data = telemetry.get_records()
+        data = get_telemetry_records()
         data = scope_ac_records(data, request.user)
         data = filter_by_location(data, request)
 
@@ -3693,7 +3694,7 @@ def telemetry_status(request):
 @api_view(["GET"])
 def latest_ac_data(request):
     try:
-        data = scope_ac_records(telemetry.get_records(), request.user)
+        data = scope_ac_records(get_telemetry_records(), request.user)
         if not data:
             return JsonResponse({"status": "success", "data": None})
         return JsonResponse({"status": "success", "data": data[-1]})
@@ -11323,7 +11324,7 @@ def attach_location(record, device_map):
 @api_view(["GET"])
 def ac_data_with_location(request):
     try:
-        data = telemetry.get_records()
+        data = get_telemetry_records()
         data = scope_ac_records(data, request.user)
         data = filter_by_location(data, request)
 
@@ -11344,7 +11345,7 @@ def ac_data_with_location(request):
 @permission_classes([IsAuthenticated])
 def ac_data(request):
     try:
-        data = telemetry.get_records()
+        data = get_telemetry_records()
         data = scope_ac_records(data, request.user)
         data = filter_by_location(data, request)
 
@@ -11370,7 +11371,7 @@ def telemetry_status(request):
 @api_view(["GET"])
 def latest_ac_data(request):
     try:
-        data = scope_ac_records(telemetry.get_records(), request.user)
+        data = scope_ac_records(get_telemetry_records(), request.user)
         if not data:
             return JsonResponse({"status": "success", "data": None})
         return JsonResponse({"status": "success", "data": data[-1]})
@@ -15166,8 +15167,6 @@ def assign_device_to_branch(request):
         }, status=200)
     except Exception as exc:
         return JsonResponse({"status": "error", "message": str(exc)}, status=500)
-
-
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

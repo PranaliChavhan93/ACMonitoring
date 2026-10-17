@@ -689,10 +689,7 @@ class CustomerSiteMapping(models.Model):
     def __str__(self):
         return f"{self.customer.company} -> {self.site.name}"
 
-
-# ============================================================
-# SITE ↔ DEVICE MAPPING
-# ============================================================
+# SITE to DEVICE MAPPING
 class SiteDeviceMapping(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     site = models.ForeignKey(Site, on_delete=models.CASCADE, related_name="device_mappings")
@@ -752,3 +749,70 @@ class DashboardPreference(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.name}"
+
+
+class TelemetryAggregate(models.Model):
+    """One row per AC per time bucket; raw telemetry remains in ThingsBoard.
+
+    The active minute bucket is updated as new readings arrive. Historical
+    buckets remain available for local chart/AI queries.
+    """
+    device_id = models.CharField(max_length=100, db_index=True)
+    bucket_start = models.DateTimeField(db_index=True)
+    interval_seconds = models.PositiveIntegerField(default=60)
+    sample_count = models.PositiveIntegerField(default=0)
+    first_timestamp = models.DateTimeField(null=True, blank=True)
+    last_timestamp = models.DateTimeField(db_index=True)
+
+    # Running sums are retained so averages can be updated incrementally.
+    sum_voltage = models.FloatField(default=0)
+    sum_current = models.FloatField(default=0)
+    sum_power = models.FloatField(default=0)
+    sum_temperature = models.FloatField(default=0)
+    sum_humidity = models.FloatField(default=0)
+
+    avg_voltage = models.FloatField(null=True, blank=True)
+    min_voltage = models.FloatField(null=True, blank=True)
+    max_voltage = models.FloatField(null=True, blank=True)
+    avg_current = models.FloatField(null=True, blank=True)
+    avg_power = models.FloatField(null=True, blank=True)
+    min_power = models.FloatField(null=True, blank=True)
+    max_power = models.FloatField(null=True, blank=True)
+    avg_temperature = models.FloatField(null=True, blank=True)
+    min_temperature = models.FloatField(null=True, blank=True)
+    max_temperature = models.FloatField(null=True, blank=True)
+    avg_humidity = models.FloatField(null=True, blank=True)
+    min_humidity = models.FloatField(null=True, blank=True)
+    max_humidity = models.FloatField(null=True, blank=True)
+
+    # Latest values in the bucket support live cards without a second table.
+    latest_voltage = models.FloatField(null=True, blank=True)
+    latest_current = models.FloatField(null=True, blank=True)
+    latest_power = models.FloatField(null=True, blank=True)
+    latest_energy_counter = models.FloatField(null=True, blank=True)
+    energy_delta = models.FloatField(default=0)
+    latest_frequency = models.FloatField(null=True, blank=True)
+    latest_power_factor = models.FloatField(null=True, blank=True)
+    latest_temperature = models.FloatField(null=True, blank=True)
+    latest_humidity = models.FloatField(null=True, blank=True)
+    latest_alarm_status = models.IntegerField(default=0)
+    latest_relay = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "telemetry_aggregate"
+        ordering = ["-bucket_start", "device_id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["device_id", "bucket_start", "interval_seconds"],
+                name="uniq_telemetry_aggregate_bucket",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["interval_seconds", "bucket_start"], name="telemetry_bucket_idx"),
+            models.Index(fields=["device_id", "last_timestamp"], name="telemetry_device_ts_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.device_id} @ {self.bucket_start.isoformat()}"

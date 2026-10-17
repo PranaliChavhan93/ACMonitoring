@@ -216,3 +216,10 @@ TPT_LOGIN_PATH = os.getenv(
     "TPT_LOGIN_PATH",
     "/api/auth/login",
 )
+
+
+# Telemetry aggregate storage. Keep "polling" until the push endpoint is tested.
+TELEMETRY_STORAGE_MODE = os.environ.get("TELEMETRY_STORAGE_MODE", "polling")
+TELEMETRY_INGEST_TOKEN = os.environ.get("TELEMETRY_INGEST_TOKEN", "")
+TELEMETRY_INGEST_MAX_BATCH = int(os.environ.get("TELEMETRY_INGEST_MAX_BATCH", "500"))
+TELEMETRY_STALE_SECONDS = int(os.environ.get("TELEMETRY_STALE_SECONDS", "120"))

@@ -26,6 +26,11 @@ class AccountsConfig(AppConfig):
             if "--noreload" not in argv and os.environ.get("RUN_MAIN") != "true":
                 return
 
+        from django.conf import settings
+        if getattr(settings, "TELEMETRY_STORAGE_MODE", "polling").lower() == "aggregate":
+            print("[Telemetry] database aggregate mode enabled; old cloud polling worker is disabled")
+            return
+
         try:
             from . import telemetry
             telemetry.start()

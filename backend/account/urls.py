@@ -1,4 +1,5 @@
 from django.urls import path
+from .telemetry_aggregate_views import save_production_type, telemetry_aggregates
 
 from .hierarchy_site_views import create_hierarchy_site, create_hierarchy_branch
 from .cloud_views import CloudCustomerListView, CloudUserListView
@@ -61,6 +62,8 @@ from .views import (
 )
 
 urlpatterns = [
+    path("save_production_type/", save_production_type),
+    path("telemetry-aggregates/", telemetry_aggregates),
     path("auth/login/", login_view),
     path("auth/logout/", logout_view),
 
@@ -82,7 +85,6 @@ urlpatterns = [
     path("devices/create/", DeviceCreateView.as_view()),
     path("devices/assign/customer/", assign_device_to_customer),
     path("devices/assign/branch/", assign_device_to_branch),
-
 
     path("auth/me/", me_view),
     path("organizations/", OrganizationListView.as_view()),
