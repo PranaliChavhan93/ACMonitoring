@@ -115,18 +115,19 @@ urlpatterns = [
     path("locations/create/", create_branch_or_floor),
     path("hierarchy-branch/create/", create_hierarchy_branch),
 
-    # Legacy Site endpoints retained temporarily for existing integrations/data.
-    # Remove after all backend consumers are migrated off Site.
     path("sites/<uuid:pk>/assignment/", site_assignment),
     path("sites/", SiteListView.as_view()),
     path("sites/create/", create_site),
+    path("pincode/<str:pincode>/", pincode_lookup),
+
     path("hierarchy-site/create/", create_hierarchy_site),
     path("devices/assign/site/", assign_device_to_site),
+
     path("customers/assign/site/", assign_customer_to_site),
     path("cloud/sites/", three_tp_sites),
     path("cloud/customers/", CloudCustomerListView.as_view()),
     path("cloud/users/", CloudUserListView.as_view()),
-    path("pincode/<str:pincode>/", pincode_lookup),
+    
     path("ai-dashboard-analysis/", ai_dashboard_analysis),
     path("ai/analyze/", ai_dashboard_analysis),
 ]
