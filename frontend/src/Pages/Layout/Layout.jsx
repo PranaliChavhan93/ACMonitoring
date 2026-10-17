@@ -67,7 +67,7 @@ function Layout({ children }) {
             <div className="welcome-text">
               <p>Welcome,</p>
               <h4>{displayName}</h4>
-              <h6>{secondaryName}</h6>
+              {/* <h6>{secondaryName}</h6> */}
               {/* {secondaryName && (
                 <span className="profile-sub">{secondaryName}</span>
               )} */}

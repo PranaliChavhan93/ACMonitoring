@@ -1543,6 +1543,7 @@ const CREATE_DEVICE_URL    = `${API_BASE}/devices/create/`;
 const ASSIGN_CUSTOMER_URL  = `${API_BASE}/devices/assign/customer/`;
 const ASSIGN_SITE_URL      = `${API_BASE}/devices/assign/site/`;
 const RELAY_CONTROL_URL    = `${API_BASE}/devices/relay/`;
+const TELEMETRY_URL         = `${API_BASE}/ac-data/`;
 const CUSTOMERS_URL        = `${API_BASE}/customers/`;
 const CLOUD_CUSTOMERS_URL  = `${API_BASE}/cloud/customers/`;
 const SITES_URL            = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
@@ -1584,6 +1585,57 @@ const normalizeList = (response) =>
     : Array.isArray(response?.results)
     ? response.results
     : [];
+
+// Telemetry can arrive as a JSON string inside the ThingsBoard `value` field.
+const parseTelemetryValue = (record) => {
+  let value = record?.value ?? record?.telemetry ?? record?.data ?? record;
+  if (typeof value === "string") {
+    try { value = JSON.parse(value); } catch { return null; }
+  }
+  return value && typeof value === "object" ? value : null;
+};
+
+const asRelayBoolean = (value) => {
+  if (value === true || value === 1 || value === "1") return true;
+  if (value === false || value === 0 || value === "0") return false;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["on", "true", "active", "high"].includes(normalized)) return true;
+    if (["off", "false", "inactive", "low"].includes(normalized)) return false;
+  }
+  return null;
+};
+
+const getRelayValueFromDevice = (device) => {
+  const candidates = [
+    device?.relay_state, device?.relayState, device?.relay,
+    device?.telemetry?.relay, device?.telemetry?.relay_state,
+    device?.latest_telemetry?.relay, device?.latest_telemetry?.relay_state,
+  ];
+  for (const candidate of candidates) {
+    const parsed = asRelayBoolean(candidate);
+    if (parsed !== null) return parsed;
+  }
+  for (const source of [device?.value, device?.data]) {
+    const parsedSource = parseTelemetryValue({ value: source });
+    if (parsedSource) {
+      const parsed = asRelayBoolean(parsedSource.relay ?? parsedSource.relay_state);
+      if (parsed !== null) return parsed;
+    }
+  }
+  return null;
+};
+
+const collectTelemetryRecords = (payload) => {
+  if (Array.isArray(payload)) return payload;
+  if (!payload || typeof payload !== "object") return [];
+  for (const key of ["data", "results", "records", "telemetry", "items"]) {
+    if (Array.isArray(payload[key])) return payload[key];
+  }
+  if (payload.value !== undefined || payload.relay !== undefined) return [payload];
+  return [];
+};
+
 
 const customerLabel = (customer) =>
   customer
@@ -1661,21 +1713,60 @@ function ACCreation() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(DEVICES_URL, {
-        method: "GET",
-        headers: authHeaders(),
-        cache: "no-store",
-      });
+      const [devicesResponse, telemetryResponse] = await Promise.all([
+        fetch(DEVICES_URL, {
+          method: "GET",
+          headers: authHeaders(),
+          cache: "no-store",
+        }),
+        fetch(TELEMETRY_URL, {
+          method: "GET",
+          headers: authHeaders(),
+          cache: "no-store",
+        }).catch(() => null),
+      ]);
 
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
+      const deviceResult = await devicesResponse.json().catch(() => ({}));
+      if (!devicesResponse.ok) {
         throw new Error(
-          result?.message || result?.detail || `HTTP ${response.status}`
+          deviceResult?.message || deviceResult?.detail || `HTTP ${devicesResponse.status}`
         );
       }
 
-      setDevices(normalizeList(result));
+      // The devices endpoint's status is the stored UI status, not necessarily
+      // the physical relay state. Read relay from live telemetry when available.
+      let telemetryRecords = [];
+      if (telemetryResponse?.ok) {
+        const telemetryPayload = await telemetryResponse.json().catch(() => ({}));
+        telemetryRecords = collectTelemetryRecords(telemetryPayload).map((record) => {
+          const value = parseTelemetryValue(record);
+          return { record, value };
+        }).filter((item) => item.value);
+      }
+
+      const telemetryByAcId = new Map();
+      const telemetryByDeviceId = new Map();
+      telemetryRecords.forEach(({ record, value }) => {
+        const acId = value.ac_id ?? record?.ac_id;
+        const deviceId = value.tpt_device_id ?? value.device_id ?? record?.device_id;
+        const relay = asRelayBoolean(value.relay ?? value.relay_state ?? value.relayState);
+        if (relay === null) return;
+        if (acId != null) telemetryByAcId.set(String(acId), relay);
+        if (deviceId != null) telemetryByDeviceId.set(String(deviceId), relay);
+      });
+
+      const normalizedDevices = normalizeList(deviceResult).map((device) => {
+        const directRelay = getRelayValueFromDevice(device);
+        const telemetryRelay = telemetryByAcId.get(String(device.ac_id)) ??
+          telemetryByDeviceId.get(String(device.tpt_device_id ?? device.id));
+        return {
+          ...device,
+          // null means telemetry did not establish the real relay state.
+          relay_state: directRelay !== null ? directRelay :
+            telemetryRelay !== undefined ? telemetryRelay : null,
+        };
+      });
+      setDevices(normalizedDevices);
     } catch (err) {
       setError(err.message || "Unable to load AC devices.");
     } finally {
@@ -2148,12 +2239,21 @@ function ACCreation() {
   const handleRelayControl = async (device, turnOn) => {
     const key = device.id || device.ac_id;
     const deviceId = device.tpt_device_id;
+    const actualRelayState = getRelayValueFromDevice(device) ?? device.relay_state;
 
-    if (!deviceId) {
+    if (actualRelayState === null || actualRelayState === undefined) {
       setRelayErrors((prev) => ({
         ...prev,
-        [key]: "3TP device ID is missing.",
+        [key]: "Relay state is unknown. Refresh telemetry before controlling this device.",
       }));
+      return;
+    }
+    if (actualRelayState === turnOn) {
+      setRelayErrors((prev) => ({ ...prev, [key]: "" }));
+      return;
+    }
+    if (!deviceId) {
+      setRelayErrors((prev) => ({ ...prev, [key]: "3TP device ID is missing." }));
       return;
     }
 
@@ -2170,17 +2270,15 @@ function ACCreation() {
           params: turnOn ? 1 : 0,
         }),
       });
-
       const result = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        throw new Error(
-          result.message || result.detail || `HTTP ${response.status}`
-        );
+        throw new Error(result.message || result.detail || `HTTP ${response.status}`);
       }
 
+      // RPC acceptance is not proof the physical relay changed. Refresh from
+      // telemetry; the switch only reflects relay_state from telemetry.
       await fetchDevices();
-      showToast(`Relay ${turnOn ? "ON" : "OFF"} command sent for ${device.ac_id}.`, "success");
+      showToast(`Relay ${turnOn ? "ON" : "OFF"} command sent. Waiting for device telemetry to confirm.`, "success");
     } catch (err) {
       setRelayErrors((prev) => ({
         ...prev,
@@ -2544,26 +2642,31 @@ function ACCreation() {
                           </div>
                         </td>
 
-                        <td>                                                            {/* Relay button */}
-                          <label className="relay-switch">
-                            <input
-                              type="checkbox"
-                              checked={device.status === "ON"}
-                              disabled={!!relayLoading[key]}
-                              onChange={(event) =>
-                                handleRelayControl(
-                                  device,
-                                  event.target.checked
-                                )
-                              }
-                            />
-                            <span className="relay-slider" />
-                          </label>
-
+                        <td>
+                          <div className="relay-control">
+                            <label className="relay-switch" title={
+                              device.relay_state === null || device.relay_state === undefined
+                                ? "Relay state unavailable from telemetry"
+                                : `Relay is ${device.relay_state ? "ON" : "OFF"}`
+                            }>
+                              <input
+                                type="checkbox"
+                                checked={device.relay_state === true}
+                                disabled={!!relayLoading[key] || device.relay_state === null || device.relay_state === undefined}
+                                onChange={(event) => handleRelayControl(device, event.target.checked)}
+                              />
+                              <span className="relay-slider" />
+                            </label>
+                            <span className={`relay-status ${device.relay_state === true ? "on" : "off"}`}>
+                              {relayLoading[key]
+                                ? "Sending..."
+                                : device.relay_state === null || device.relay_state === undefined
+                                ? "Unknown"
+                                : device.relay_state ? "ON" : "OFF"}
+                            </span>
+                          </div>
                           {relayErrors[key] && (
-                            <div className="relay-error">
-                              {relayErrors[key]}
-                            </div>
+                            <div className="relay-error">{relayErrors[key]}</div>
                           )}
                         </td>
                       </tr>

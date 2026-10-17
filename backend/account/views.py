@@ -14941,7 +14941,6 @@ Requirements:
         )
 
 
-
 @api_view(["POST"])
 def control_device_relay(request):
     device_id = request.data.get("device_id")
@@ -15009,10 +15008,7 @@ def control_device_relay(request):
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
-
-# ============================================================
 # DIRECT DEVICE -> BRANCH ASSIGNMENT (SITE-FREE WORKFLOW)
-# ============================================================
 @csrf_exempt
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
