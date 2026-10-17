@@ -1,105 +1,4 @@
-// import React from "react";
-// import {
-//   ResponsiveContainer,
-//   LineChart,
-//   Line,
-//   CartesianGrid,
-//   XAxis,
-//   YAxis,
-//   Tooltip,
-//   Legend,
-// } from "recharts";
-
-// function EnergyConsumptionChart({ data = [] }) {
-//   const chartData =
-//     data.length > 0
-//       ? data.map((item, index) => ({
-//           name: item.timestamp?.slice(11, 16) || item.date || `P${index + 1}`,
-//           currentMonth: Number( item.energy_consumption 
-//             ?? item.energy 
-//             ?? item.kwh 
-//             ?? 0 ),
-//           previousMonth: Number( item.previous_energy 
-//             ?? item.previous_month_energy 
-//             ?? 0 ),
-//         }))
-//       : [
-//           // { name: "1 Sep", currentMonth: 28, previousMonth: 24 },
-//           // { name: "3 Sep", currentMonth: 35, previousMonth: 28 },
-//           // { name: "5 Sep", currentMonth: 42, previousMonth: 31 },
-//           // { name: "7 Sep", currentMonth: 55, previousMonth: 36 },
-//           // { name: "9 Sep", currentMonth: 61, previousMonth: 42 },
-//           // { name: "11 Sep", currentMonth: 67, previousMonth: 44 },
-//           // { name: "13 Sep", currentMonth: 74, previousMonth: 48 },
-//           // { name: "15 Sep", currentMonth: 68, previousMonth: 46 },
-//         ];
-
-//   return (
-//     <div className="chart-box">
-//       <div className="chart-header">
-//         <h3>▥ Energy Consumption Trend</h3>
-
-//         {/* <select className="chart-select">
-//           <option>Daily</option>
-//           <option>Weekly</option>
-//           <option>Monthly</option>
-//         </select> */}
-//       </div>
-
-//       <ResponsiveContainer width="100%" height={250}>
-//         <LineChart data={chartData}>
-//           <CartesianGrid
-//             strokeDasharray="3 3"
-//             stroke="#e5e7eb"
-//           />
-
-//           <XAxis
-//             dataKey="name"
-//             tick={{ fontSize: 11 }}
-//           />
-
-//           <YAxis
-//             tick={{ fontSize: 11 }}
-//             label={{
-//               value: "Energy (kWh)",
-//               angle: -90,
-//               position: "insideLeft",
-//               fontSize: 11,
-//             }}
-//           />
-
-//           <Tooltip />
-
-//           <Legend />
-
-//           <Line
-//             type="monotone"
-//             dataKey="currentMonth"
-//             name="This Month"
-//             stroke="#3182BD"
-//             strokeWidth={3}
-//             dot={{ r: 3 }}
-//           />
-
-//           <Line
-//             type="monotone"
-//             dataKey="previousMonth"
-//             name="Previous Month"
-//             stroke="#94a3b8"
-//             strokeWidth={2}
-//             dot={{ r: 2 }}
-//           />
-//         </LineChart>
-//       </ResponsiveContainer>
-//     </div>
-//   );
-// }
-
-// export default EnergyConsumptionChart;
-
-
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -111,12 +10,18 @@ import {
   Legend,
 } from "recharts";
 
+const API_URL = "http://localhost:8000/api/telemetry-aggregates/";
+
+const TB_HISTORY_URL = "http://localhost:8000/api/thingsboard/history/";
+
+const STALE_REFRESH_MS = 60000;
+const FALLBACK_REFRESH_MS = 5 * 60 * 1000; // don’t hammer ThingsBoard
+const PRIMARY_WINDOW_MS = 31 * 24 * 60 * 60 * 1000; // match backend cap
+
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
-
-const pad2 = (n) => String(n).padStart(2, "0");
 
 const GRANULARITY_OPTIONS = [
   { value: "daily", label: "Daily" },
@@ -124,27 +29,172 @@ const GRANULARITY_OPTIONS = [
   { value: "monthly", label: "Monthly" },
 ];
 
-/** Fallback data used when no `data` prop is supplied. */
-const FALLBACK_DATA = [
-  { timestamp: "2025-09-01T08:00:00", energy_consumption: 28, previous_energy: 24 },
-  { timestamp: "2025-09-03T08:00:00", energy_consumption: 35, previous_energy: 28 },
-  { timestamp: "2025-09-05T08:00:00", energy_consumption: 42, previous_energy: 31 },
-  { timestamp: "2025-09-07T08:00:00", energy_consumption: 55, previous_energy: 36 },
-  { timestamp: "2025-09-09T08:00:00", energy_consumption: 61, previous_energy: 42 },
-  { timestamp: "2025-09-11T08:00:00", energy_consumption: 67, previous_energy: 44 },
-  { timestamp: "2025-09-13T08:00:00", energy_consumption: 74, previous_energy: 48 },
-  { timestamp: "2025-09-15T08:00:00", energy_consumption: 68, previous_energy: 46 },
-];
+const pad2 = (n) => String(n).padStart(2, "0");
 
-/** Parse a row's date out of the usual field names. */
+const getToken = () =>
+  localStorage.getItem("token") ||
+  localStorage.getItem("authToken") ||
+  localStorage.getItem("access_token") ||
+  localStorage.getItem("accessToken") ||
+  "";
+
+/* ---------------- data helpers ---------------- */
+
 function parseDate(item) {
-  const raw = item?.timestamp ?? item?.date ?? item?.created_at;
-  if (!raw) return null;
-  const d = new Date(raw);
-  return Number.isNaN(d.getTime()) ? null : d;
+  const raw =
+    item?.timestamp ?? item?.ts ?? item?.date ??
+    item?.created_at ?? item?.bucket_start;
+
+  if (raw === undefined || raw === null) return null;
+
+  const value =
+    typeof raw === "number" || /^\d+$/.test(String(raw))
+      ? Number(raw)
+      : raw;
+
+  const date =
+    typeof value === "number"
+      ? new Date(value < 1e12 ? value * 1000 : value)
+      : new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** Map a date to a bucket (key + display label + sort value). */
+function getEnergy(item) {
+  const candidates = [
+    item?.energy_consumption,
+    item?.energy_avg,
+    item?.energy_average,
+    item?.avg_energy,
+    item?.energy,
+    item?.avg?.energy,
+    item?.average?.energy,
+    item?.values?.energy,
+    item?.kwh,
+  ];
+
+  for (const value of candidates) {
+    if (value !== undefined && value !== null && value !== "") {
+      const number = Number(value);
+      if (Number.isFinite(number)) return number;
+    }
+  }
+  return null;
+}
+
+function getStartOfDay(date) {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate()
+  );
+}
+
+function getChartRange(granularity, now = new Date()) {
+  const today = getStartOfDay(now);
+
+  if (granularity === "daily") {
+    return {
+      from: today,
+      to: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+    };
+  }
+
+  if (granularity === "weekly") {
+    const from = new Date(today);
+    from.setDate(from.getDate() - 7);
+
+    return {
+      from,
+      to: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+    };
+  }
+
+  return {
+    from: new Date(today.getFullYear(), today.getMonth(), 1),
+    to: new Date(today.getTime() + 24 * 60 * 60 * 1000),
+  };
+}
+
+// function buildChartData(rows, granularity, now = new Date()) {
+//   const { from, to } = getChartRange(granularity, now);
+//   const buckets = new Map();
+
+//   const makeBucket = (date) => {
+//     if (granularity === "daily") {
+//       const hour = date.getHours();
+//       const start = new Date(date);
+//       start.setMinutes(0, 0, 0);
+
+//       return {
+//         key: String(start.getTime()),
+//         name: `${String(hour).padStart(2, "0")}:00`,
+//         sort: start.getTime(),
+//       };
+//     }
+
+//     const start = getStartOfDay(date);
+//     const key =
+//       `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
+
+//     return {
+//       key,
+//       name: `${start.getDate()} ${MONTH_NAMES[start.getMonth()]}`,
+//       sort: start.getTime(),
+//     };
+//   };
+
+//   // Create every expected interval, including intervals without readings.
+//   const cursor = new Date(from);
+
+//   while (cursor < to) {
+//     const bucket = makeBucket(cursor);
+
+//     buckets.set(bucket.key, {
+//       name: bucket.name,
+//       sort: bucket.sort,
+//       sum: 0,
+//       count: 0,
+//       currentMonth: null,
+//       previousMonth: null,
+//     });
+
+//     if (granularity === "daily") {
+//       cursor.setHours(cursor.getHours() + 1);
+//     } else {
+//       cursor.setDate(cursor.getDate() + 1);
+//     }
+//   }
+
+//   // Merge multiple readings into their matching hour/day.
+//   rows.forEach((item) => {
+//     const date = parseDate(item);
+//     const energy = getEnergy(item);
+
+//     if (!date || energy === null || date < from || date >= to) {
+//       return;
+//     }
+
+//     const bucket = makeBucket(date);
+//     const entry = buckets.get(bucket.key);
+
+//     if (!entry) return;
+
+//     entry.sum += energy;
+//     entry.count += 1;
+//   });
+
+//   return [...buckets.values()]
+//     .sort((a, b) => a.sort - b.sort)
+//     .map(({ name, sum, count }) => ({
+//       name,
+//       currentMonth: count
+//         ? Number((sum / count).toFixed(2))
+//         : null,
+//       previousMonth: null,
+//     }));
+// }
+
 function getBucket(date, granularity) {
   const y = date.getFullYear();
   const m = date.getMonth();
@@ -159,11 +209,10 @@ function getBucket(date, granularity) {
   }
 
   if (granularity === "weekly") {
-    // Week starts on Monday
     const start = new Date(y, m, d);
     start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
     return {
-      key: `W-${start.getFullYear()}-${pad2(start.getMonth() + 1)}-${pad2(start.getDate())}`,
+      key: `${start.getFullYear()}-${pad2(start.getMonth() + 1)}-${pad2(start.getDate())}`,
       label: `Wk ${start.getDate()} ${MONTH_NAMES[start.getMonth()]}`,
       sort: start.getTime(),
     };
@@ -176,26 +225,23 @@ function getBucket(date, granularity) {
   };
 }
 
-/** Group + sum the raw rows into the shape recharts expects. */
+function normalizeRows(payload) {
+  if (Array.isArray(payload)) return payload;
+  for (const key of ["results", "data", "records", "items"]) {
+    if (Array.isArray(payload?.[key])) return payload[key];
+  }
+  return [];
+}
+
 function buildChartData(rows, granularity) {
   const buckets = new Map();
 
-  rows.forEach((item, index) => {
+  rows.forEach((item) => {
     const date = parseDate(item);
+    const energy = getEnergy(item);
+    if (!date || energy === null) return;
 
-    const bucket = date
-      ? getBucket(date, granularity)
-      : {
-          key: `row-${index}`,
-          label: item?.date || item?.timestamp || `P${index + 1}`,
-          sort: index,
-        };
-
-    const current =
-      Number(item?.energy_consumption ?? item?.energy ?? item?.kwh ?? 0) || 0;
-    const previous =
-      Number(item?.previous_energy ?? item?.previous_month_energy ?? 0) || 0;
-
+    const bucket = getBucket(date, granularity);
     if (!buckets.has(bucket.key)) {
       buckets.set(bucket.key, {
         name: bucket.label,
@@ -204,20 +250,62 @@ function buildChartData(rows, granularity) {
         previousMonth: 0,
       });
     }
-
-    const entry = buckets.get(bucket.key);
-    entry.currentMonth += current;
-    entry.previousMonth += previous;
+    buckets.get(bucket.key).currentMonth += energy;
   });
 
   return [...buckets.values()]
     .sort((a, b) => a.sort - b.sort)
     .map(({ name, currentMonth, previousMonth }) => ({
       name,
-      currentMonth: Math.round(currentMonth * 100) / 100,
-      previousMonth: Math.round(previousMonth * 100) / 100,
+      currentMonth: Number(currentMonth.toFixed(2)),
+      previousMonth: Number(previousMonth.toFixed(2)),
     }));
 }
+
+/* ---------------- network helpers ---------------- */
+
+async function fetchFromAggregates(from, to) {
+  const params = new URLSearchParams({
+    from: from.toISOString(),
+    to: to.toISOString(),
+  });
+
+  const token = getToken();
+  const response = await fetch(`${API_URL}?${params.toString()}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    cache: "no-store",
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result?.message || result?.detail || `HTTP ${response.status}`);
+  }
+  return normalizeRows(result);
+}
+
+async function fetchFromThingsBoard() {
+  const now = Date.now();
+
+  // Wide-open range. The backend clamps to what ThingsBoard actually has.
+  const params = new URLSearchParams({
+    from: "0",
+    to: String(now),
+  });
+
+  const token = getToken();
+  const response = await fetch(`${TB_HISTORY_URL}?${params.toString()}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    cache: "no-store",
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result?.message || result?.detail || `HTTP ${response.status}`);
+  }
+  return normalizeRows(result);
+}
+
+/* ---------------- UI bits ---------------- */
 
 const iconButtonStyle = {
   display: "inline-flex",
@@ -226,13 +314,11 @@ const iconButtonStyle = {
   width: 30,
   height: 30,
   padding: 0,
-  // border: none,
   border: "1px solid #e5e7eb",
   borderRadius: 8,
   background: "#fff",
   color: "#475569",
   cursor: "pointer",
-  flex: "0 0 auto",
 };
 
 const overlayStyle = {
@@ -260,89 +346,98 @@ const modalStyle = {
   overflow: "hidden",
 };
 
-const modalHeaderStyle = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  gap: 12,
-};
-
-const ExpandIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <polyline points="15 3 21 3 21 9" />
-    <polyline points="9 21 3 21 3 15" />
-    <line x1="21" y1="3" x2="14" y2="10" />
-    <line x1="3" y1="21" x2="10" y2="14" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-
-function EnergyConsumptionChart({ data = [] }) {
+function EnergyConsumptionChart({ data }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [granularity, setGranularity] = useState("daily");
+  const [historyRows, setHistoryRows] = useState([]);
+  const [usingFallback, setUsingFallback] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const sourceData =
-    Array.isArray(data) && data.length > 0 ? data : FALLBACK_DATA;
+  // Cache for the expensive ThingsBoard “all history” query.
+  const fallbackCacheRef = useRef({ rows: [], ts: 0 });
 
-  // Re-aggregates whenever the raw data or the selected granularity changes
-  const chartData = useMemo(
-    () => buildChartData(sourceData, granularity),
-    [sourceData, granularity]
-  );
+  const fetchHistory = useCallback(async () => {
+    setLoading(true);
+    setError("");
 
-  /* Close on Escape + lock body scroll while expanded */
+    try {
+      const now = new Date();
+      const start = new Date(now.getTime() - PRIMARY_WINDOW_MS);
+
+      // 1. Try the last 31 days (local aggregate table).
+      const primaryRows = await fetchFromAggregates(start, now);
+
+      if (primaryRows.length > 0) {
+        setHistoryRows(primaryRows);
+        setUsingFallback(false);
+        return;
+      }
+
+      // 2. No local data in the last month → use ThingsBoard “all history”.
+      //    Guard with a short cache so 60s polling doesn’t hammer TB.
+      const cache = fallbackCacheRef.current;
+      const nowTs = Date.now();
+
+      if (cache.rows.length > 0 && nowTs - cache.ts < FALLBACK_REFRESH_MS) {
+        setHistoryRows(cache.rows);
+        setUsingFallback(true);
+        return;
+      }
+
+      const fallbackRows = await fetchFromThingsBoard();
+      fallbackCacheRef.current = { rows: fallbackRows, ts: nowTs };
+      setHistoryRows(fallbackRows);
+      setUsingFallback(true);
+    } catch (err) {
+      setError(err.message || "Unable to load historical energy data.");
+      setHistoryRows([]);
+      setUsingFallback(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!isExpanded) return undefined;
+    fetchHistory();
+    const timer = window.setInterval(fetchHistory, STALE_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [fetchHistory]);
 
-    const handleKeyDown = (event) => {
+  useEffect(() => {
+    if (!isExpanded) return;
+
+    const onKeyDown = (event) => {
       if (event.key === "Escape") setIsExpanded(false);
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    const previousOverflow = document.body.style.overflow;
+    const oldOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = previousOverflow;
+      document.body.style.overflow = oldOverflow;
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [isExpanded]);
 
-  /* Single chart renderer shared by the small box and the big modal */
+  const chartData = useMemo(
+    () =>
+      buildChartData(
+        Array.isArray(data) && data.length ? data : historyRows,
+        granularity
+      ),
+    [data, historyRows, granularity]
+  );
+
   const renderChart = (height) => (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: 0 }}>
+      <LineChart
+        data={chartData}
+        margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
+      >
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-
         <YAxis
           tick={{ fontSize: 11 }}
           label={{
@@ -352,59 +447,64 @@ function EnergyConsumptionChart({ data = [] }) {
             fontSize: 11,
           }}
         />
-
         <Tooltip />
         <Legend />
-
         <Line
           type="monotone"
           dataKey="currentMonth"
-          name="This Month"
+          name="Energy Consumption"
           stroke="#3182BD"
           strokeWidth={3}
           dot={{ r: 3 }}
-        />
-
-        <Line
-          type="monotone"
-          dataKey="previousMonth"
-          name="Previous Month"
-          stroke="#94a3b8"
-          strokeWidth={2}
-          dot={{ r: 2 }}
         />
       </LineChart>
     </ResponsiveContainer>
   );
 
+  const fallbackNote = usingFallback ? (
+    <small style={{ color: "#b45309", display: "block", marginTop: 4 }}>
+      No data in the last 31 days — showing all available ThingsBoard history.
+    </small>
+  ) : null;
+
   return (
     <>
-      {/* ---------------- Small (inline) card ---------------- */}
       <div className="chart-box">
         <div className="chart-header">
           <h3>▥ Energy Consumption Trend</h3>
 
           <button
             type="button"
-            className="chart-expand-btn"
             style={iconButtonStyle}
             onClick={() => setIsExpanded(true)}
             title="Expand chart"
             aria-label="Expand chart"
           >
-            <ExpandIcon />
+            <svg width="16" height="16" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 3 21 3 21 9" />
+              <polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" />
+              <line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
           </button>
         </div>
 
-        {renderChart(250)}
+        {fallbackNote}
+
+        {loading ? (
+          <p>Loading historical energy data...</p>
+        ) : error ? (
+          <p role="alert">{error}</p>
+        ) : chartData.length === 0 ? (
+          <p>No historical energy data available for this period.</p>
+        ) : (
+          renderChart(250)
+        )}
       </div>
 
       {isExpanded && (
-        <div
-          style={overlayStyle}
-          role="presentation"
-          onClick={() => setIsExpanded(false)}
-        >
+        <div style={overlayStyle} onClick={() => setIsExpanded(false)}>
           <div
             style={modalStyle}
             role="dialog"
@@ -412,10 +512,10 @@ function EnergyConsumptionChart({ data = [] }) {
             aria-label="Energy Consumption Trend"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="chart-header" style={modalHeaderStyle}>
+            <div className="chart-header">
               <h3>▥ Energy Consumption Trend</h3>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ display: "flex", gap: 10 }}>
                 <select
                   className="chart-select"
                   value={granularity}
@@ -430,18 +530,28 @@ function EnergyConsumptionChart({ data = [] }) {
 
                 <button
                   type="button"
-                  className="chart-close-btn"
                   style={iconButtonStyle}
                   onClick={() => setIsExpanded(false)}
-                  title="Close"
-                  aria-label="Close"
+                  aria-label="Close chart"
                 >
-                  <CloseIcon />
+                  ×
                 </button>
               </div>
             </div>
 
-            <div style={{ flex: 1, minHeight: 0 }}>{renderChart("100%")}</div>
+            {fallbackNote}
+
+            {loading ? (
+              <p>Loading historical energy data...</p>
+            ) : error ? (
+              <p role="alert">{error}</p>
+            ) : chartData.length === 0 ? (
+              <p>No historical energy data available.</p>
+            ) : (
+              <div style={{ flex: 1, minHeight: 0 }}>
+                {renderChart("100%")}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -54,13 +54,6 @@ function Layout({ children }) {
             >
               <Menu size={20} />
             </button>
-            <div className="project-brand" aria-label="Project name">
-              <span className="project-brand__mark">AC</span>
-              <span className="project-brand__copy">
-                <strong>AC Energy Monitoring</strong>
-                <small>Live energy intelligence</small>
-              </span>
-            </div>
           </div>
 
           <div className="profile-section">

@@ -1661,3 +1661,168 @@
 .fault-panel__message, .fault-panel__error { padding: 12px; border-radius: 8px; background: #f8fafc; color: #475569; }
 .fault-panel__error { background: #fef2f2; color: #b91c1c; }
 .fault-panel__footer { display: block; margin-top: 12px; color: #94a3b8; }
+
+
+/* =====================================================
+   Energy Consumption Chart
+   Extends .chart-box / .chart-header / .chart-select
+   ===================================================== */
+
+/* Fallback notice (shown when TB all-history is being used) */
+.energy-chart-fallback-note {
+    display: block;
+    margin: 0 0 8px;
+    padding: 6px 10px;
+    border: 1px solid #fde68a;
+    border-radius: 6px;
+    background: #fffbeb;
+    color: #92400e;
+    font-size: 10px;
+    line-height: 1.4;
+}
+
+/* Loading / error / empty states rendered inside the chart box */
+.energy-chart-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 240px;
+    padding: 16px;
+    box-sizing: border-box;
+    color: #94a3b8;
+    font-size: 12px;
+    text-align: center;
+}
+
+.energy-chart-state--error {
+    margin: 8px 0 0;
+    border-radius: 8px;
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
+/* Icon button (expand / close) */
+.energy-chart-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    background: #fff;
+    color: #475569;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s;
+}
+
+.energy-chart-icon-btn:hover {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: #1e293b;
+}
+
+.energy-chart-icon-btn:focus-visible {
+    outline: 2px solid #3182bd;
+    outline-offset: 2px;
+}
+
+/* Expanded overlay */
+.energy-chart-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    padding: 24px;
+    box-sizing: border-box;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(2px);
+    animation: energy-chart-fade .15s ease-out;
+}
+
+/* Expanded modal */
+.energy-chart-modal {
+    margin: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    width: min(1200px, 100%);
+    height: min(760px, 100%);
+    padding: 20px 24px 16px;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    animation: energy-chart-pop .18s ease-out;
+}
+
+/* Modal header — reuse .chart-header but tighten its children */
+.energy-chart-modal .chart-header {
+    min-height: 43px;
+    margin-bottom: 4px;
+}
+
+.energy-chart-modal .chart-header > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* Body area that lets the Recharts container flex-grow */
+.energy-chart-modal__body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.energy-chart-modal__body .recharts-responsive-container,
+.chart-box .recharts-responsive-container {
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+/* Recharts tooltip + legend, aligned with the dashboard look */
+.chart-box .recharts-default-tooltip,
+.energy-chart-modal .recharts-default-tooltip {
+    border-radius: 8px !important;
+    border: 1px solid #e5e7eb !important;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08) !important;
+    font-size: 11px !important;
+}
+
+.chart-box .recharts-legend-wrapper,
+.energy-chart-modal .recharts-legend-wrapper {
+    font-size: 10px !important;
+}
+
+.chart-box .recharts-legend-item-text,
+.energy-chart-modal .recharts-legend-item-text {
+    color: #475569 !important;
+}
+
+/* Animations */
+@keyframes energy-chart-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes energy-chart-pop {
+    from { opacity: 0; transform: translateY(8px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0)  scale(1); }
+}
+
+/* Responsive */
+@media (max-width: 700px) {
+    .energy-chart-overlay { padding: 10px; }
+    .energy-chart-modal   { padding: 14px; border-radius: 10px; }
+    .energy-chart-modal .chart-header { flex-wrap: wrap; gap: 8px; }
+    .energy-chart-modal .chart-header h3 { font-size: 13px; }
+    .energy-chart-state   { min-height: 200px; font-size: 11px; }
+}
+

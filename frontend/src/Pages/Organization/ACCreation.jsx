@@ -981,6 +981,20 @@ function ACCreation() {
                 className="admins-table"
                 style={{ tableLayout: "fixed", width: "100%" }}
               >
+                <colgroup>
+                  <col style={{ width: "10%" }} /> {/* AC ID */}
+                  <col style={{ width: "10%" }} /> {/* Device */}
+                  <col style={{ width: "9%" }} />  {/* Capacity */}
+                  <col style={{ width: "10%" }} /> {/* Maintenance */}
+                  {canAssignCustomer && (
+                    <col style={{ width: "14%" }} /> /* Customer */
+                  )}
+                  <col style={{ width: "14%" }} /> {/* Branch */}
+                  <col style={{ width: canAssignCustomer ? "17%" : "20%" }} /> {/* Actions */}
+                  {canAssignCustomer && (
+                    <col style={{ width: "10%" }} />
+                  )}
+                </colgroup>
                 <thead>
                   <tr>
                     <th>AC ID</th>
@@ -989,7 +1003,7 @@ function ACCreation() {
                     <th>Maintenance Date</th>
                     {canAssignCustomer && <th>Customer</th> }
                     <th>Branch</th>
-                    {canAssignCustomer && <th>Status</th> }
+                    {/* {canAssignCustomer && <th>Status</th> } */}
                     <th>Actions</th>
                     {canAssignCustomer && <th>Relay Control</th> }
                   </tr>
@@ -1041,7 +1055,7 @@ function ACCreation() {
                         </td>
 
                         {/* ---------- STATUS ---------- */}
-                        {canAssignCustomer && (
+                        {/* {canAssignCustomer && (
                           <td>
                             <span
                               className={
@@ -1053,7 +1067,7 @@ function ACCreation() {
                               ● {device.status || "OFF"}
                             </span>
                           </td>
-                        )}
+                        )} */}
                         {/* ---------- RELAY + EDIT + DELETE ---------- */}
                         <td>
                           <div
@@ -1136,11 +1150,11 @@ function ACCreation() {
                                 <span className="relay-slider" />
                               </label>
                               <span className={`relay-status ${device.relay_state === true ? "on" : "off"}`}>
-                                {relayLoading[key]
+                                {/* {relayLoading[key]
                                   ? "Sending..."
                                   : device.relay_state === null || device.relay_state === undefined
                                   ? "Unknown"
-                                  : device.relay_state ? "ON" : "OFF"}
+                                  : device.relay_state ? "ON" : "OFF"} */}
                               </span>
                             </div>
                             {relayErrors[key] && (
@@ -1502,7 +1516,7 @@ function ACCreation() {
 
             <div style={{ marginTop: 20 }}>
               <label>
-                Search Customer
+                Search Customer <t />
                 <input
                   value={customerSearch}
                   onChange={(event) => setCustomerSearch(event.target.value)}
