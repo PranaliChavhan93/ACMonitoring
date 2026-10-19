@@ -43,12 +43,6 @@ from .hierarchy_persistence import persist_customer_branch_floor
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 
-from .cloud_sync import (
-    provision_customer,
-    provision_user,
-)
-
-
 from .models import (
     Country,
     CustomerDeviceMapping,
