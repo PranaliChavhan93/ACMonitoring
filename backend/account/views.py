@@ -46,13 +46,6 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from .cloud_sync import (
     provision_customer,
     provision_user,
-    # sync_customer,
-    # sync_site,
-    # sync_device,
-    # link_3tp_device_to_site,
-    # create_3tp_device,
-    # ThreeTPError,
-    # ThreeTPAPIError,
 )
 
 

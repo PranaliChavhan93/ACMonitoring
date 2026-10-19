@@ -23,8 +23,7 @@
   --shadow-md: 0 8px 24px -12px rgba(15, 23, 42, 0.18);
 }
 
-html,
-body,
+html, body,
 #root {
   height: 100%;
 }
