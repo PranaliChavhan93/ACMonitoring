@@ -1,157 +1,5 @@
-// import React, { useMemo } from "react";
-
-// import {
-//     ResponsiveContainer,
-//     BarChart,
-//     Bar,
-//     CartesianGrid,
-//     XAxis,
-//     YAxis,
-//     Tooltip,
-// } from "recharts";
-
-
-// function ZoneEnergyChart({ data = [] }) {
-
-//     const chartData = useMemo(() => {
-
-//         const zones = {};
-
-
-//         data.forEach((item) => {
-
-//             const zone =
-//                 item.zone ??
-//                 item.zone_name ??
-//                 item.region ??
-//                 "Unknown";
-
-
-//             const energy = Number(
-//                 item.energy_consumption ??
-//                 item.energy ??
-//                 item.kwh ??
-//                 0
-//             );
-
-
-//             zones[zone] =
-//                 (zones[zone] || 0) +
-//                 energy;
-
-//         });
-
-
-//         return Object.entries(zones)
-//             .map(([name, energy]) => ({
-//                 name,
-//                 energy:
-//                     Number(energy.toFixed(2)),
-//             }))
-//             .sort(
-//                 (a, b) =>
-//                     b.energy - a.energy
-//             );
-
-//     }, [data]);
-
-
-//     return (
-
-//         <div className="chart-box">
-
-//             <div className="chart-header">
-
-//                 <div>
-
-//                     <h3>
-//                         📊 Zone-wise Energy
-//                     </h3>
-
-//                     <span>
-//                         Energy consumption by zone
-//                     </span>
-
-//                 </div>
-
-//             </div>
-
-
-//             {chartData.length === 0 ? (
-
-//                 <div className="chart-empty">
-//                     No zone data available
-//                 </div>
-
-//             ) : (
-
-//                 <ResponsiveContainer
-//                     width="100%"
-//                     height={280}
-//                 >
-
-//                     <BarChart
-//                         data={chartData}
-//                         layout="vertical"
-//                         margin={{
-//                             top: 10,
-//                             right: 20,
-//                             left: 10,
-//                             bottom: 10,
-//                         }}
-//                     >
-
-//                         <CartesianGrid
-//                             strokeDasharray="3 3"
-//                         />
-
-//                         <XAxis
-//                             type="number"
-//                         />
-
-//                         <YAxis
-//                             type="category"
-//                             dataKey="name"
-//                             width={80}
-//                         />
-
-//                         <Tooltip
-//                             formatter={(value) => [
-//                                 `${Number(value).toFixed(2)} kWh`,
-//                                 "Energy",
-//                             ]}
-//                         />
-
-
-//                         <Bar
-//                             dataKey="energy"
-//                             name="Energy"
-//                             radius={[
-//                                 0,
-//                                 5,
-//                                 5,
-//                                 0,
-//                             ]}
-//                         />
-
-//                     </BarChart>
-
-//                 </ResponsiveContainer>
-
-//             )}
-
-//         </div>
-
-//     );
-// }
-
-
-// export default ZoneEnergyChart;
-
-
 
 import React, { useMemo } from "react";
-
 import {
     ResponsiveContainer,
     BarChart,
@@ -186,8 +34,7 @@ const getBranch = (item) => getField(item, ["branch_name", "branch", "Branch", "
 const getFloor = (item) => getField(item, ["floor_name", "floor", "Floor", "Floor_Name"]);
 
 const getUnitName = (item, index) =>
-    getField(item, ["ac_id", "AC_ID", "device_name", "device_id", "unit_name", "name"]) ||
-    `AC ${index + 1}`;
+    getField(item, ["ac_id", "AC_ID", "device_name", "device_id", "unit_name", "name"]) || `AC ${index + 1}`;
 
 const getEnergy = (item) =>
     numberValue(
@@ -200,17 +47,7 @@ const getEnergy = (item) =>
         0
     );
 
-/**
- * Which level of the org hierarchy to compare, based on the filters
- * currently applied. Hierarchy: Zone -> State -> Circle -> City -> Branch.
- *
- *  - no zone selected      -> compare zones
- *  - zone selected         -> compare states within that zone
- *  - state selected too    -> compare circles within that state
- *  - circle selected too   -> compare cities within that circle
- *  - city selected too     -> compare branches within that city
- *  - branch selected too   -> compare floors (or units, if no floor data)
- */
+    
 const getDrillLevel = (filters = {}) => {
     if (!filters?.zone) {
         return { getter: getZone, title: "Zone-wise Energy", subtitle: "Energy consumption by zone" };
