@@ -17,7 +17,7 @@ import "./CustomerCreation.css";
 // const CUSTOMERS_URL = `${API_BASE}/customers/`;
 // const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
 
-const API_BASE = "http://192.168.1.18:8000/api";
+const API_BASE = "http://192.168.1.5:8000/api";
 const CUSTOMERS_URL = `${API_BASE}/customers/`;
 const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
 

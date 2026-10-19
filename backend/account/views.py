@@ -11284,8 +11284,6 @@ def attach_location(record, device_map):
     enriched["location_type"] = loc.get("location_type", "")
     enriched["hierarchy_type"] = loc.get("hierarchy_type", "")
 
-    # Weather charts need coordinates saved on the mapped local Branch.
-    # Prefer stable UUID, then branch code (e.g. KO-01), then a name fallback.
     branch_ref = (
         device_info.get("branch_id")
         or geographical.get("branch_id")

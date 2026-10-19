@@ -20,7 +20,10 @@ DEVICES_FILE = os.path.join(DATA_DIR, "3tp_devices.json")
 CONFIG_FILE = os.path.join(DATA_DIR, "3tp_config.json")
 
 CACHE_SEC = float(os.environ.get("TPT_CACHE_SEC", "2"))
-LOOKBACK_SEC = int(os.environ.get("TPT_LOOKBACK_SEC", "86400"))
+# LOOKBACK_SEC = int(os.environ.get("TPT_LOOKBACK_SEC", "86400"))
+
+LOOKBACK_SEC = int( os.environ.get("TPT_LOOKBACK_SEC", str(7 * 24 * 60 * 60)) )
+OFFLINE_ERROR_AFTER = 7 * 24 * 60 * 60
 STALE_SEC = int(os.environ.get("TPT_STALE_SEC", "120"))
 TIMEOUT = float(os.environ.get("TPT_TIMEOUT", "8"))
 
@@ -249,70 +252,140 @@ def _fetch_device(cfg, dev, start_ms, end_ms):
     record = to_record(dev, ts, payload)
     return record
 
+def _get_saved_record(device):
+    """
+    Recover the latest saved telemetry after a device stops reporting
+    or the application restarts.
+    """
+    try:
+        from .telemetry_aggregate import _record_from_row
+        from .models import TelemetryAggregate, ACDevice
+
+        row = (
+            TelemetryAggregate.objects
+            .filter(
+                device_id=device["ac_id"],
+                interval_seconds=60,
+            )
+            .order_by("-bucket_start")
+            .first()
+        )
+
+        if row is None or row.last_timestamp is None:
+            return None
+
+        name = (
+            ACDevice.objects
+            .filter(ac_id=device["ac_id"])
+            .values_list("device_name", flat=True)
+            .first()
+        )
+
+        record = _record_from_row(row, name)
+
+        age_seconds = max(
+            0,
+            (datetime.now(timezone.utc) - row.last_timestamp).total_seconds(),
+        )
+
+        record["last_seen"] = record["timestamp"]
+
+        if age_seconds > OFFLINE_ERROR_AFTER:
+            record["status"] = "ERROR"
+            record["message"] = (
+                "Device has been offline for more than 7 days."
+            )
+        else:
+            record["status"] = "OFFLINE"
+
+        record["offline_duration_seconds"] = int(age_seconds)
+
+        return record
+
+    except Exception:
+        log.exception(
+            "Failed to recover saved telemetry for %s",
+            device.get("ac_id"),
+        )
+        return None
+
+
 def _refresh():
-    """Call 3TP for every device and update the cache. Caller holds _lock."""
+    """Fetch telemetry for every device, update cache, and store aggregates."""
     cfg = _config()
     devices = _devices()
+
     end_ms = int(time.time() * 1000)
     start_ms = end_ms - LOOKBACK_SEC * 1000
 
     errors = []
+
+    if not devices:
+        _state["last_fetch"] = time.time()
+        _state["last_error"] = "No devices configured."
+        log.warning("No devices configured for telemetry fetching.")
+        return
+
     with ThreadPoolExecutor(max_workers=min(8, len(devices))) as pool:
-        futures = [(d, pool.submit(_fetch_device, cfg, d, start_ms, end_ms)) for d in devices]
+        futures = [
+            (dev, pool.submit(_fetch_device, cfg, dev, start_ms, end_ms))
+            for dev in devices
+        ]
+
         for dev, fut in futures:
+            device_id = dev.get("ac_id") or dev.get("device_id")
+
             try:
+                # Fetch the latest telemetry from 3TP.
                 rec = fut.result()
-                if rec:
-                    # Preserve the existing live dashboard cache.
-                    _live[rec["ac_id"]] = rec
 
-                    # Store the fetched telemetry in the local 60-second aggregate table.
-                    try:
-                        age_seconds = (
-                            time.time()
-                            - datetime.fromisoformat(
-                                rec["timestamp"]
-                            ).timestamp()
-                        )
+                # If 3TP returns no new record, recover the last saved reading.
+                if rec is None:
+                    rec = _get_saved_record(dev)
 
-                        if age_seconds < STALE_SEC:
-                            ingest_payload({
-                                "ac_id": rec["ac_id"],
-                                "ts": rec["timestamp"],
-                                "voltage": rec["voltage"],
-                                "current": rec["current"],
-                                "power": rec["active_power"],
-                                "energy": rec["energy_consumption"],
-                                "frequency": rec["frequency"],
-                                "power_factor": rec["power_factor"],
-                                "indoor_temperature": rec["temperature"],
-                                "indoor_humidity": rec["humidity"],
-                                "alarm_status": rec["alarm_status"],
-                                "relay": rec["relay"],
-                            })
-                        ingest_payload({
-                            "ac_id": rec["ac_id"],
-                            "ts": rec["timestamp"],
-                            "voltage": rec["voltage"],
-                            "current": rec["current"],
-                            "power": rec["active_power"],
-                            "energy": rec["energy_consumption"],
-                            "frequency": rec["frequency"],
-                            "power_factor": rec["power_factor"],
-                            "indoor_temperature": rec["temperature"],
-                            "indoor_humidity": rec["humidity"],
-                            "alarm_status": rec["alarm_status"],
-                            "relay": rec["relay"],
-                        })
-                    except Exception:
-                        log.exception(
-                            "Failed to aggregate telemetry for device %s",
-                            rec.get("ac_id"),
-                        )
+                # No live or saved reading is available for this device.
+                if not rec:
+                    log.warning(
+                        "No telemetry available for device %s",
+                        device_id,
+                    )
+                    continue
+
+                # Update the in-memory cache, preserving the last known values.
+                _live[rec["ac_id"]] = rec
+
+                # Store the reading in the local 60-second aggregate table.
+                # Duplicate timestamps are expected to be ignored by ingest_payload.
+                try:
+                    ingest_payload({
+                        "ac_id": rec["ac_id"],
+                        "ts": rec["timestamp"],
+                        "voltage": rec.get("voltage"),
+                        "current": rec.get("current"),
+                        "power": rec.get("active_power"),
+                        "energy": rec.get("energy_consumption"),
+                        "frequency": rec.get("frequency"),
+                        "power_factor": rec.get("power_factor"),
+                        "indoor_temperature": rec.get("temperature"),
+                        "indoor_humidity": rec.get("humidity"),
+                        "alarm_status": rec.get("alarm_status"),
+                        "relay": rec.get("relay"),
+                    })
+                except Exception:
+                    log.exception(
+                        "Failed to aggregate telemetry for device %s",
+                        device_id,
+                    )
+
             except Exception as e:
-                errors.append(f"{dev.get('ac_id') or dev.get('device_id')}: {e}")
+                errors.append(f"{device_id}: {e}")
+                log.exception(
+                    "Failed to fetch telemetry for device %s",
+                    device_id,
+                )
 
     _state["last_fetch"] = time.time()
+
     if errors:
         _state["last_error"] = "; ".join(errors)
         log.warning("3TP fetch errors: %s", errors)
@@ -322,30 +395,64 @@ def _refresh():
 
 def get_records():
     with _lock:
-        if not _live:
-            raise TelemetryError(
-                _state["last_error"] or
-                "No telemetry data available yet"
-            )
         out = []
         now = time.time()
 
+        # Recover persisted records if the process restarted and
+        # the in-memory cache is empty.
+        if not _live:
+            try:
+                from .telemetry_aggregate import get_latest_records
+
+                for record in get_latest_records():
+                    _live[record["ac_id"]] = record
+
+            except Exception:
+                log.exception("Failed to recover telemetry cache")
+
         for rec in _live.values():
             r = dict(rec)
+
             try:
                 last_timestamp = datetime.fromisoformat(
                     r["timestamp"]
                 ).timestamp()
-                age_seconds = now - last_timestamp
+
+                age_seconds = max(0, now - last_timestamp)
+
             except (KeyError, TypeError, ValueError):
-                age_seconds = STALE_SEC
-            if age_seconds >= STALE_SEC:
-                r["relay"] = 0
+                age_seconds = None
+
+            if age_seconds is None:
+                r["status"] = "UNKNOWN"
+                r["message"] = "Last telemetry timestamp is unavailable."
+
+            elif age_seconds > OFFLINE_ERROR_AFTER:
+                r["status"] = "ERROR"
+                r["message"] = (
+                    "Device has been offline for more than 7 days."
+                )
+                r["last_seen"] = r.get("timestamp")
+                r["offline_duration_seconds"] = int(age_seconds)
+
+            elif age_seconds >= STALE_SEC:
+                # Preserve the last telemetry values.
+                # Do not overwrite voltage, current, energy, etc.
                 r["status"] = "OFFLINE"
+                r["last_seen"] = r.get("timestamp")
+                r["offline_duration_seconds"] = int(age_seconds)
+
             out.append(r)
+
+        if not out:
+            raise TelemetryError(
+                _state["last_error"]
+                or "No telemetry data available yet"
+            )
 
         return out
 
+    
 def get_status():
     with _lock:
         return {

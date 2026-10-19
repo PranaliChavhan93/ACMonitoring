@@ -201,7 +201,7 @@ http://YOUR_PC_IP:9000/api/analyze-dashboard
 Example:
 
 ```text
-http://192.168.1.18:9000/api/analyze-dashboard
+http://192.168.1.5:9000/api/analyze-dashboard
 ```
 
 Allow TCP port 9000 through Windows Firewall if required.
