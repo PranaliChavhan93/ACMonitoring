@@ -29,6 +29,9 @@ import FaultDetectionPanel from "./FaultDetectionPanel"
 
 import "./dashboard.css";
 import "./dashboard-insight.css";
+// import CurrentChart from "./Current/Current";
+// import CurrentTrendChart from "./Current/Current";
+import CurrentHistoryChart from "./Current/CurrentHistoryChart";
 
 const numberValue = (value) => {
     if (value === null || value === undefined || value === "") {
@@ -113,6 +116,8 @@ function ACDashboard({
     const [branchWeather, setBranchWeather] = useState([]);
     const [weatherStatus, setWeatherStatus] = useState("idle");
     const [weatherError, setWeatherError] = useState("");
+    // const isFloorScope = Boolean(selectedFloor);
+    const isFloorScope = Boolean(filters?.floor);
     const safeData = useMemo(() => {
         if (Array.isArray(data)) return data;
         if (Array.isArray(data?.data)) return data.data;
@@ -258,15 +263,119 @@ function ACDashboard({
     };
 
     // Presentation adapts to the selected hierarchy without changing API polling.
-    const hierarchyLevels = filters?.hierarchy === "ZONAL"
-        ? ["zone", "circle", "region", "division", "branch", "floor"]
-        : ["state", "district", "taluka", "city", "branch", "floor"];
-    const selectedLevel = [...hierarchyLevels].reverse().find((key) => Boolean(filters?.[key])) || "country";
-    const isBranchScope = ["branch", "floor"].includes(selectedLevel);
-    const isFloorScope = selectedLevel === "floor";
-    const isSingleDeviceScope = Boolean(filters?.ac_id || filters?.device_id || filters?.device);
+    // const hierarchyLevels = filters?.hierarchy === "ZONAL"
+    //     ? ["zone", "circle", "region", "division", "branch", "floor"]
+    //     : ["state", "district", "taluka", "city", "branch", "floor"];
+    // const selectedLevel = [...hierarchyLevels].reverse().find((key) => Boolean(filters?.[key])) || "country";
+    // const isBranchScope = ["branch", "floor"].includes(selectedLevel);
+    // const isFloorScope = selectedLevel === "floor";
+    // const isSingleDeviceScope = Boolean(filters?.ac_id || filters?.device_id || filters?.device);
+    
+    const hierarchyLevels =
+        filters?.hierarchy === "ZONAL"
+            ? ["zone", "circle", "region", "division", "branch", "device"]
+            : ["state", "district", "taluka", "city", "branch", "device"];
+
+    const selectedLevel =
+        [...hierarchyLevels]
+            .reverse()
+            .find((key) => Boolean(filters?.[key])) || "country";
+
+    const isBranchScope = selectedLevel === "branch";
+    const isDeviceScope = selectedLevel === "device";
+
+    // const selectedDeviceId = useMemo(() => {
+    //     const filterDeviceId =
+    //         filters?.selectedDeviceId ||
+    //         filters?.tpt_device_id ||
+    //         filters?.thingsboard_device_id ||
+    //         filters?.device_uuid ||
+    //         filters?.device_id ||
+    //         (typeof filters?.device === "string"
+    //             ? filters.device
+    //             : filters?.device?.device_id ||
+    //             filters?.device?.tpt_device_id ||
+    //             filters?.device?.thingsboard_device_id ||
+    //             filters?.device?.device_uuid ||
+    //             "");
+
+    // console.log("[Energy Chart] Filters:", filters);
+    // // console.log("[Energy Chart] Selected device ID:", selectedDeviceId);
+    // // console.log("[Energy Chart] Selected device ID:", selectedDeviceId);
+    // console.log("[Energy Chart] First device record:", filteredData[0]);
+
+    //     // When a single device is selected, inspect its telemetry record.
+    //     const recordDeviceId =
+    //         filteredData.length === 1
+    //             ? (
+    //                 filteredData[0]?.tpt_device_id ||
+    //                 filteredData[0]?.thingsboard_device_id ||
+    //                 filteredData[0]?.device_uuid ||
+    //                 filteredData[0]?.device?.device_id ||
+    //                 ""
+    //             )
+    //             : "";
+
+    //     return filterDeviceId || recordDeviceId;
+    // }, [filters, filteredData]);
+
+    // const selectedDeviceId = useMemo(() => {
+    //     const device = filters?.device;
+
+    //     const filterDeviceId =
+    //         filters?.selectedDeviceId ||
+    //         filters?.device_id ||
+    //         filters?.tpt_device_id ||
+    //         filters?.thingsboard_device_id ||
+    //         filters?.device_uuid ||
+    //         (typeof device === "string" ? device : "") ||
+    //         device?.value ||
+    //         device?.tpt_device_id ||
+    //         device?.thingsboard_device_id ||
+    //         device?.thingsboard_id ||
+    //         device?.device_id ||
+    //         device?.device_uuid ||
+    //         "";
+
+    //     // Use the record ID only when exactly one device is present.
+    //     const record = filteredData.length === 1 ? filteredData[0] : null;
+
+    //     const recordDeviceId =
+    //         record?.tpt_device_id ||
+    //         record?.thingsboard_device_id ||
+    //         record?.thingsboard_id ||
+    //         record?.device_id ||
+    //         record?.device_uuid ||
+    //         record?.device?.device_id ||
+    //         "";
+
+    //     const id = String(filterDeviceId || recordDeviceId).trim();
+
+    //     console.log("[Current Trend] Filters:", filters);
+    //     console.log("[Current Trend] Selected device ID:", id);
+
+    //     return id;
+    // }, [filters, filteredData]);
+
+
+    const selectedDeviceId = String(
+        filters?.selectedDeviceId ||
+        filters?.device_id ||
+        (typeof filters?.device === "string"
+            ? filters.device
+            : filters?.device?.value || "")
+        ).trim();
+
+        console.log("[Current Trend] Selected device ID:", selectedDeviceId);
+
+    const isSingleDeviceScope =
+        isDeviceScope || Boolean(filters?.ac_id || selectedDeviceId);
+
     const selectedState = filters?.state || "";
     const showWidget = (key) => visibleWidgets?.[key] !== false;
+    
+    // const selectedState = filters?.state || "";
+    // const showWidget = (key) => visibleWidgets?.[key] !== false;
 
     // Local outdoor weather is fetched from Open-Meteo using the coordinates
     // stored on the selected branch. AC telemetry and rolling averages remain unchanged.
@@ -347,6 +456,18 @@ function ACDashboard({
         branchCoordinates?.latitude,
         branchCoordinates?.longitude,
     ]);
+
+    // useEffect(() => {
+    //     const deviceId = selected.device || "";
+
+    //     onFilterChange?.({
+    //         hierarchy,
+    //         ...selected,
+    //         device: deviceId,
+    //         device_id: deviceId,
+    //         selectedDeviceId: deviceId,
+    //     });
+    //     }, [hierarchy, selected, onFilterChange]);
 
     return (
         <div className="ac-dashboard">
@@ -468,24 +589,28 @@ function ACDashboard({
                 </section>
 
                 <section className="dashboard-grid dashboard-grid--primary">
-                    {showWidget("energy_chart") && <EnergyConsumptionChart data={trendHistory} />}
+                    {showWidget("energy_chart") && <EnergyConsumptionChart deviceId={selectedDeviceId} /> }
                     {showWidget("power_chart") && <CurrentFluctuationChart value={metrics.totalPower} />}
                     {showWidget("health_chart") && <ACHealthChart data={deviceData} />}
                 </section>
 
                 <section className="dashboard-grid dashboard-grid--secondary">
-                    {selectedLevel === "branch" && showWidget("temperature") && (
-                        <TemperatureChart data={branchWeather} indoorData={trendHistory} locationName={filters?.branch} status={weatherStatus} error={weatherError} />
+                    {selectedLevel === "branch" && showWidget("temperature") && ( 
+                        <TemperatureChart data={branchWeather} indoorData={trendHistory} locationName={filters?.branch} status={weatherStatus} error={weatherError} /> 
                     )}
-
                     {showWidget("zone_chart") && <ZoneEnergyChart data={deviceData} filters={filters} />}
-
                     {selectedLevel === "branch" && showWidget("humidity") && (
                         <HumidityChart data={branchWeather} indoorData={trendHistory} locationName={filters?.branch} status={weatherStatus} error={weatherError} />
                     )}
-                    
+                    {showWidget("current_chart") && (
+                        <CurrentHistoryChart
+                            data={filteredData}
+                            deviceId={selectedDeviceId}
+                            scope={filters}
+                        />
+                    )}
                 </section>
-
+                
                 {!isBranchScope && !isSingleDeviceScope && (
                     <section className="dashboard-grid dashboard-grid--regional">
                         {/* {showWidget("zone_chart") && <ZoneEnergyChart data={deviceData} filters={filters} />} */}

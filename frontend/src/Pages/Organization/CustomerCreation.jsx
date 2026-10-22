@@ -13,16 +13,11 @@ import {
 
 import "./CustomerCreation.css";
 
-// const API_BASE = "http://localhost:8000/api";
-// const CUSTOMERS_URL = `${API_BASE}/customers/`;
-// const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
+const API_BASE = "http://192.168.1.7:8000/api";
+const LOCATIONS_URL = `${API_BASE}/v1/filters/locations/`;
 
-const API_BASE = "http://192.168.1.5:8000/api";
 const CUSTOMERS_URL = `${API_BASE}/customers/`;
 const SITES_URL = `${API_BASE}/cloud/sites/?pageSize=1000&page=0`;
-
-
-
 
 const getToken = () =>
   localStorage.getItem("token") ||
@@ -44,7 +39,7 @@ const HIERARCHY_OPTIONS = [
   {
     value: "GEOGRAPHICAL",
     label: "Geographical",
-    description: "India → State → District → Taluka → City → Branch",
+    description: "India → State → District → Taluka → Branch",
   },
   {
     value: "ZONAL",
@@ -83,11 +78,13 @@ const emptyForm = {
   address_line_1: "",
   state: "",
   district: "",
+  taluka: "",
   city: "",
   pincode: "",
 
   designation: "",
   admin_mobile: "",
+
 };
 
 /* =========================================================
@@ -107,9 +104,35 @@ const customerNameOf = (customer) =>
 const customerEmailOf = (customer) =>
   customer?.company_email ?? customer?.email ?? "";
 
-/* =========================================================
-   COMPONENT
-========================================================= */
+const getHeadOfficeHierarchy = (customer) => {
+  const hierarchyType = customer?.hierarchy_type;
+
+  if (hierarchyType === "GEOGRAPHICAL") {
+    const parts = [
+      "India",
+      customer?.state,
+      customer?.district,
+      customer?.taluka,
+      customer?.city,
+    ];
+
+    return parts.filter(Boolean).join(" → ");
+  }
+
+  if (hierarchyType === "ZONAL") {
+    const parts = [
+      "India",
+      customer?.zone,
+      customer?.circle,
+      customer?.region,
+      customer?.division,
+    ];
+
+    return parts.filter(Boolean).join(" → ");
+  }
+
+  return "-";
+};
 
 function CustomerCreation() {
   const [view, setView] = useState("list");
@@ -134,6 +157,9 @@ function CustomerCreation() {
   const [assignError, setAssignError] = useState("");
   const [assignSuccess, setAssignSuccess] = useState("");
 
+  const [locationTree, setLocationTree] = useState([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
+  const [locationsError, setLocationsError] = useState("");
 
   const [toast, setToast] = useState(null);
   
@@ -161,6 +187,7 @@ function CustomerCreation() {
       }
 
       const result = await res.json();
+      console.log("Customer API response:", result);
       setCustomers(normalizeList(result));
     } catch (err) {
       setError(err.message || "Unable to load customers.");
@@ -292,6 +319,85 @@ function CustomerCreation() {
     fetchCustomers();
   }, [fetchCustomers]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchLocationTree = async () => {
+      setLocationsLoading(true);
+      setLocationsError("");
+
+      try {
+        const response = await fetch(
+          `${LOCATIONS_URL}?hierarchy=GEOGRAPHICAL`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              ...authHeaders(),
+            },
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Unable to load locations (${response.status})`
+          );
+        }
+
+        const result = await response.json();
+
+        if (!cancelled) {
+          setLocationTree(
+            Array.isArray(result?.data) ? result.data : []
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setLocationsError(error.message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLocationsLoading(false);
+        }
+      }
+    };
+
+    fetchLocationTree();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const headOfficeOptions = useMemo(() => {
+    const india = locationTree.find(
+      (item) =>
+        String(item?.country_name || "").toLowerCase() ===
+        "india"
+    );
+
+    const states = india?.states || [];
+
+    const selectedState = states.find(
+      (item) => item.state_name === form.state
+    );
+
+    const districts = selectedState?.districts || [];
+
+    const selectedDistrict = districts.find(
+      (item) => item.district_name === form.district
+    );
+
+    const talukas = selectedDistrict?.talukas || [];
+
+    return {
+      states: states.map((item) => item.state_name).filter(Boolean),
+      districts: districts.map((item) => item.district_name).filter(Boolean),
+      talukas: talukas.map((item) => item.taluka_name).filter(Boolean),
+    };
+  }, [locationTree, form.state, form.district]);
+
   //  SEARCH
   const filteredCustomers = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -347,6 +453,7 @@ function CustomerCreation() {
       address_line_1: customer.address_line_1 || "",
       state: customer.state || "",
       district: customer.district || "",
+      taluka: customer.taluka || "",
       city: customer.city || "",
       pincode: customer.pincode || "",
       designation: customer.designation || "",
@@ -370,6 +477,16 @@ function CustomerCreation() {
     setFormError("");
     setHierarchyError("");
   };
+
+  // const headOfficeFilters = {
+  //   hierarchy: "GEOGRAPHICAL",
+  //   country: "India",
+  //   state: loggedInCustomer?.state || "",
+  //   district: loggedInCustomer?.district || "",
+  //   taluka: loggedInCustomer?.taluka || "",
+  //   branch: "",
+  //   floor: "",
+  // };
 
   // FIELD CHANGE
 
@@ -399,6 +516,10 @@ function CustomerCreation() {
       return "Contact person email is required.";
     // if (!form.designation.trim()) return "Designation is required.";
     if (!form.admin_mobile.trim()) return "Contact person mobile is required.";
+
+    if (!form.state) return "Please select a state.";
+    if (!form.district) return "Please select a district.";
+    if (!form.taluka) return "Please select a taluka.";
 
     if (!isEditing) {
       if (!form.password.trim()) return "Password is required.";
@@ -458,6 +579,13 @@ function CustomerCreation() {
       phone: form.admin_mobile.trim() || form.phone.trim(),
       hierarchy_type: selectedHierarchy || form.hierarchy_type,
       is_active: form.is_active,
+
+      // Head Office details: used as the initial dashboard filter
+      state: form.state.trim(),
+      district: form.district.trim(),
+      taluka: form.taluka,
+      city: form.city.trim(),
+      pincode: form.pincode.trim(),
     };
 
     if (form.password.trim()) {
@@ -651,11 +779,12 @@ function CustomerCreation() {
                   <tr>
                     <th>Customer</th>
                     <th>Code</th>
-                    <th>Type</th>
+                    {/* <th>Type</th> */}
                     <th>Email</th>
                     <th>Contact</th>
                     <th>Phone</th>
                     <th>Hierarchy</th>
+                    <th>Head Office</th>
                     <th>Status</th>
                     <th className="actions-col">Actions</th>
                   </tr>
@@ -680,7 +809,7 @@ function CustomerCreation() {
                       </td>
 
                       <td>{customer.code || "-"}</td>
-                      <td>{customer.bank_type || "-"}</td>
+                      {/* <td>{customer.bank_type || "-"}</td> */}
                       <td>{customerEmailOf(customer) || "-"}</td>
                       <td>{customer.contact_person || "-"}</td>
                       <td>{customer.phone || "-"}</td>
@@ -689,6 +818,10 @@ function CustomerCreation() {
                         {customer.hierarchy_type
                           ? HIERARCHY_LABEL[customer.hierarchy_type]
                           : "-"}
+                      </td>
+
+                      <td className="head-office-hierarchy">
+                        {getHeadOfficeHierarchy(customer)}
                       </td>
 
                       <td>
@@ -772,7 +905,6 @@ function CustomerCreation() {
                     value={form.company}
                     onChange={(e) => handleFieldChange("company", e.target.value)}
                     placeholder="HDFC Bank"
-                    required
                   />
                 </label>
 
@@ -785,7 +917,6 @@ function CustomerCreation() {
                       handleFieldChange("code", e.target.value.toUpperCase())
                     }
                     placeholder="HDFC001"
-                    required
                   />
                 </label>
 
@@ -801,7 +932,6 @@ function CustomerCreation() {
                       )
                     }
                     placeholder="HDFC"
-                    required
                   />
                 </label>
 
@@ -812,7 +942,6 @@ function CustomerCreation() {
                     onChange={(e) =>
                       handleFieldChange("bank_type", e.target.value)
                     }
-                    required
                   >
                     <option value="">Select Customer Type</option>
 
@@ -833,7 +962,6 @@ function CustomerCreation() {
                       handleFieldChange("company_email", e.target.value)
                     }
                     placeholder="admin@bank.com"
-                    required
                   />
                 </label>
 
@@ -844,7 +972,6 @@ function CustomerCreation() {
                     value={form.phone}
                     onChange={(e) => handleFieldChange("phone", e.target.value)}
                     placeholder="+91 22 XXXXXXXX"
-                    required
                   />
                 </label>
 
@@ -879,34 +1006,86 @@ function CustomerCreation() {
                 </label>
 
                 <label>
-                  State
-                  <input
-                    type="text"
+                  State *
+                  <select
                     value={form.state}
-                    onChange={(e) => handleFieldChange("state", e.target.value)}
-                    placeholder="Maharashtra"
-                  />
+                    required
+                    disabled={locationsLoading}
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        state: e.target.value,
+                        district: "",
+                        taluka: "",
+                        city: "",
+                      }));
+                    }}
+                  >
+                    <option value="">
+                      {locationsLoading ? "Loading states..." : "Select State"}
+                    </option>
+
+                    {headOfficeOptions.states.map((state) => (
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label>
-                  District
-                  <input
-                    type="text"
+                  District *
+                  <select
                     value={form.district}
-                    onChange={(e) => handleFieldChange("district", e.target.value)}
-                    placeholder="Pune"
-                  />
+                    required
+                    disabled={!form.state || locationsLoading}
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        district: e.target.value,
+                        taluka: "",
+                        city: "",
+                      }));
+                    }}
+                  >
+                    <option value="">Select District</option>
+
+                    {headOfficeOptions.districts.map((district) => (
+                      <option key={district} value={district}>
+                        {district}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <label>
-                  City
-                  <input
-                    type="text"
-                    value={form.city}
-                    onChange={(e) => handleFieldChange("city", e.target.value)}
-                    placeholder="Pune"
-                  />
+                  Taluka *
+                  <select
+                    value={form.taluka}
+                    required
+                    disabled={!form.district || locationsLoading}
+                    onChange={(e) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        taluka: e.target.value,
+                        city: "",
+                      }));
+                    }}
+                  >
+                    <option value="">Select Taluka</option>
+
+                    {headOfficeOptions.talukas.map((taluka) => (
+                      <option key={taluka} value={taluka}>
+                        {taluka}
+                      </option>
+                    ))}
+                  </select>
                 </label>
+
+                {locationsError && (
+                  <p className="form-error">{locationsError}</p>
+                )}
+
 
                 <label>
                   PIN Code
@@ -941,7 +1120,6 @@ function CustomerCreation() {
                       handleFieldChange("contact_person", e.target.value)
                     }
                     placeholder="Rahul Sharma"
-                    required
                   />
                 </label>
 
@@ -954,7 +1132,6 @@ function CustomerCreation() {
                       handleFieldChange("contact_person_email", e.target.value)
                     }
                     placeholder="admin@bank.com"
-                    required
                   />
                   <small className="field-hint">
                     This email will be used for portal login.
@@ -970,7 +1147,6 @@ function CustomerCreation() {
                       handleFieldChange("admin_mobile", e.target.value)
                     }
                     placeholder="+91 98765 43210"
-                    required
                   />
                 </label>
 
@@ -1307,7 +1483,6 @@ function CustomerCreation() {
                         setAssignError("");
                         setAssignSuccess("");
                       }}
-                      required
                     >
                       <option value="">Choose a customer</option>
                       {assignCustomers.map((customer) => (
@@ -1328,7 +1503,6 @@ function CustomerCreation() {
                         setAssignError("");
                         setAssignSuccess("");
                       }}
-                      required
                       disabled={!assignCustomerId}
                     >
                       

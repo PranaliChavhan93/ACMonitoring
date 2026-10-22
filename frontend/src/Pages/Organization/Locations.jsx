@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw, Search, MapPin, Building2 } from "lucide-react";
 import "./Locations.css";
 
-const API_BASE = "http://192.168.1.5:8000/api";
+const API_BASE = "http://192.168.1.7:8000/api";
 const FILTER_LOCATIONS_URL = `${API_BASE}/v1/filters/locations/`;
 const BRANCHES_URL = `${API_BASE}/branches/`;
 
@@ -452,27 +452,27 @@ function Locations () {
 
             {String(currentUser?.role ?? currentUser?.user_role ?? "").toUpperCase() === "ORG_SUPER_ADMIN" && (
                 <div className="form-group" style={{ maxWidth: 420, marginBottom: 18 }}>
-                <label>Customer *</label>
-                <select value={selectedCustomer} onChange={(e) => setSelectedCustomer(e.target.value)}>
-                    <option value="">All</option>
-                    {customers.map((customer) => (
-                        <option key={getItemId(customer)} value={getItemId(customer)}>
-                            {getItemLabel(customer)}
-                        </option>
-                    ))}
-                </select>
+                    <label>Customer *</label>
+                    <select value={selectedCustomer} onChange={(e) => setSelectedCustomer(e.target.value)}>
+                        <option value="">All</option>
+                        {customers.map((customer) => (
+                            <option key={getItemId(customer)} value={getItemId(customer)}>
+                                {getItemLabel(customer)}
+                            </option>
+                        ))}
+                    </select>
                 </div>
             )}
 
             <div className="location-summary">
                 <div className="summary-card">
-                <div className="summary-icon branch-icon"><Building2 size={21} /></div>
-                <div className="summary-content"><span>Total Branches</span><strong>{branches.length}</strong></div>
+                    <div className="summary-icon branch-icon"><Building2 size={21} /></div>
+                    <div className="summary-content"><span>Total Branches</span><strong>{branches.length}</strong></div>
                 </div>
-                <div className="summary-card">
-                <div className="summary-icon state-icon"><MapPin size={21} /></div>
-                <div className="summary-content"><span>States</span><strong>{totalStates}</strong></div>
-                </div>
+                {/* <div className="summary-card">
+                    <div className="summary-icon state-icon"><MapPin size={21} /></div>
+                    <div className="summary-content"><span>States</span><strong>{totalStates}</strong></div>
+                </div> */}
             </div>
 
             {error && <div className="location-error"><strong>Unable to load branches</strong><span>{error}</span></div>}
@@ -497,25 +497,25 @@ function Locations () {
                                 <th>Branch</th>
                                 <th>Code</th>
                                 <th>Hierarchy</th>
-                                <th>Parent</th>
+                                {/* <th>Parent</th> */}
                                 <th>Address</th>
                             </tr>
                         </thead>
 
                         <tbody>
                             {filteredBranches.map((branch) => {
-                            const parent = branch.taluka_name || branch.city_name || branch.division_name || "—";
-                            const hierarchy = branch.hierarchy_type || customerHierarchy || "—";
-                            const sync = branch.tpt_sync_status || (branch.tpt_branch_id ? "SYNCED" : "UNKNOWN");
-                            return (
-                                <tr key={branch.id || branch.pk || branch.code}>
-                                <td><strong>{branch.name || "—"}</strong></td>
-                                <td>{branch.code || "—"}</td>
-                                <td>{hierarchy}</td>
-                                <td>{parent}</td>
-                                <td>{branch.address || "—"}</td>
-                                </tr>
-                            );
+                                const parent = branch.taluka_name || branch.city_name || branch.division_name || "—";
+                                const hierarchy = branch.hierarchy_type || customerHierarchy || "—";
+                                const sync = branch.tpt_sync_status || (branch.tpt_branch_id ? "SYNCED" : "UNKNOWN");
+                                return (
+                                    <tr key={branch.id || branch.pk || branch.code}>
+                                    <td><strong>{branch.name || "—"}</strong></td>
+                                    <td>{branch.code || "—"}</td>
+                                    <td>{hierarchy}</td>
+                                    {/* <td>{parent}</td> */}
+                                    <td>{branch.address || "—"}</td>
+                                    </tr>
+                                );
                             })}
                         </tbody>
                     </table>
@@ -574,7 +574,6 @@ function Locations () {
                                             .slice(0, 11),
                                     })
                                 }
-                                required
                                 maxLength={11}
                                 placeholder="e.g. HDFC0001234"
                             />
@@ -588,7 +587,6 @@ function Locations () {
                             <select
                                 value={hasFloor}
                                 onChange={(e) => handleHasFloorChange(e.target.value)}
-                                required
                             >
                                 <option value="">Select</option>
                                 <option value="yes">Yes</option>
@@ -607,7 +605,6 @@ function Locations () {
                                         value={floorCount}
                                         onChange={(e) => handleFloorCountChange(e.target.value)}
                                         placeholder="e.g. 3"
-                                        required
                                     />
                                 </div>
 

@@ -34,7 +34,9 @@ const normalizeList = (result) =>
       ? result.data
       : Array.isArray(result?.results)
         ? result.results
-        : [];
+        : Array.isArray(result?.data?.results)
+          ? result.data.results
+          : [];
 
 const emptyForm = {
   id: null,
@@ -50,7 +52,7 @@ const emptyForm = {
 };
 
 const hierarchyLabel = {
-  GEOGRAPHICAL: "Geographical — State → District → Taluka → City → Branch",
+  GEOGRAPHICAL: "Geographical — State → District → Taluka → Branch",
   ZONAL: "Zonal — Zone → Circle → Region → Division → Branch",
 };
 
@@ -85,17 +87,45 @@ const Admin_Creation = () => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(timer);
-}, [toast]);
+  }, [toast]);
+
+  
+const getCustomerId = (user) => {
+  const customer = user?.customer;
+
+  return (
+    customer?.id ??
+    customer?.pk ??
+    (typeof customer === "string" || typeof customer === "number"
+      ? customer
+      : null) ??
+    user?.customer_id ??
+    user?.scopeId ??
+    ""
+  );
+};
 
   const currentCustomerId = useMemo(() => {
     if (!isCustomerUser) return "";
-    return String(
-      currentUser?.customer ??
-      currentUser?.customer_id ??
-      currentUser?.scopeId ??
-      ""
-    );
+    return String(getCustomerId(currentUser) || "");
   }, [currentUser, isCustomerUser]);
+
+  const selectedCustomer = useMemo(() => {
+    const id = String(form.customer || currentCustomerId || "");
+
+    return (
+      customers.find((customer) => String(customer.id) === id) ||
+      null
+    );
+  }, [customers, form.customer, currentCustomerId]);
+
+  const hierarchy = (
+    isCustomerUser
+      ? currentUser?.customer_hierarchy_type ??
+        currentUser?.customer?.hierarchy_type
+      : selectedCustomer?.hierarchy_type || form.hierarchy_type
+  ) || "";
+
 
   const currentCustomerName = useMemo(
     () => currentUser?.scope_name || currentUser?.customer_name || "Your Customer",
@@ -137,49 +167,72 @@ const Admin_Creation = () => {
     }
   }, [isSuperAdmin]);
 
-  const selectedCustomer = useMemo(() => {
-    const id = String(form.customer || currentCustomerId || "");
-    return customers.find((customer) => String(customer.id) === id) || null;
-  }, [customers, form.customer, currentCustomerId]);
-
-  const hierarchy = isCustomerUser
-    ? currentUser?.customer_hierarchy_type
-    : form.hierarchy_type || selectedCustomer?.hierarchy_type || "";
-
+  
   const fetchLocations = useCallback(async (customerId, hierarchyType) => {
     setStates([]);
     setZones([]);
+    setFormError("");
+
     if (!customerId || !hierarchyType) return;
 
     setLocationsLoading(true);
+
     try {
+      const endpoint =
+        hierarchyType === "GEOGRAPHICAL"
+          ? STATES_URL
+          : hierarchyType === "ZONAL"
+            ? ZONES_URL
+            : null;
+
+      if (!endpoint) {
+        throw new Error(`Unsupported hierarchy: ${hierarchyType}`);
+      }
+
+      const url = new URL(endpoint);
+      url.searchParams.set("customer", String(customerId));
+
+      const response = await fetch(url.toString(), {
+        headers: authHeaders(),
+        cache: "no-store",
+      });
+
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(
+          result?.detail ||
+          result?.message ||
+          `Unable to load locations (HTTP ${response.status})`
+        );
+      }
+
+      const locations = normalizeList(result);
+
       if (hierarchyType === "GEOGRAPHICAL") {
-        const response = await fetch(
-          `${STATES_URL}?customer=${encodeURIComponent(customerId)}`,
-          { headers: authHeaders(), cache: "no-store" }
-        );
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(result?.detail || `HTTP ${response.status}`);
-        }
-        setStates(normalizeList(result));
+        setStates(locations);
+        setZones([]);
       } else {
-        const response = await fetch(
-          `${ZONES_URL}?customer=${encodeURIComponent(customerId)}`,
-          { headers: authHeaders(), cache: "no-store" }
+        setZones(locations);
+        setStates([]);
+      }
+
+      if (locations.length === 0) {
+        setFormError(
+          `No ${
+            hierarchyType === "GEOGRAPHICAL" ? "states" : "zones"
+          } found for this customer. Check the backend customer filter.`
         );
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(result?.detail || `HTTP ${response.status}`);
-        }
-        setZones(normalizeList(result));
       }
     } catch (err) {
+      setStates([]);
+      setZones([]);
       setFormError(err.message || "Unable to load hierarchy locations.");
     } finally {
       setLocationsLoading(false);
     }
   }, []);
+
 
   useEffect(() => {
     fetchAdmins();
@@ -296,7 +349,10 @@ const Admin_Creation = () => {
   };
 
   const handleCustomerChange = (customerId) => {
-    const customer = customers.find((item) => String(item.id) === String(customerId));
+    const customer = customers.find(
+      (item) => String(item.id) === String(customerId)
+    );
+
     setForm((previous) => ({
       ...previous,
       customer: customerId,
@@ -304,6 +360,10 @@ const Admin_Creation = () => {
       state: "",
       zone: "",
     }));
+
+    setStates([]);
+    setZones([]);
+    setFormError("");
   };
 
   const handleSubmit = async (event) => {
@@ -442,7 +502,11 @@ const Admin_Creation = () => {
               <input
                 className="admins-search"
                 style={{ paddingLeft: 36, width: "100%" }}
-                placeholder="Search by name, email, customer, state or zone..."
+                placeholder={
+                  isCustomerUser
+                    ? "Search by name, email, state or zone..."
+                    : "Search by name, email, customer, state or zone..."
+                }
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
@@ -466,7 +530,8 @@ const Admin_Creation = () => {
                   <tr>
                     <th>Name</th>
                     <th>Email</th>
-                    <th>Customer</th>
+                    {/* <th>Customer</th>  */}
+                    {!isCustomerUser && <th>Customer</th>}
                     <th>Hierarchy</th>
                     <th>Assigned Scope</th>
                     <th>Status</th>
@@ -478,7 +543,12 @@ const Admin_Creation = () => {
                     <tr key={admin.id}>
                       <td>{admin.name || "—"}</td>
                       <td>{admin.email || "—"}</td>
-                      <td>{admin.customer_name || admin.customer?.company || "—"}</td>
+                      {/* <td>{admin.customer_name || admin.customer?.company || "—"}</td> */}
+                      {!isCustomerUser && (
+                        <td>
+                          {admin.customer_name || admin.customer?.company || "—"}
+                        </td>
+                      )}
                       <td>{hierarchyLabel[admin.customer_hierarchy_type] || "—"}</td>
                       <td>
                         {admin.customer_hierarchy_type === "ZONAL"
@@ -534,7 +604,6 @@ const Admin_Creation = () => {
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  required
                 />
               </label>
 
@@ -544,7 +613,6 @@ const Admin_Creation = () => {
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  required
                 />
               </label>
 
@@ -562,7 +630,7 @@ const Admin_Creation = () => {
                   type="password"
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
-                  required={!form.id}
+                  // required={!form.id}
                 />
               </label>
 
@@ -572,7 +640,6 @@ const Admin_Creation = () => {
                   <select
                     value={form.customer}
                     onChange={(e) => handleCustomerChange(e.target.value)}
-                    required
                   >
                     <option value="">Select Customer</option>
                     {customers.map((customer) => (
@@ -610,7 +677,6 @@ const Admin_Creation = () => {
                       setForm({ ...form, state: e.target.value })
                     }
                     disabled={locationsLoading}
-                    required
                   >
                     <option value="">
                       {locationsLoading ? "Loading states..." : "Select State"}
@@ -633,7 +699,6 @@ const Admin_Creation = () => {
                       setForm({ ...form, zone: e.target.value })
                     }
                     disabled={locationsLoading}
-                    required
                   >
                     <option value="">
                       {locationsLoading ? "Loading zones..." : "Select Zone"}

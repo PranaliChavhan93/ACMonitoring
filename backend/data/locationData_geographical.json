@@ -30131,163 +30131,6 @@
                             {
                                 "taluka_id": "MH-D01-T01",
                                 "taluka_name": "Pune Taluka",
-                                "cities": [
-                                    {
-                                        "city_id": "MH-D01-T01-C01",
-                                        "city_name": "Pune",
-                                        "branches": [
-                                            {
-                                                "branch_id": "MH-B01",
-                                                "branch_name": "Pune Branch 01",
-                                                "floors": [],
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-MH-B01-04",
-                                                        "device_name": "AC-04",
-                                                        "status": "OFF",
-                                                        "ac_id": "AC-MH-B01-04"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "branch_id": "BA-01",
-                                                "branch_name": "Baner",
-                                                "floors": [],
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-005",
-                                                        "device_name": "AC-005",
-                                                        "status": "ON",
-                                                        "physical_site_id": "bca6213a-1c63-4bde-bdc9-3a3224177c5d",
-                                                        "physical_site_name": "SBI Kothrud",
-                                                        "physical_site_code": "BA-01",
-                                                        "capacity_ton": 2.5,
-                                                        "installation_date": "2023-10-20",
-                                                        "last_maintenance_date": "2026-05-12"
-                                                    }
-                                                ],
-                                                "hierarchy_type": "GEOGRAPHICAL",
-                                                "state_id": "MH",
-                                                "state_name": "Maharashtra",
-                                                "district_id": "MH-D01",
-                                                "district_name": "Pune",
-                                                "taluka_id": "MH-D01-T01",
-                                                "taluka_name": "Pune Taluka",
-                                                "city_id": "MH-D01-T01-C01",
-                                                "city_name": "Pune",
-                                                "customer_id": 5,
-                                                "admin_ids": [],
-                                                "engineer_ids": [],
-                                                "physical_sites": [
-                                                    {
-                                                        "site_id": "bca6213a-1c63-4bde-bdc9-3a3224177c5d",
-                                                        "site_code": "BA-01",
-                                                        "site_name": "SBI Kothrud",
-                                                        "branch_id": "BA-01",
-                                                        "branch_name": "Baner",
-                                                        "floor_id": "",
-                                                        "floor_name": "",
-                                                        "address": "Durian Furniture, Mont Vert Apex Baner Road, Dist, opp. Orchid School, Baner, Pune,",
-                                                        "pincode": "411045"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "branch_id": "KN-01",
-                                                "branch_name": "Karve Nagar",
-                                                "floors": [],
-                                                "sites": [],
-                                                "hierarchy_type": "GEOGRAPHICAL",
-                                                "state_id": "MH",
-                                                "state_name": "Maharashtra",
-                                                "district_id": "MH-D01",
-                                                "district_name": "Pune",
-                                                "taluka_id": "MH-D01-T01",
-                                                "taluka_name": "Pune Taluka",
-                                                "city_id": "MH-D01-T01-C01",
-                                                "city_name": "Pune",
-                                                "customer_id": 5,
-                                                "admin_ids": [],
-                                                "engineer_ids": [],
-                                                "physical_sites": [
-                                                    {
-                                                        "site_id": "4cfa409b-5f47-43a1-ac02-b0cd7dd5329e",
-                                                        "site_code": "KN-01",
-                                                        "site_name": "Karve Nagar",
-                                                        "branch_id": "KN-01",
-                                                        "branch_name": "Karve Nagar",
-                                                        "floor_id": "",
-                                                        "floor_name": "",
-                                                        "address": "Samarth Path, near Pratidnya Mangal Karyalaya, Hingne Budrukh, Karve Nagar",
-                                                        "pincode": "411052"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "branch_id": "KO-01",
-                                                "branch_name": "Kothrud",
-                                                "floors": [],
-                                                "sites": [],
-                                                "hierarchy_type": "GEOGRAPHICAL",
-                                                "state_id": "MH",
-                                                "state_name": "Maharashtra",
-                                                "district_id": "MH-D01",
-                                                "district_name": "Pune",
-                                                "taluka_id": "MH-D01-T01",
-                                                "taluka_name": "Pune Taluka",
-                                                "city_id": "MH-D01-T01-C01",
-                                                "city_name": "Pune",
-                                                "customer_id": 5,
-                                                "admin_ids": [],
-                                                "engineer_ids": [],
-                                                "physical_sites": [
-                                                    {
-                                                        "site_id": "08d4dd13-15ab-403d-a2b7-f7f3abbf4400",
-                                                        "site_code": "KO-01",
-                                                        "site_name": "SBI Kothrud",
-                                                        "branch_id": "KO-01",
-                                                        "branch_name": "Kothrud",
-                                                        "floor_id": "",
-                                                        "floor_name": "",
-                                                        "address": "Paud Rd, opposite Anandanagar, LIC Colony, Rambaug Colony, Kothrud",
-                                                        "pincode": "411038"
-                                                    }
-                                                ]
-                                            },
-                                            {
-                                                "branch_id": "SN-01",
-                                                "branch_name": "Shijavi Nagar",
-                                                "floors": [],
-                                                "sites": [],
-                                                "hierarchy_type": "GEOGRAPHICAL",
-                                                "state_id": "MH",
-                                                "state_name": "Maharashtra",
-                                                "district_id": "MH-D01",
-                                                "district_name": "Pune",
-                                                "taluka_id": "MH-D01-T01",
-                                                "taluka_name": "Pune Taluka",
-                                                "city_id": "MH-D01-T01-C01",
-                                                "city_name": "Pune",
-                                                "customer_id": 9,
-                                                "admin_ids": [],
-                                                "engineer_ids": [],
-                                                "physical_sites": [
-                                                    {
-                                                        "site_id": "b0b44fc5-5d7c-4540-b521-76efd48587d5",
-                                                        "site_code": "SN-01",
-                                                        "site_name": "BOM Shivaji Nagar",
-                                                        "branch_id": "SN-01",
-                                                        "branch_name": "Shijavi Nagar",
-                                                        "floor_id": "",
-                                                        "floor_name": "",
-                                                        "address": "Bank of Maharashtra, 1501, Shivajinagar, Lokmangal, Pune",
-                                                        "pincode": "411005"
-                                                    }
-                                                ]
-                                            }
-                                        ]
-                                    }
-                                ],
                                 "branches": [
                                     {
                                         "branch_id": "KO-01",
@@ -30358,6 +30201,24 @@
                                         "taluka_id": "MH-D01-T01",
                                         "taluka_name": "Pune Taluka",
                                         "customer_id": 5,
+                                        "admin_ids": [],
+                                        "engineer_ids": []
+                                    },
+                                    {
+                                        "branch_id": "MI-01",
+                                        "branch_name": "Minakshipuram",
+                                        "address": "Ganga Bhagyoday, Next to Manik Baug Petrol Pump, Sinhagad Road, Vadgaon Budruk, Pune",
+                                        "pincode": "411041",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T01",
+                                        "taluka_name": "Pune Taluka",
+                                        "customer_id": 12,
                                         "admin_ids": [],
                                         "engineer_ids": []
                                     }
@@ -32512,14 +32373,265 @@
                         ]
                     },
                     {
-                        "district_id": "MH-D18",
-                        "district_name": "Mumbai",
-                        "talukas": []
+                        "district_id": "MH-D01",
+                        "district_name": "Mumbai City",
+                        "talukas": [
+                            {
+                                "taluka_id": "MH-D01-T00-C01",
+                                "taluka_name": "Fort",
+                                "branches": [
+                                    {
+                                        "branch_id": "MC-01",
+                                        "branch_name": "ICICI Pru AMC \u2013 Fort",
+                                        "address": "2nd Floor, Brady House, 12/14, Veer Nariman Road, Fort, Mumbai",
+                                        "pincode": "400001",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Mumbai City",
+                                        "taluka_id": "MH-D01-T00-C01",
+                                        "taluka_name": "Fort"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D01-T00-C02",
+                                "taluka_name": "Bandra West",
+                                "branches": [
+                                    {
+                                        "branch_id": "MC-02",
+                                        "branch_name": "IDBI Bank \u2013 Bandra West",
+                                        "address": "Utsahi Bldg, Rebellow Road, Near Mount Mary Steps, Ground Floor, Bandra (West), Mumbai",
+                                        "pincode": "400050",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Mumbai City",
+                                        "taluka_id": "MH-D01-T00-C02",
+                                        "taluka_name": "Bandra West"
+                                    },
+                                    {
+                                        "branch_id": "MC-03",
+                                        "branch_name": "IndusInd Bank \u2013 Bandra West",
+                                        "address": "IndusInd Centre, 231, S. V. Road, Bandra (West), Mumbai",
+                                        "pincode": "400050",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Mumbai City",
+                                        "taluka_id": "MH-D01-T00-C02",
+                                        "taluka_name": "Bandra West"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D01-T00-C03",
+                                "taluka_name": "Bandra Kurla Complex",
+                                "branches": [
+                                    {
+                                        "branch_id": "MC-04",
+                                        "branch_name": "HDFC Bank \u2013 BKC (G Block)",
+                                        "address": "Shop No 11, Ground Floor, Kembara INS Tower, Opp Indian Oil Petrol Pump, G Block, BKC, Bandra, Mumbai",
+                                        "pincode": "400051",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Mumbai City",
+                                        "taluka_id": "MH-D01-T00-C03",
+                                        "taluka_name": "Bandra Kurla Complex"
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     {
-                        "district_id": "MH-D19",
+                        "district_id": "MH-D02",
                         "district_name": "Mumbai Suburban",
-                        "talukas": []
+                        "talukas": [
+                            {
+                                "taluka_id": "MH-D02-T01-C01",
+                                "taluka_name": "Andheri East",
+                                "branches": [
+                                    {
+                                        "branch_id": "AN-01",
+                                        "branch_name": "Tamilnad Mercantile Bank \u2013 Andheri East",
+                                        "address": "Unit No.14, Bldg.no.2, Mittal Indust. Estate, Marol Naka, Andheri E, Mumbai",
+                                        "pincode": "400059",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T01-C01",
+                                        "taluka_name": "Andheri East"
+                                    },
+                                    {
+                                        "branch_id": "AN-02",
+                                        "branch_name": "IndusInd Bank \u2013 Andheri East",
+                                        "address": "Acme Plaza, C.T.S. No. 32, Opp. Sangam Talkies, Andheri\u2011Kurla Road, Andheri (E), Mumbai",
+                                        "pincode": "400059",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T01-C01",
+                                        "taluka_name": "Andheri East"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D02-T01-C02",
+                                "taluka_name": "Andheri West",
+                                "branches": [
+                                    {
+                                        "branch_id": "AN-03",
+                                        "branch_name": "Bandhan Bank \u2013 Andheri West",
+                                        "address": "Shop No 2, Ground Floor, Holar Samaj CHS, Plot No 11, S H O, Four Bungalows, J P Road, Andheri W, Mumbai",
+                                        "pincode": "400053",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T01-C02",
+                                        "taluka_name": "Andheri West"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D02-T02-C01",
+                                "taluka_name": "Borivali West",
+                                "branches": [
+                                    {
+                                        "branch_id": "BO-01",
+                                        "branch_name": "Axis Bank \u2013 Borivali West (IC Colony)",
+                                        "address": "Purv Deep CHSL, Mandpeshwar Road, Opp. Bhagwati Hospital, Borivali West, Mumbai",
+                                        "pincode": "400103",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T02-C01",
+                                        "taluka_name": "Borivali West"
+                                    },
+                                    {
+                                        "branch_id": "BO-02",
+                                        "branch_name": "IDBI Bank \u2013 Borivali West",
+                                        "address": "Star Apartment, S V Road, New Borivali Police Station, Opp SBI, Borivali (West), Mumbai",
+                                        "pincode": "400092",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T02-C01",
+                                        "taluka_name": "Borivali West"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D02-T02-C02",
+                                "taluka_name": "Borivali East",
+                                "branches": [
+                                    {
+                                        "branch_id": "BO-03",
+                                        "branch_name": "Yes Bank \u2013 Borivali East",
+                                        "address": "Shop no. 1 to 5, Ground Floor, Gangadhar Nagar Co\u2011Operative Housing Society Ltd, Shri Krishna Nagar, Borivali (East), Mumbai",
+                                        "pincode": "400066",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T02-C02",
+                                        "taluka_name": "Borivali East"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D02-T03-C01",
+                                "taluka_name": "Kurla West",
+                                "branches": [
+                                    {
+                                        "branch_id": "KU-01",
+                                        "branch_name": "Axis Bank \u2013 Kurla West",
+                                        "address": "Rockcel Co\u2011Op Hsg. Soc. Ltd, LBS Marg, Opp. Kamani Petrol Pump, Kamani, Kurla (W), Mumbai",
+                                        "pincode": "400070",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T03-C01",
+                                        "taluka_name": "Kurla West"
+                                    },
+                                    {
+                                        "branch_id": "KU-02",
+                                        "branch_name": "HDFC Bank \u2013 Kurla West",
+                                        "address": "Gr. Floor, Mayflower CHS Ltd, Opp. Mukund Steel, LBS Marg, Kurla (W), Mumbai",
+                                        "pincode": "400070",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T03-C01",
+                                        "taluka_name": "Kurla West"
+                                    }
+                                ]
+                            },
+                            {
+                                "taluka_id": "MH-D02-T03-C02",
+                                "taluka_name": "Chembur",
+                                "branches": [
+                                    {
+                                        "branch_id": "KU-03",
+                                        "branch_name": "Kotak Mahindra Bank \u2013 Chembur",
+                                        "address": "Basant Vihar Commercial Complex CHS, Dr. C. Gidwani Marg, Near Basant Cinema, Chembur, Mumbai",
+                                        "pincode": "400074",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D02",
+                                        "district_name": "Mumbai Suburban",
+                                        "taluka_id": "MH-D02-T03-C02",
+                                        "taluka_name": "Chembur"
+                                    }
+                                ]
+                            }
+                        ]
                     },
                     {
                         "district_id": "MH-D20",

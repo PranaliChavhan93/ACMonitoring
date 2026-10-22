@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://192.168.1.5:8000/api";
+const API_BASE = "http://192.168.1.7:8000/api";
 
 const DEFAULT_3TP_DEVICE_ID = "fdf8b310-c3d9-11f1-9fbd-e7ab598bb869";
 const KEYS = ["fault", "fault_type", "reason", "recommendation", "severity"];

@@ -1,9 +1,155 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://192.168.1.5:8000/api/v1/filters/locations/";
+const API_BASE = "http://192.168.1.7:8000/api/v1/filters/locations/";
 
 const DEFAULT_COUNTRY = "India";
+
+
+// export const HIERARCHY_CONFIG = {
+//   // GEOGRAPHICAL: {
+//   //   label: "Geographical",
+//   //   levels: [
+//   //     {
+//   //       name: "country",
+//   //       label: "Country",
+//   //       field: "country_name",
+//   //       childrenKey: "states",
+//   //     },
+//   //     {
+//   //       name: "state",
+//   //       label: "State",
+//   //       field: "state_name",
+//   //       childrenKey: "districts",
+//   //     },
+//   //     {
+//   //       name: "district",
+//   //       label: "District",
+//   //       field: "district_name",
+//   //       childrenKey: "talukas",
+//   //     },
+//   //     {
+//   //       name: "taluka",
+//   //       label: "Taluka",
+//   //       field: "taluka_name",
+//   //       childrenKey: "branches",
+//   //     },
+//   //     {
+//   //       name: "branch",
+//   //       label: "Branch",
+//   //       field: "branch_name",
+//   //       childrenKey: "floors",
+//   //     },
+//   //     {
+//   //       name: "floor",
+//   //       label: "Floor",
+//   //       field: "floor_name",
+//   //       childrenKey: null,
+//   //     },
+//   //   ],
+//   // },
+
+//   GEOGRAPHICAL: {
+//     label: "Geographical",
+//     levels: [
+//       {
+//         name: "country",
+//         label: "Country",
+//         field: "country_name",
+//         childrenKey: "states",
+//       },
+//       {
+//         name: "state",
+//         label: "State",
+//         field: "state_name",
+//         childrenKey: "districts",
+//       },
+//       {
+//         name: "district",
+//         label: "District",
+//         field: "district_name",
+//         childrenKey: "talukas",
+//       },
+//       {
+//         name: "taluka",
+//         label: "Taluka",
+//         field: "taluka_name",
+//         childrenKey: "branches",
+//       },
+//       // {
+//       //   name: "city",
+//       //   label: "City",
+//       //   field: "city_name",
+//       //   childrenKey: "branches",
+//       // },
+//       {
+//         name: "branch",
+//         label: "Branch",
+//         field: "branch_name",
+//         childrenKey: "floors",
+//       },
+//       {
+//         name: "floor",
+//         label: "Floor",
+//         field: "floor_name",
+//         childrenKey: null,
+//       },
+//     ],
+//   },
+
+//   ZONAL: {
+//     label: "Zonal",
+//     levels: [
+//       {
+//         name: "country",
+//         label: "Country",
+//         field: "country_name",
+//         childrenKey: "zones",
+//       },
+//       {
+//         name: "zone",
+//         label: "Zone",
+//         field: "zone_name",
+//         childrenKey: "circles",
+//       },
+//       {
+//         name: "circle",
+//         label: "Circle",
+//         field: "circle_name",
+//         childrenKey: "regions",
+//       },
+//       {
+//         name: "region",
+//         label: "Region",
+//         field: "region_name",
+//         childrenKey: "divisions",
+//       },
+//       {
+//         name: "division",
+//         label: "Division",
+//         field: "division_name",
+//         childrenKey: "branches",
+//       },
+//       {
+//         name: "branch",
+//         label: "Branch",
+//         field: "branch_name",
+//         childrenKey: "floors",
+//       },
+//       {
+//         name: "floor",
+//         label: "Floor",
+//         field: "floor_name",
+//         childrenKey: null,
+//       },
+//     ],
+//   },
+// };
+
+// ---------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------
+
 
 export const HIERARCHY_CONFIG = {
   GEOGRAPHICAL: {
@@ -37,12 +183,12 @@ export const HIERARCHY_CONFIG = {
         name: "branch",
         label: "Branch",
         field: "branch_name",
-        childrenKey: "floors",
+        childrenKey: "devices",
       },
       {
-        name: "floor",
-        label: "Floor",
-        field: "floor_name",
+        name: "device",
+        label: "Available Devices",
+        field: "device_name",
         childrenKey: null,
       },
     ],
@@ -85,21 +231,60 @@ export const HIERARCHY_CONFIG = {
         name: "branch",
         label: "Branch",
         field: "branch_name",
-        childrenKey: "floors",
+        childrenKey: "devices",
       },
       {
-        name: "floor",
-        label: "Floor",
-        field: "floor_name",
+        name: "device",
+        label: "Available Devices",
+        field: "device_name",
         childrenKey: null,
       },
     ],
   },
 };
 
-// ---------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------
+
+const getDeviceId = (device) => {
+  if (typeof device === "string") return device.trim();
+
+  return (
+    device?.tpt_device_id ||
+    device?.thingsboard_device_id ||
+    device?.thingsboard_id ||
+    device?.device_id ||
+    device?.device_uuid ||
+    device?.uuid ||
+    device?.id ||
+    ""
+  );
+};
+
+const getDeviceName = (device) => {
+  if (typeof device === "string") return device;
+
+  return (
+    device?.device_name ||
+    device?.name ||
+    device?.ac_id ||
+    device?.label ||
+    getDeviceId(device) ||
+    "Unnamed device"
+  );
+};
+
+const getDevicesFromBranch = (branch) => {
+  if (!branch) return [];
+
+  const devices = Array.isArray(branch.devices)
+    ? branch.devices
+    : [];
+
+  // Only devices with a usable ThingsBoard UUID are selectable.
+  return devices.filter((device) => getDeviceId(device));
+};
+
+
+
 const getAuthToken = () => {
   const keys = [
     "access_token",
@@ -143,33 +328,78 @@ const pickHierarchy = (preferred, allowedKeys) => {
 };
 
 
+// const buildSelection = (
+//   value,
+//   hierarchy,
+//   lockedValues = {}
+// ) => {
+//   const levels =
+//     HIERARCHY_CONFIG[hierarchy]?.levels || [];
+
+//   return Object.fromEntries(
+//     levels.map((level) => [
+//       level.name,
+//       lockedValues[level.name] ||
+//         value?.[level.name] ||
+//         (level.name === "country" ? DEFAULT_COUNTRY : ""),
+//     ])
+//   );
+// };
+
+// const buildSelection = (
+//   value,
+//   hierarchy,
+//   lockedValues = {}
+// ) => {
+//   const levels =
+//     HIERARCHY_CONFIG[hierarchy]?.levels || [];
+
+//   const selection = Object.fromEntries(
+//     levels.map((level) => [
+//       level.name,
+//       String(
+//         lockedValues?.[level.name] ??
+//           value?.[level.name] ??
+//           (level.name === "country" ? DEFAULT_COUNTRY : "")
+//       ).trim(),
+//     ])
+//   );
+
+//   if (hierarchy === "GEOGRAPHICAL") {
+//     selection.city = String(
+//       lockedValues?.city ?? value?.city ?? ""
+//     ).trim();
+//   }
+
+//   return selection;
+// };
+
+
 const buildSelection = (
   value,
   hierarchy,
   lockedValues = {}
 ) => {
-  const levels =
-    HIERARCHY_CONFIG[hierarchy]?.levels || [];
+  const levels = HIERARCHY_CONFIG[hierarchy]?.levels || [];
 
   return Object.fromEntries(
     levels.map((level) => [
       level.name,
-      lockedValues[level.name] ||
-        value?.[level.name] ||
-        (level.name === "country" ? DEFAULT_COUNTRY : ""),
+      String(
+        lockedValues?.[level.name] ??
+        value?.[level.name] ??
+        (level.name === "country" ? DEFAULT_COUNTRY : "")
+      ).trim(),
     ])
   );
 };
 
-
-// ---------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------
 const FilterDashboard = ({
   initialValue = null,
   restoreVersion = 0,
   allowedHierarchies,
   lockedValues = {},
+  filters = {},
   onFilterChange,
   onReset,
 }) => {
@@ -179,7 +409,7 @@ const FilterDashboard = ({
   );
 
   const allowedSignature = allowedKeys.join("|");
-
+  const [filtersReady, setFiltersReady] = useState(false);
   const initialHierarchy = pickHierarchy(
     initialValue?.hierarchy,
     allowedKeys
@@ -416,9 +646,9 @@ const FilterDashboard = ({
 
     // Special handling for branches created directly
     // under a Taluka in the geographical hierarchy.
+    
     if (hierarchy === "GEOGRAPHICAL") {
       let nodes = filteredTree;
-      let talukaNode = null;
 
       const parentLevels = [
         { name: "country", field: "country_name", key: "states" },
@@ -436,7 +666,7 @@ const FilterDashboard = ({
         nodes = match?.[parent.key] || [];
       }
 
-      talukaNode = (nodes || []).find(
+      const talukaNode = (nodes || []).find(
         (item) =>
           String(item?.taluka_name || "") ===
           String(selected.taluka || "")
@@ -461,22 +691,19 @@ const FilterDashboard = ({
           ? selectedCity.branches
           : [];
 
-        // Without a selected City, show branches directly
-        // under the Taluka. With a City selected, include
-        // its branches as well.
         const branches = [
           ...directBranches,
           ...cityBranches,
         ];
 
         const uniqueBranches = [];
-        const seenBranches = new Set();
+        const seen = new Set();
 
         branches.forEach((branch) => {
           const name = String(branch?.branch_name || "").trim();
 
-          if (name && !seenBranches.has(name)) {
-            seenBranches.add(name);
+          if (name && !seen.has(name)) {
+            seen.add(name);
             uniqueBranches.push(branch);
           }
         });
@@ -491,37 +718,133 @@ const FilterDashboard = ({
             String(selected.branch || "")
         );
 
-        result.floor = selectedBranch
-          ? [
-              ...new Set(
-                (selectedBranch.floors || [])
-                  .map((floor) =>
-                    String(floor?.floor_name || "").trim()
-                  )
-                  .filter(Boolean)
-              ),
-            ]
-          : [];
+        const devices = getDevicesFromBranch(selectedBranch);
+
+        result.device = devices.map((device) => ({
+          value: getDeviceId(device),
+          label: getDeviceName(device),
+        }));
       }
+    } else {
+      // Zonal hierarchy: locate the selected branch and its devices.
+      const branchIndex = levels.findIndex(
+        (level) => level.name === "branch"
+      );
+
+      let nodes = filteredTree;
+      let selectedBranch = null;
+
+      for (let i = 0; i <= branchIndex; i++) {
+        const level = levels[i];
+
+        const match = (nodes || []).find(
+          (item) =>
+            String(item?.[level.field] || "") ===
+            String(selected[level.name] || "")
+        );
+
+        if (!match) {
+          selectedBranch = null;
+          break;
+        }
+
+        if (level.name === "branch") {
+          selectedBranch = match;
+          break;
+        }
+
+        nodes = match?.[level.childrenKey] || [];
+      }
+
+      const devices = getDevicesFromBranch(selectedBranch);
+
+      result.device = devices.map((device) => ({
+        value: getDeviceId(device),
+        label: getDeviceName(device),
+      }));
     }
+
 
     return result;
   }, [filteredTree, levels, selected, hierarchy]);
 
-
-  /*
-   * Send the current filter to the parent component.
-   */
   useEffect(() => {
-    onFilterChange?.({
+    if (loading || !tree.length) return;
+
+    setSelected((previous) => {
+      const next = { ...previous };
+      let changed = false;
+
+      for (const level of levels) {
+        const currentValue = String(
+          next[level.name] || ""
+        ).trim();
+
+        const options = optionsByLevel[level.name] || [];
+
+        if (!currentValue) continue;
+
+        const matchedOption = options.find((option) => {
+          const optionValue =
+            typeof option === "object" && option !== null
+              ? option.value
+              : option;
+
+          return (
+            String(optionValue ?? "").trim().toLowerCase() ===
+            currentValue.toLowerCase()
+          );
+        });
+
+        if (matchedOption) {
+          const matchedValue =
+            typeof matchedOption === "object" &&
+            matchedOption !== null
+              ? matchedOption.value
+              : matchedOption;
+
+          if (String(matchedValue) !== currentValue) {
+            next[level.name] = String(matchedValue);
+            changed = true;
+          }
+        } else {
+          next[level.name] = "";
+          changed = true;
+        }
+      }
+
+      return changed ? next : previous;
+    });
+  }, [loading, tree, levels, optionsByLevel]);
+
+  // useEffect(() => { const deviceId = selected.device || "";
+  //   onFilterChange?.({
+  //     hierarchy,
+  //     ...selected,
+  //     device: deviceId,
+  //     device_id: deviceId,
+  //     selectedDeviceId: deviceId,
+  //   });
+  // }, [hierarchy, selected, onFilterChange]);
+
+
+  useEffect(() => {
+    const deviceId = selected.device || "";
+
+    const nextFilters = {
       hierarchy,
       ...selected,
-    });
-  }, [hierarchy, selected, onFilterChange]);
+      device: deviceId,
+      device_id: deviceId,
+      selectedDeviceId: deviceId,
+    };
 
-  /*
-   * Change the active hierarchy.
-   */
+    console.log("[FilterDashboard] Selected AC:", selected.device);
+    console.log("[FilterDashboard] Sending filters:", nextFilters);
+
+    onFilterChange?.(nextFilters);
+  }, [hierarchy, selected, onFilterChange]);
+  
   const changeHierarchy = (nextHierarchy) => {
     if (!allowedKeys.includes(nextHierarchy)) {
       return;
@@ -643,7 +966,7 @@ const FilterDashboard = ({
       )}
 
       {/* Hierarchy Dropdowns */}
-      {levels.map((level, index) => {
+      {/* {levels.map((level, index) => {
         const locked = lockedValues?.[level.name];
 
         const parent =
@@ -697,7 +1020,59 @@ const FilterDashboard = ({
             ))}
           </select>
         );
+      })} */}
+
+      {levels.map((level, index) => {
+        const locked = lockedValues?.[level.name];
+        const parent = index > 0 ? levels[index - 1] : null;
+        const isDevice = level.name === "device";
+
+        const disabled =
+          Boolean(locked) ||
+          loading ||
+          (isDevice
+            ? !selected.branch
+            : index > 0 && !selected[parent.name]);
+
+        const options = isDevice
+        ? optionsByLevel.device || []
+        : (optionsByLevel[level.name] || []).map((value) => ({
+            value: String(value),
+            label: String(value),
+          }));
+
+      const deviceCount = (optionsByLevel.device || []).length;
+
+        return (
+          <select
+            key={level.name}
+            value={selected[level.name] || ""}
+            disabled={disabled}
+            className="filter-dropdown"
+            onChange={(event) =>
+              changeLevel(level.name, event.target.value)
+            }
+          >
+            <option value="">
+              {loading
+                ? "Loading..."
+                : isDevice
+                  ? `Available ACs (${deviceCount})`
+                  : `Select ${level.label}`}
+            </option>
+
+            {options.map((option) => (
+              <option
+                key={option.value}
+                value={option.value}
+              >
+                {option.label}
+              </option>
+            ))}
+          </select>
+        );
       })}
+
 
       {/* Reset Button */}
       <button

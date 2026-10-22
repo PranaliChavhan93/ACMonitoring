@@ -11,22 +11,23 @@ import FilterDashboard from "./FilterDashboard";
 import ACDashboard from "../../Second_Person/Forntend/ACDashboard";
 import { useAuth } from "../Layout/AuthContext";
 
-const API_BASE = "http://192.168.1.5:8000/api";
+const API_BASE = "http://192.168.1.7:8000/api";
+// const API_BASE = "http://192.168.1.7:8000/api/v1/filters/locations/";
 const API_URL = `${API_BASE}/ac-data/`;
 const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 
-const FILTER_KEYS = [
-    "zone",
-    "state",
-    "district",
-    "taluka",
-    "circle",
-    "region",
-    "division",
-    "city",
-    "branch",
-    "floor",
-];
+// const FILTER_KEYS = [
+//     "zone",
+//     "state",
+//     "district",
+//     "taluka",
+//     "circle",
+//     "region",
+//     "division",
+//     "city",
+//     "branch",
+//     "floor",
+// ];
 
 const FILTER_LABELS = {
     zone: "Zone",
@@ -39,7 +40,23 @@ const FILTER_LABELS = {
     city: "City",
     branch: "Branch",
     floor: "Floor",
+    device: "Device",
 };
+
+const FILTER_KEYS = [
+    "zone",
+    "state",
+    "district",
+    "taluka",
+    "circle",
+    "region",
+    "division",
+    "city",
+    "branch",
+    "floor",
+    "device", // Preserve the selected ThingsBoard device UUID
+];
+
 
 const EMPTY_FILTERS = {
     hierarchy: "GEOGRAPHICAL",
@@ -96,12 +113,98 @@ const normalizeResponse = (result) => {
     return [];
 };
 
-const normalizeFilters = (input = {}) => ({
-    hierarchy: input?.hierarchy || "GEOGRAPHICAL",
-    ...Object.fromEntries(
-        FILTER_KEYS.map((key) => [key, input?.[key] || ""])
-    ),
-});
+const normalizeFilters = (input = {}) => {
+    const normalized = {
+        hierarchy: input.hierarchy || "GEOGRAPHICAL",
+    };
+
+    FILTER_KEYS.forEach((key) => {
+        normalized[key] = input[key] || "";
+    });
+
+    const device =
+        typeof input.device === "string"
+            ? input.device
+            : input.device?.value ||
+            input.device?.uuid ||
+            input.device?.id ||
+            input.device?.tpt_device_id ||
+            input.device?.thingsboard_device_id ||
+            input.device?.thingsboard_id ||
+            input.device?.device_uuid ||
+            input.device?.device_id ||
+            "";
+
+    normalized.device = device;
+
+    normalized.selectedDeviceId =
+        input.selectedDeviceId ||
+        input.device_id ||
+        device;
+
+    normalized.device_id = normalized.selectedDeviceId;
+
+    return normalized;
+};
+
+const getHeadOfficeDefaults = (user) => {
+    const defaults = user?.filter_defaults || {};
+
+    const hierarchy =
+        defaults.hierarchy ||
+        user?.customer_hierarchy_type ||
+        "GEOGRAPHICAL";
+
+    return normalizeFilters({
+        ...EMPTY_FILTERS,
+        ...defaults,
+        hierarchy,
+
+        // Geographical hierarchy
+        state:
+            defaults.state ||
+            user?.head_office_state ||
+            user?.state_name ||
+            "",
+
+        district:
+            defaults.district ||
+            user?.head_office_district ||
+            user?.district_name ||
+            "",
+
+        taluka:
+            defaults.taluka ||
+            user?.head_office_taluka ||
+            "",
+
+        city:
+            defaults.city ||
+            user?.head_office_city_name ||
+            "",
+
+        // Zonal hierarchy
+        zone:
+            defaults.zone ||
+            user?.head_office_zone ||
+            user?.zone_name ||
+            "",
+
+        circle: defaults.circle || "",
+        region: defaults.region || "",
+        division: defaults.division || "",
+
+        branch:
+            defaults.branch ||
+            user?.head_office_branch ||
+            "",
+
+        floor:
+            defaults.floor ||
+            user?.head_office_floor ||
+            "",
+    });
+};
 
 function Org_Dashboard() {
     const { user: currentUser } = useAuth();
@@ -153,7 +256,126 @@ function Org_Dashboard() {
     const [dashboardMessage, setDashboardMessage] = useState("");
     const [restoreVersion, setRestoreVersion] = useState(0);
 
+    const [filtersReady, setFiltersReady] = useState(false);
+    
+    const [dashboardFilters, setDashboardFilters] = useState({});
+
+    // const loadSavedDashboards = useCallback(async () => {
+    //     try {
+    //         const response = await fetch(DASHBOARD_URL, {
+    //             method: "GET",
+    //             headers: authHeaders(),
+    //             cache: "no-store",
+    //         });
+
+    //         if (response.status === 401) {
+    //             throw new Error("Session expired. Please login again.");
+    //         }
+
+    //         if (!response.ok) {
+    //             throw new Error(`Dashboard API HTTP ${response.status}`);
+    //         }
+
+    //         const result = await response.json();
+    //         const dashboards = normalizeResponse(result);
+
+    //         setSavedDashboards(dashboards);
+
+    //         const defaultDashboard =
+    //             dashboards.find((item) => item.is_default) || dashboards[0];
+
+    //         if (defaultDashboard) {
+    //             setActiveDashboardId(defaultDashboard.id);
+    //             setDashboardName(defaultDashboard.name || "My Dashboard");
+    //             setFilters(normalizeFilters(defaultDashboard.main_filters));
+    //             setCardFilters(defaultDashboard.card_filters || {});
+    //             setVisibleWidgets({
+    //                 ...DEFAULT_WIDGETS,
+    //                 ...(defaultDashboard.visible_widgets || {}),
+    //             });
+    //             setRestoreVersion((value) => value + 1);
+    //         }
+    //     } catch (err) {
+    //         console.error("DASHBOARD PREFERENCE LOAD ERROR:", err);
+    //     }
+    // }, []);
+
+    
+    // const loadSavedDashboards = useCallback(async () => {
+    //     setDashboardLoading(true);
+
+    //     try {
+    //         const response = await fetch(DASHBOARD_URL, {
+    //             method: "GET",
+    //             headers: authHeaders(),
+    //             cache: "no-store",
+    //         });
+
+    //         if (response.status === 401) {
+    //             throw new Error("Session expired. Please login again.");
+    //         }
+
+    //         if (!response.ok) {
+    //             throw new Error(`Dashboard API HTTP ${response.status}`);
+    //         }
+
+    //         const result = await response.json();
+    //         const dashboards = normalizeResponse(result);
+
+    //         setSavedDashboards(dashboards);
+
+    //         const defaultDashboard =
+    //             dashboards.find((item) => item.is_default) ||
+    //             dashboards[0];
+
+    //         if (defaultDashboard) {
+    //             // Restore the saved dashboard.
+    //             setActiveDashboardId(defaultDashboard.id);
+    //             setDashboardName(defaultDashboard.name || "My Dashboard");
+
+    //             setFilters(
+    //                 normalizeFilters(defaultDashboard.main_filters)
+    //             );
+
+    //             setCardFilters(defaultDashboard.card_filters || {});
+
+    //             setVisibleWidgets({
+    //                 ...DEFAULT_WIDGETS,
+    //                 ...(defaultDashboard.visible_widgets || {}),
+    //             });
+    //         } else {
+    //             // No saved dashboard exists: use the customer's Head Office.
+    //             const defaultFilters = getHeadOfficeDefaults(currentUser);
+
+    //             setActiveDashboardId(null);
+    //             setDashboardName("My Dashboard");
+    //             setFilters(defaultFilters);
+    //             setCardFilters({});
+    //             setVisibleWidgets(DEFAULT_WIDGETS);
+    //             setRestoreVersion((value) => value + 1);
+    //         }
+    //         setRestoreVersion((value) => value + 1);
+    //     } catch (err) {
+
+            
+    //         console.error("DASHBOARD PREFERENCE LOAD ERROR:", err);
+
+    //         // Fallback if the preference API fails.
+    //         setActiveDashboardId(null);
+    //         setDashboardName("My Dashboard");
+    //         setFilters(getHeadOfficeDefaults(currentUser));
+    //         setCardFilters({});
+    //         setVisibleWidgets(DEFAULT_WIDGETS);
+    //         setRestoreVersion((value) => value + 1);
+    //     } finally {
+    //         setFiltersReady(true);
+    //         setDashboardLoading(false);
+    //     }
+    // }, [currentUser]);
+
     const loadSavedDashboards = useCallback(async () => {
+        setDashboardLoading(true);
+
         try {
             const response = await fetch(DASHBOARD_URL, {
                 method: "GET",
@@ -175,27 +397,89 @@ function Org_Dashboard() {
             setSavedDashboards(dashboards);
 
             const defaultDashboard =
-                dashboards.find((item) => item.is_default) || dashboards[0];
+                dashboards.find((item) => item.is_default) ||
+                dashboards[0];
+
+            let nextFilters;
 
             if (defaultDashboard) {
+                // Restore saved dashboard preferences.
                 setActiveDashboardId(defaultDashboard.id);
-                setDashboardName(defaultDashboard.name || "My Dashboard");
-                setFilters(normalizeFilters(defaultDashboard.main_filters));
+                setDashboardName(
+                    defaultDashboard.name || "My Dashboard"
+                );
+
+                nextFilters = normalizeFilters(
+                    defaultDashboard.main_filters
+                );
+
                 setCardFilters(defaultDashboard.card_filters || {});
+
                 setVisibleWidgets({
                     ...DEFAULT_WIDGETS,
                     ...(defaultDashboard.visible_widgets || {}),
                 });
-                setRestoreVersion((value) => value + 1);
+            } else {
+                // No saved dashboard: select Head Office defaults.
+                setActiveDashboardId(null);
+                setDashboardName("My Dashboard");
+
+                nextFilters = getHeadOfficeDefaults(currentUser);
+
+                setCardFilters({});
+                setVisibleWidgets(DEFAULT_WIDGETS);
             }
+
+            // Enforce access restrictions and apply the selected hierarchy.
+            nextFilters = normalizeFilters({
+                ...nextFilters,
+                ...filterAccess.lockedValues,
+                hierarchy:
+                    filterAccess.allowed.length === 1
+                        ? filterAccess.allowed[0]
+                        : nextFilters.hierarchy,
+            });
+
+            setFilters(nextFilters);
+
+            // Trigger FilterDashboard restoration once.
+            setRestoreVersion((version) => version + 1);
         } catch (err) {
             console.error("DASHBOARD PREFERENCE LOAD ERROR:", err);
+
+            const defaults = getHeadOfficeDefaults(currentUser);
+
+            setActiveDashboardId(null);
+            setDashboardName("My Dashboard");
+            setFilters(
+                normalizeFilters({
+                    ...defaults,
+                    ...filterAccess.lockedValues,
+                    hierarchy:
+                        filterAccess.allowed.length === 1
+                            ? filterAccess.allowed[0]
+                            : defaults.hierarchy,
+                })
+            );
+
+            setCardFilters({});
+            setVisibleWidgets(DEFAULT_WIDGETS);
+            setRestoreVersion((version) => version + 1);
+        } finally {
+            setFiltersReady(true);
+            setDashboardLoading(false);
         }
-    }, []);
+    }, [currentUser, filterAccess]);
 
     useEffect(() => {
+        if (!currentUser) {
+            setFiltersReady(false);
+            return;
+        }
+
+        setFiltersReady(false);
         loadSavedDashboards();
-    }, [loadSavedDashboards]);
+    }, [currentUser, loadSavedDashboards]);
 
     const fetchACData = useCallback(async () => {
         try {
@@ -246,29 +530,46 @@ function Org_Dashboard() {
     }, [filters]);
 
     useEffect(() => {
+        if (!filtersReady) return;
+
         fetchACData();
+
         const interval = setInterval(fetchACData, 2000);
+
         return () => clearInterval(interval);
-    }, [fetchACData]);
+    }, [fetchACData, filtersReady]);
 
     const handleFilterChange = useCallback((newFilters) => {
-        const nextFilters = normalizeFilters(newFilters);
-        console.log("SELECTED FILTERS:", nextFilters);
-        setFilters(nextFilters);
-    }, []);
+        console.log("[Org Dashboard] Received filters:", newFilters);
+
+        setFilters({
+            ...newFilters,
+            device: newFilters.device || "",
+            device_id: newFilters.device_id || "",
+            selectedDeviceId: newFilters.selectedDeviceId || "",
+        });
+        }, []);
+
+    // const handleResetFilters = useCallback(() => {
+    //     const defaults = getHeadOfficeDefaults(currentUser);
+
+    //     const scoped = {
+    //         ...defaults,
+    //         ...filterAccess.lockedValues,
+    //         hierarchy:
+    //             filterAccess.allowed[0] || defaults.hierarchy,
+    //     };
+
+    //     setFilters(normalizeFilters(scoped));
+    //     setCardFilters({});
+    //     setRestoreVersion((value) => value + 1);
+    // }, [currentUser, filterAccess]);
 
     const handleResetFilters = useCallback(() => {
-        const hierarchy = filterAccess.allowed[0] || EMPTY_FILTERS.hierarchy;
-        const scoped = {
-            hierarchy,
-            ...Object.fromEntries(FILTER_KEYS.map((key) => [
-                key, filterAccess.lockedValues?.[key] || "",
-            ])),
-        };
-        setFilters(scoped);
+        setFilters(getHeadOfficeDefaults(currentUser));
         setCardFilters({});
         setRestoreVersion((value) => value + 1);
-    }, [filterAccess]);
+    }, [currentUser]);
 
     const handleCardFilterChange = useCallback((nextCardFilters) => {
         setCardFilters((previous) => ({
@@ -336,14 +637,21 @@ function Org_Dashboard() {
     ]);
 
     const createNewDashboard = useCallback(() => {
+        const defaults = getHeadOfficeDefaults(currentUser);
+
         setActiveDashboardId(null);
         setDashboardName("My Dashboard");
-        setFilters(EMPTY_FILTERS);
+        setFilters({
+            ...defaults,
+            ...filterAccess.lockedValues,
+            hierarchy:
+                filterAccess.allowed[0] || defaults.hierarchy,
+        });
         setCardFilters({});
         setVisibleWidgets(DEFAULT_WIDGETS);
         setRestoreVersion((value) => value + 1);
         setDashboardMessage("New dashboard");
-    }, []);
+    }, [currentUser, filterAccess]);
 
     const loadDashboard = useCallback((dashboard) => {
         setActiveDashboardId(dashboard.id);

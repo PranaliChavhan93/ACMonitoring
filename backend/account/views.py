@@ -3191,6 +3191,59 @@ def _scoped_tree(location_file, user):
     tree = ownership.filter_tree_for_user(tree, user)
     return ownership.attach_owner_details(tree)
 
+
+from django.db.models import Field
+
+def find_invalid_fields(value, path="data"):
+    problems = []
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            problems.extend(
+                find_invalid_fields(item, f"{path}.{key}")
+            )
+
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            problems.extend(
+                find_invalid_fields(item, f"{path}[{index}]")
+            )
+
+    elif isinstance(value, Field):
+        problems.append(
+            f"{path} contains a Django {type(value).__name__}"
+        )
+
+    problems = find_invalid_fields(data)
+    print("INVALID LOCATION FIELDS:", problems)
+
+    return problems
+
+def find_non_json_values(value, path="data"):
+    """Find Django field objects or other unexpected values in a response."""
+    from django.db.models import Field
+
+    problems = []
+
+    if isinstance(value, dict):
+        for key, item in value.items():
+            problems.extend(
+                find_non_json_values(item, f"{path}.{key}")
+            )
+
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            problems.extend(
+                find_non_json_values(item, f"{path}[{index}]")
+            )
+
+    elif isinstance(value, Field):
+        problems.append(
+            f"{path}: Django field object {type(value).__name__}"
+        )
+
+    return problems
+
 def _locations_impl(request):
     if request.method == "GET":
         hierarchy = request.GET.get("hierarchy", "").strip().upper()
@@ -3245,6 +3298,9 @@ def _locations_impl(request):
 
     try:
         tree = load_location_tree(location_file)
+        tree = ownership.filter_tree_for_user(tree, user)
+        tree = ownership.attach_owner_details(tree)
+        return tree
     except json.JSONDecodeError:
         return JsonResponse({"success": False, "message": "Invalid JSON format"}, status=500)
 
@@ -3648,7 +3704,11 @@ def ac_data_with_location(request):
     except json.JSONDecodeError:
         return JsonResponse({"status": "error", "message": "Invalid JSON format"}, status=500)
     except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        traceback.print_exc()
+        return JsonResponse(
+            { "success": False, "message": str(e), },
+            status=500,
+        )
 
 
 @api_view(["GET"])
@@ -4493,7 +4553,6 @@ class CircleListView(generics.ListAPIView):
             qs = qs.filter(zone_id=zone_id)
         return qs
 
-
 class StateListView(generics.ListAPIView):
     serializer_class = StateSerializer
 
@@ -4501,18 +4560,29 @@ class StateListView(generics.ListAPIView):
         user = self.request.user
         qs = State.objects.select_related("customer")
 
+        if not user.is_authenticated:
+            return qs.none()
+
         if user.role == Role.ORG_SUPER_ADMIN:
-            qs = qs.filter(customer__organization_id=user.organization_id)
-        elif user.role in [Role.CUSTOMER, Role.BR_ADMIN, Role.ENGINEER]:
+            qs = qs.filter(
+                customer__organization_id=user.organization_id
+            )
+        elif user.role in (
+            Role.CUSTOMER,
+            Role.BR_ADMIN,
+            Role.ENGINEER,
+        ):
             qs = qs.filter(customer_id=user.customer_id)
         else:
             return qs.none()
 
         customer_id = self.request.query_params.get("customer")
-        if customer_id:
-            qs = qs.filter(customer_id=customer_id)
-        return qs
 
+        if customer_id:
+            # Prevent selecting a customer outside the user's scope.
+            qs = qs.filter(customer_id=customer_id)
+
+        return qs.order_by("name")
 
 class TalukaListView(generics.ListAPIView):
     serializer_class = TalukaSerializer
@@ -11851,7 +11921,7 @@ class CustomerListView(CustomerScopeMixin, generics.ListCreateAPIView):
                 "customer_admin": {"name": admin.name, "email": admin.email, "role": admin.role},
             },
         }, status=status.HTTP_201_CREATED)
-    
+
 class CustomerDetailView(CustomerScopeMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CustomerSerializer
     permission_classes = [IsOrgSuperAdmin]
@@ -12044,19 +12114,38 @@ class CountryListAPIView(generics.ListAPIView):
             is_active=True
         ).order_by("name")
 
+
 class ZoneListView(generics.ListAPIView):
     serializer_class = ZoneSerializer
 
     def get_queryset(self):
         user = self.request.user
-        if user.role == Role.ORG_SUPER_ADMIN:
-            return Zone.objects.filter(customer__organization_id=user.organization_id)
-        if user.role == Role.CUSTOMER:
-            return Zone.objects.filter(customer_id=user.customer_id)
-        if user.role in [Role.BR_ADMIN, Role.ENGINEER]:
-            return Zone.objects.filter(pk=user.zone_id)
-        return Zone.objects.none()
+        qs = Zone.objects.select_related("customer")
 
+        if not user.is_authenticated:
+            return qs.none()
+
+        if user.role == Role.ORG_SUPER_ADMIN:
+            qs = qs.filter(
+                customer__organization_id=user.organization_id
+            )
+
+        elif user.role in (
+            Role.CUSTOMER,
+            Role.BR_ADMIN,
+            Role.ENGINEER,
+        ):
+            qs = qs.filter(customer_id=user.customer_id)
+
+        else:
+            return qs.none()
+
+        # Optional customer filter, used by AdminCreation.jsx.
+        customer_id = self.request.query_params.get("customer")
+        if customer_id:
+            qs = qs.filter(customer_id=customer_id)
+
+        return qs.order_by("name")
 
 class CircleListView(generics.ListAPIView):
     serializer_class = CircleSerializer
@@ -15239,3 +15328,254 @@ def ac_faults_from_3tp(request):
     
     return Response({"status": "success", "device_id": device_id, "ac_id": device.ac_id,
                      "count": len(results), "data": results})
+
+
+"""
+Paste into views.py (it uses names that already exist there: telemetry,
+get_telemetry_records, scope_ac_records, filter_by_location, ACDevice, etc.)
+then add to urls.py:
+
+    from .views import current_history
+    path("current-history/", current_history),
+
+Reads the `current` telemetry straight from ThingsBoard (3TP), exactly like
+ac_faults_from_3tp does -- no new table, no migration.
+
+GET /api/current-history/?period=today|week|month&from=<ISO or ms>&to=<ISO or ms>
+        &device_id=<tpt_device_id>              (single AC), or
+        &hierarchy=&state=&district=&...&branch= (same filters as /ac-data/)
+
+Response: {"status":"success","period":"week","key":"current",
+           "devices_queried":3,"devices_with_data":3,
+           "data":[{"bucket":"2026-10-21T10:00:00+00:00","avg":..,"min":..,"max":..,"count":..}]}
+"""
+import hashlib
+import json
+import logging
+import time
+import urllib.error
+from datetime import datetime, timezone as dt_tz
+from urllib.parse import urlencode
+
+from django.core.cache import cache
+from django.utils.dateparse import parse_datetime
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+CURRENT_KEY = "current"        # the ThingsBoard telemetry key holding the amps
+MAX_DEVICES = 50               # safety cap for branch/org requests
+MAX_RAW_ROWS = 30_000          # cap per device when raw rows must be read (newest kept)
+PAGE_SIZE = 1000               # same page size ac_faults_from_3tp already uses
+CACHE_SECONDS = 30
+BUCKET_MS = {"today": 60_000, "week": 3_600_000, "month": 3_600_000}
+
+
+# ------------------------------------------------------------ ThingsBoard
+def _tb_timeseries(device_id, key, start_ms, end_ms, **extra):
+    """One timeseries call (same login / 401-retry pattern as ac_faults_from_3tp)."""
+    cfg = telemetry._config()
+    url = (
+        f"{cfg['base_url']}/api/plugins/telemetry/DEVICE/{device_id}/values/timeseries?"
+        + urlencode({"keys": key, "startTs": start_ms, "endTs": end_ms, **extra})
+    )
+
+    def call():
+        return telemetry._request(
+            url, headers={"X-Authorization": f"Bearer {telemetry._token['value']}"}
+        )
+
+    if not telemetry._token.get("value"):
+        telemetry._login(cfg)
+    try:
+        try:
+            raw = call()
+        except urllib.error.HTTPError as exc:
+            if exc.code != 401:
+                raise
+            telemetry._login(cfg)
+            raw = call()
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read().decode("utf-8", "replace")[:300]
+        except Exception:
+            body = ""
+        raise RuntimeError(f"HTTP {exc.code} {body} (params: {extra})") from exc
+
+    values = raw.get(key, []) if isinstance(raw, dict) else []
+    return values if isinstance(values, list) else []
+
+
+def _as_float(value):
+    """Plain number, numeric string, or the device JSON string ({"current": 0.05, ...})."""
+    if isinstance(value, str):
+        text = value.strip()
+        if text[:1] == "{":
+            try:
+                value = json.loads(text).get("current")
+            except ValueError:
+                return None
+        else:
+            value = text
+    elif isinstance(value, dict):
+        value = value.get("current")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if number == number else None  # drop NaN
+
+
+def _device_buckets(device_id, period, start_ms, end_ms):
+    """-> {bucket_start_ms: {"sum","min","max","count"}} for one device."""
+    interval = BUCKET_MS[period]
+    out = {}
+
+    # Probe: is the stored value a number (ThingsBoard can aggregate it) or a JSON string?
+    probe = _tb_timeseries(device_id, CURRENT_KEY, start_ms, end_ms,
+                           limit=1, agg="NONE", orderBy="DESC")
+    if not probe:
+        return out
+
+    if isinstance(probe[0].get("value"), (int, float)) or _is_plain_number(probe[0].get("value")):
+        # Fast path: let ThingsBoard aggregate (4 small calls, no raw rows).
+        try:
+            def agg(name):
+                rows = _tb_timeseries(device_id, CURRENT_KEY, start_ms, end_ms,
+                                      agg=name, interval=interval, limit=50_000, orderBy="ASC")
+                return {int(r["ts"]): _as_float(r["value"]) for r in rows if r.get("ts") is not None}
+
+            avg, lo, hi, cnt = agg("AVG"), agg("MIN"), agg("MAX"), agg("COUNT")
+            for ts, a in avg.items():
+                if a is None:
+                    continue
+                n = int(cnt.get(ts) or 1)
+                out[ts] = {"sum": a * n, "min": lo.get(ts, a), "max": hi.get(ts, a), "count": n}
+            return out
+        except Exception:
+            logging.getLogger("telemetry").warning(
+                "ThingsBoard aggregation rejected for %s; falling back to raw rows", device_id, exc_info=True)
+            out = {}
+
+    # Slow path (JSON-string values, or aggregation not accepted): read raw rows in
+    # pages of PAGE_SIZE, newest first, and bucket them here.
+    end = end_ms
+    fetched = 0
+    while fetched < MAX_RAW_ROWS:
+        rows = _tb_timeseries(device_id, CURRENT_KEY, start_ms, end,
+                              agg="NONE", limit=PAGE_SIZE, orderBy="DESC")
+        if not rows:
+            break
+        for row in rows:
+            v, ts = _as_float(row.get("value")), row.get("ts")
+            if v is None or ts is None:
+                continue
+            key = int(ts) // interval * interval
+            b = out.setdefault(key, {"sum": 0.0, "min": v, "max": v, "count": 0})
+            b["sum"] += v
+            b["count"] += 1
+            b["min"], b["max"] = min(b["min"], v), max(b["max"], v)
+        fetched += len(rows)
+        oldest = min(int(r["ts"]) for r in rows if r.get("ts") is not None)
+        if len(rows) < PAGE_SIZE or oldest <= start_ms:
+            break
+        end = oldest - 1
+    return out
+
+
+def _is_plain_number(value):
+    try:
+        float(value)
+        return not isinstance(value, str) or value.strip()[:1] != "{"
+    except (TypeError, ValueError):
+        return False
+
+
+def _parse_time_ms(raw, default_ms):
+    if raw in (None, ""):
+        return default_ms
+    try:
+        n = float(raw)
+        return int(n if n > 1e12 else n * 1000)
+    except ValueError:
+        dt = parse_datetime(str(raw).replace(" ", "+"))  # '+' in a URL decodes to a space
+        if dt is None:
+            raise ValueError("invalid time")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=dt_tz.utc)
+        return int(dt.timestamp() * 1000)
+
+
+# -------------------------------------------------------------- the view
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def current_history(request):
+    from .models import ACDevice
+
+    q = request.query_params
+    period = q.get("period", "today")
+    if period not in BUCKET_MS:
+        return Response({"status": "error", "message": "period must be today, week or month."}, status=400)
+
+    now_ms = int(time.time() * 1000)
+    try:
+        start_ms = _parse_time_ms(q.get("from") or q.get("startTs"), now_ms - 24 * 3_600_000)
+        end_ms = _parse_time_ms(q.get("to") or q.get("endTs"), now_ms)
+    except ValueError:
+        return Response({"status": "error", "message": "from/to must be ISO 8601 or Unix time."}, status=400)
+    if start_ms > end_ms:
+        return Response({"status": "error", "message": "from must be <= to."}, status=400)
+
+    # ---- which ThingsBoard devices? (always limited to what this user may see)
+    device_id = str(q.get("device_id", "")).strip()
+    if device_id:
+        device = ACDevice.objects.filter(tpt_device_id=device_id).first()
+        if not device:
+            return Response({"status": "error", "message": "No local AC is mapped to this 3TP device ID."}, status=404)
+        if not scope_ac_records([{"ac_id": device.ac_id}], request.user):
+            return Response({"status": "error", "message": "You do not have access to this AC."}, status=403)
+        targets = [device_id]
+    else:
+        records = filter_by_location(scope_ac_records(get_telemetry_records(), request.user), request)
+        ac_ids = {r.get("ac_id") for r in records if r.get("ac_id")}
+        targets = list(
+            ACDevice.objects.filter(ac_id__in=ac_ids).exclude(tpt_device_id__isnull=True)
+            .exclude(tpt_device_id="").values_list("tpt_device_id", flat=True)
+        )[:MAX_DEVICES]
+
+    # Round so repeated polls within the cache window share one result.
+    raw_key = f"{sorted(targets)}|{period}|{start_ms // 60_000}|{end_ms // 60_000}"
+    cache_key = "cur_hist:" + hashlib.md5(raw_key.encode()).hexdigest()
+    cached = cache.get(cache_key)
+    if cached:
+        return Response(cached)
+
+    # ---- fetch + merge (mean across devices; min of mins; max of maxes)
+    merged, with_data, errors = {}, 0, []
+    for tb_id in targets:
+        try:
+            buckets = _device_buckets(tb_id, period, start_ms, end_ms)
+        except Exception as exc:  # one bad device must not blank the chart
+            errors.append(f"{tb_id}: {exc}")
+            continue
+        if buckets:
+            with_data += 1
+        for ts, b in buckets.items():
+            m = merged.setdefault(ts, {"sum": 0.0, "min": b["min"], "max": b["max"], "count": 0})
+            m["sum"] += b["sum"]
+            m["count"] += b["count"]
+            m["min"], m["max"] = min(m["min"], b["min"]), max(m["max"], b["max"])
+
+    if targets and errors and len(errors) == len(targets):
+        return Response({"status": "error", "message": "Could not fetch current history from 3TP.",
+                         "details": errors[:3]}, status=502)
+
+    data = [
+        {"bucket": datetime.fromtimestamp(ts / 1000, dt_tz.utc).isoformat(),
+         "avg": round(m["sum"] / m["count"], 4), "min": m["min"], "max": m["max"], "count": m["count"]}
+        for ts, m in sorted(merged.items()) if m["count"]
+    ]
+    payload = {"status": "success", "period": period, "key": CURRENT_KEY,
+               "devices_queried": len(targets), "devices_with_data": with_data, "data": data}
+    cache.set(cache_key, payload, CACHE_SECONDS)
+    return Response(payload)

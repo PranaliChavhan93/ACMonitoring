@@ -5,8 +5,6 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from account import telemetry
-
 from .models import TelemetryAggregate, ACDevice
 
 METRICS = {
@@ -17,7 +15,6 @@ METRICS = {
     "humidity": ("indoor_humidity", "latest_humidity", "sum_humidity", "avg_humidity", "min_humidity", "max_humidity"),
 }
 
-
 def _number(value):
     if value in (None, ""):
         return None
@@ -27,12 +24,10 @@ def _number(value):
     except (TypeError, ValueError):
         return None
 
-
 def _timestamp(value):
     if value is None:
         return timezone.now()
     if isinstance(value, (int, float)):
-        # ThingsBoard timestamps are epoch milliseconds; tolerate seconds too.
         seconds = value / 1000 if value > 10_000_000_000 else value
         return datetime.fromtimestamp(seconds, tz=dt_timezone.utc)
     if isinstance(value, str):
@@ -44,7 +39,6 @@ def _timestamp(value):
         except ValueError as exc:
             raise ValueError("timestamp must be epoch milliseconds or ISO-8601") from exc
     raise ValueError("unsupported timestamp format")
-
 
 def _flatten(item):
     """Accept raw payload, {ts, value}, {data:[...]}, or a list of readings."""
@@ -60,7 +54,6 @@ def _flatten(item):
     if isinstance(item, list):
         return [entry for entry in item if isinstance(entry, dict)]
     return [item] if isinstance(item, dict) else []
-
 
 def normalize_payload(payload):
     if not isinstance(payload, dict):
@@ -80,24 +73,18 @@ def normalize_payload(payload):
     ts = _timestamp(values.get("ts") or values.get("timestamp"))
     return device_id, ts, values
 
-
 def _bucket(ts, seconds):
     epoch = int(ts.timestamp())
     start = epoch - (epoch % seconds)
     return datetime.fromtimestamp(start, tz=dt_timezone.utc)
 
-
 def _apply_reading(device_id, ts, values, interval_seconds=60):
     bucket = _bucket(ts, interval_seconds)
-    # Row-level lock serializes concurrent updates on PostgreSQL. Unique constraint
-    # protects creation races; use PostgreSQL for production ingestion throughput.
     with transaction.atomic():
         row, created = TelemetryAggregate.objects.select_for_update().get_or_create(
             device_id=device_id, bucket_start=bucket, interval_seconds=interval_seconds,
             defaults={"last_timestamp": ts, "first_timestamp": ts},
         )
-        # Ignore out-of-order samples for latest-state fields, but keep aggregate
-        # metrics only for readings newer than the row's last processed timestamp.
         if not created and row.last_timestamp and ts <= row.last_timestamp:
             return False
 
@@ -123,7 +110,6 @@ def _apply_reading(device_id, ts, values, interval_seconds=60):
             if max_field:
                 old = getattr(row, max_field)
                 setattr(row, max_field, val if old is None else max(old, val))
-        # sample_count counts accepted readings, not the number of individual metrics.
         row.sample_count = count + 1
         energy = _number(values.get("energy"))
         if energy is not None:
@@ -147,7 +133,6 @@ def _apply_reading(device_id, ts, values, interval_seconds=60):
         row.last_timestamp = ts
         row.save()
     return True
-
 
 def ingest_payload(payload):
     items = _flatten(payload)
@@ -174,6 +159,7 @@ def _record_from_row(row, device_name=None):
     relay = int(row.latest_relay or 0)
     status = "OFFLINE" if age > int(getattr(settings, "TELEMETRY_STALE_SECONDS", 120)) else ("ON" if relay else "OFF")
     device_name = device_name or row.device_id
+    
     return {
         "ac_id": row.device_id, 
         "site_id": row.device_id, 
@@ -195,6 +181,13 @@ def _record_from_row(row, device_name=None):
         "source": "local_aggregate", 
         "sample_count": row.sample_count,
         "bucket_start": row.bucket_start.isoformat(), "interval_seconds": row.interval_seconds,
+
+        "energy_delta": float(row.energy_delta or 0),
+        "latest_energy_counter": (
+            float(row.latest_energy_counter)
+            if row.latest_energy_counter is not None
+            else None
+        ),
     }
 
 
@@ -213,15 +206,18 @@ def get_latest_records():
     return [_record_from_row(row, names.get(row.device_id)) for row in rows]
 
 
-def get_telemetry_records():
-    if getattr(settings, "TELEMETRY_STORAGE_MODE", "polling").lower() == "aggregate":
-        return get_latest_records()
-
-    return telemetry.get_records()
-
-
 def query_aggregates(start, end, device_ids=None, interval_seconds=60):
     qs = TelemetryAggregate.objects.filter(interval_seconds=interval_seconds, bucket_start__gte=start, bucket_start__lt=end)
     if device_ids is not None:
         qs = qs.filter(device_id__in=device_ids)
     return qs.order_by("bucket_start", "device_id")
+
+def get_telemetry_records():
+    if getattr(
+        settings, "TELEMETRY_STORAGE_MODE", "polling"
+    ).lower() == "aggregate":
+        return get_latest_records()
+
+    from . import telemetry
+
+    return telemetry.get_records()

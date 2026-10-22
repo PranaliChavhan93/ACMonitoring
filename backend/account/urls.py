@@ -36,6 +36,7 @@ from .views import (
     create_branch_or_floor, 
     create_device, 
     create_site,
+    current_history,
     pincode_lookup, 
     search_site_branches, 
     site_assignment, 
@@ -119,6 +120,8 @@ urlpatterns = [
     path("sites/", SiteListView.as_view()),
     path("sites/create/", create_site),
     path("pincode/<str:pincode>/", pincode_lookup),
+
+    path("current-history/", current_history),
 
     path("hierarchy-site/create/", create_hierarchy_site),
     path("devices/assign/site/", assign_device_to_site),

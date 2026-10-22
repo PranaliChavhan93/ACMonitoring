@@ -4,6 +4,8 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.utils import timezone
 import uuid
 
+from jsonschema import ValidationError
+from django.core.exceptions import ValidationError
 
 class ACData(models.Model):
     timestamp = models.DateTimeField()
@@ -79,7 +81,7 @@ class Customer(models.Model):
 
     # Head office
     address_line_1 = models.CharField(max_length=255, blank=True, default="")
-    address_line_2 = models.CharField(max_length=255, blank=True, default="")
+    # address_line_2 = models.CharField(max_length=255, blank=True, default="")
     state = models.CharField(max_length=100, blank=True, default="")
     district = models.CharField(max_length=100, blank=True, default="")
     city = models.CharField(max_length=100, blank=True, default="")
@@ -87,18 +89,50 @@ class Customer(models.Model):
     # Primary bank admin
     contact_person = models.CharField(max_length=255, blank=True)
     contact_person_email = models.EmailField(blank=True)
-    admin_designation = models.CharField(max_length=150, blank=True, default="")
-    admin_mobile = models.CharField(max_length=30, blank=True, default="")
+    # admin_designation = models.CharField(max_length=150, blank=True, default="")
+    # admin_mobile = models.CharField(max_length=30, blank=True, default="")
 
     hierarchy_type = models.CharField(
         max_length=20,
         choices=HierarchyType.choices,
-        blank=True,
-        null=True,
+        blank=False,
+        null=False,
         help_text=(
-            "Locked in at creation: Geographical or Zonal. "
-            "Cannot be changed once branches exist."
+            "Required: Geographical or Zonal. "
+            "Cannot be changed once branches have been created."
         ),
+    )
+
+    head_office_state = models.ForeignKey(
+        "State",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="head_office_state_customers",
+    )
+
+    head_office_district = models.ForeignKey(
+        "District",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="head_office_district_customers",
+    )
+
+    head_office_city = models.ForeignKey(
+        "City",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="head_office_customers",
+    )
+    
+    head_office_division = models.ForeignKey(
+        "Division",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="head_office_customers",
     )
 
     is_active = models.BooleanField(default=True)
@@ -113,25 +147,37 @@ class Customer(models.Model):
         return f"{self.company} ({self.code})"
 
     def clean(self):
-        """Once branches exist, hierarchy type cannot be changed."""
-        if self.pk and self.hierarchy_type:
-            original = (
+        super().clean()
+
+        if not self.hierarchy_type:
+            raise ValidationError({
+                "hierarchy_type": "Select Geographical or Zonal."
+            })
+
+        valid_hierarchies = {
+            value for value, _label in HierarchyType.choices
+        }
+
+        if self.hierarchy_type not in valid_hierarchies:
+            raise ValidationError({
+                "hierarchy_type": "Invalid hierarchy type."
+            })
+
+        if self.pk and Branch.objects.filter(customer_id=self.pk).exists():
+            original_hierarchy = (
                 Customer.objects
                 .filter(pk=self.pk)
                 .values_list("hierarchy_type", flat=True)
                 .first()
             )
-            if (
-                original
-                and original != self.hierarchy_type
-                and Branch.objects.filter(customer_id=self.pk).exists()
-            ):
-                from django.core.exceptions import ValidationError
-                raise ValidationError(
-                    "hierarchy_type cannot be changed once branches have "
-                    "been created for this bank."
-                )
 
+            if original_hierarchy != self.hierarchy_type:
+                raise ValidationError({
+                    "hierarchy_type": (
+                        "Hierarchy cannot be changed once branches "
+                        "have been created for this customer."
+                    )
+                })
 
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -235,13 +281,18 @@ class State(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="states")
     name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, unique=True)
+    # code = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=50)
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "states"
-        unique_together = ("customer", "name")
+        unique_together = (
+            ("customer", "name"),
+            ("customer", "code"),
+        )
         ordering = ["name"]
 
     def __str__(self):
@@ -252,14 +303,19 @@ class District(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     state = models.ForeignKey(State, on_delete=models.CASCADE, related_name="districts")
     name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, unique=True)
+    # code = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=50)
+
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        db_table = "districts"
-        unique_together = ("state", "name")
-        ordering = ["name"]
+            db_table = "districts"
+            unique_together = (
+                ("state", "name"),
+                ("state", "code"),
+            )
+            ordering = ["name"]
 
     def __str__(self):
         return self.name
@@ -678,7 +734,6 @@ class CustomerSiteMapping(models.Model):
         blank=True,
         default="",
     )
-
 
     class Meta:
         db_table = "customer_site_mappings"

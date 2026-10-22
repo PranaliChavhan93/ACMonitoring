@@ -1,4 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+
 import {
   ResponsiveContainer,
   LineChart,
@@ -11,12 +19,11 @@ import {
 } from "recharts";
 
 const API_URL = "http://localhost:8000/api/telemetry-aggregates/";
-
 const TB_HISTORY_URL = "http://localhost:8000/api/thingsboard/history/";
 
-const STALE_REFRESH_MS = 60000;
-const FALLBACK_REFRESH_MS = 5 * 60 * 1000; // don’t hammer ThingsBoard
-const PRIMARY_WINDOW_MS = 31 * 24 * 60 * 60 * 1000; // match backend cap
+const STALE_REFRESH_MS = 60_000;
+const FALLBACK_REFRESH_MS = 5 * 60_000;
+const PRIMARY_WINDOW_MS = 31 * 24 * 60 * 60 * 1000;
 
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -38,39 +45,101 @@ const getToken = () =>
   localStorage.getItem("accessToken") ||
   "";
 
-/* ---------------- data helpers ---------------- */
+/* =========================================================
+   DATA HELPERS
+========================================================= */
 
+// Handles ThingsBoard timestamps in milliseconds or seconds.
 function parseDate(item) {
   const raw =
-    item?.timestamp ?? item?.ts ?? item?.date ??
-    item?.created_at ?? item?.bucket_start;
+    item?.ts ??
+    item?.timestamp ??
+    item?.date ??
+    item?.created_at ??
+    item?.bucket_start;
 
-  if (raw === undefined || raw === null) return null;
+  if (raw === undefined || raw === null || raw === "") {
+    return null;
+  }
 
-  const value =
-    typeof raw === "number" || /^\d+$/.test(String(raw))
-      ? Number(raw)
-      : raw;
+  const numeric = Number(raw);
+  const isNumeric =
+    String(raw).trim() !== "" && Number.isFinite(numeric);
 
-  const date =
-    typeof value === "number"
-      ? new Date(value < 1e12 ? value * 1000 : value)
-      : new Date(value);
+  const date = isNumeric
+    ? new Date(numeric < 1e12 ? numeric * 1000 : numeric)
+    : new Date(raw);
 
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// Your ThingsBoard response contains JSON inside item.value.
+function unwrapTelemetry(item) {
+  let value = item?.value ?? item?.data ?? item?.values ?? item;
+
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+
+  return value && typeof value === "object" ? value : null;
+}
+
+// Supports both ThingsBoard JSON readings and aggregate records.
+// function getEnergy(item) {
+//   const payload = unwrapTelemetry(item);
+
+//   if (!payload) return null;
+
+//   const candidates = [
+//     payload.energy_consumption,
+//     payload.energy_kwh,
+//     payload.energy,
+//     payload.kwh,
+//     payload.energy_avg,
+//     payload.energy_average,
+//     payload.avg_energy,
+//     payload.avg?.energy,
+//     payload.average?.energy,
+//     payload.values?.energy,
+
+//     item?.energy_consumption,
+//     item?.energy_kwh,
+//     item?.energy,
+//     item?.energy_avg,
+//     item?.avg_energy,
+//     item?.kwh,
+//   ];
+
+//   for (const value of candidates) {
+//     if (value !== undefined && value !== null && value !== "") {
+//       const number = Number(value);
+
+//       if (Number.isFinite(number)) {
+//         return number;
+//       }
+//     }
+//   }
+
+//   return null;
+// }
+
 function getEnergy(item) {
+  const payload = unwrapTelemetry(item);
+  if (!payload) return null;
+
   const candidates = [
+    item?.energy_delta,
+    payload?.energy_delta,
     item?.energy_consumption,
-    item?.energy_avg,
-    item?.energy_average,
-    item?.avg_energy,
-    item?.energy,
-    item?.avg?.energy,
-    item?.average?.energy,
-    item?.values?.energy,
-    item?.kwh,
+    item?.latest_energy_counter,
+    payload?.energy_consumption,
+    payload?.energy,
+    payload?.energy_kwh,
+    payload?.kwh,
   ];
 
   for (const value of candidates) {
@@ -79,19 +148,119 @@ function getEnergy(item) {
       if (Number.isFinite(number)) return number;
     }
   }
+
   return null;
 }
 
-function getStartOfDay(date) {
-  return new Date(
+function normalizeRows(payload) {
+  if (Array.isArray(payload)) return payload;
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  for (const key of ["data", "results", "records", "items"]) {
+    if (Array.isArray(payload[key])) {
+      return payload[key];
+    }
+  }
+
+  // Supports a single record as well as an array.
+  if (
+    payload.data &&
+    typeof payload.data === "object" &&
+    !Array.isArray(payload.data)
+  ) {
+    return [payload.data];
+  }
+
+  return [];
+}
+
+/* =========================================================
+   CHART BUCKETS
+========================================================= */
+
+// Daily: each hour of the day.
+// Weekly: each calendar day across the last seven days.
+// Monthly: each calendar day in the current month.
+// function getBucket(date, granularity) {
+//   const year = date.getFullYear();
+//   const month = date.getMonth();
+//   const day = date.getDate();
+
+//   if (granularity === "daily") {
+//     const start = new Date(date);
+//     start.setMinutes(0, 0, 0);
+
+//     const hour = start.getHours();
+
+//     return {
+//       key: String(start.getTime()),
+//       label: `${pad2(hour)}:00`,
+//       sort: start.getTime(),
+//     };
+//   }
+
+//   if (granularity === "weekly") {
+//     const start = new Date(year, month, day);
+//     start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+
+//     return {
+//       key: `${start.getFullYear()}-${pad2(
+//         start.getMonth() + 1
+//       )}-${pad2(start.getDate())}`,
+//       label: `${start.getDate()} ${MONTH_NAMES[start.getMonth()]}`,
+//       sort: start.getTime(),
+//     };
+//   }
+
+//   const start = new Date(year, month, day);
+
+//   return {
+//     key: `${year}-${pad2(month + 1)}-${pad2(day)}`,
+//     label: `${day} ${MONTH_NAMES[month]}`,
+//     sort: start.getTime(),
+//   };
+// }
+
+
+function getBucket(date, granularity) {
+  // Daily → hourly bucket
+  if (granularity === "daily") {
+    const start = new Date(date);
+    start.setMinutes(0, 0, 0);
+
+    return {
+      key: String(start.getTime()),
+      label: `${pad2(start.getHours())}:00`,
+      sort: start.getTime(),
+    };
+  }
+
+  // Weekly & Monthly → daily bucket
+  // (User wants "every day should point" / "every date should point")
+  const start = new Date(
     date.getFullYear(),
     date.getMonth(),
     date.getDate()
   );
+
+  return {
+    key: `${start.getFullYear()}-${pad2(
+      start.getMonth() + 1
+    )}-${pad2(start.getDate())}`,
+    label: `${start.getDate()} ${MONTH_NAMES[start.getMonth()]}`,
+    sort: start.getTime(),
+  };
 }
 
-function getChartRange(granularity, now = new Date()) {
-  const today = getStartOfDay(now);
+function getDisplayRange(granularity, now = new Date()) {
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate()
+  );
 
   if (granularity === "daily") {
     return {
@@ -102,7 +271,7 @@ function getChartRange(granularity, now = new Date()) {
 
   if (granularity === "weekly") {
     const from = new Date(today);
-    from.setDate(from.getDate() - 7);
+    from.setDate(from.getDate() - 6);
 
     return {
       from,
@@ -116,153 +285,79 @@ function getChartRange(granularity, now = new Date()) {
   };
 }
 
-// function buildChartData(rows, granularity, now = new Date()) {
-//   const { from, to } = getChartRange(granularity, now);
-//   const buckets = new Map();
-
-//   const makeBucket = (date) => {
-//     if (granularity === "daily") {
-//       const hour = date.getHours();
-//       const start = new Date(date);
-//       start.setMinutes(0, 0, 0);
-
-//       return {
-//         key: String(start.getTime()),
-//         name: `${String(hour).padStart(2, "0")}:00`,
-//         sort: start.getTime(),
-//       };
-//     }
-
-//     const start = getStartOfDay(date);
-//     const key =
-//       `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-${String(start.getDate()).padStart(2, "0")}`;
-
-//     return {
-//       key,
-//       name: `${start.getDate()} ${MONTH_NAMES[start.getMonth()]}`,
-//       sort: start.getTime(),
-//     };
-//   };
-
-//   // Create every expected interval, including intervals without readings.
-//   const cursor = new Date(from);
-
-//   while (cursor < to) {
-//     const bucket = makeBucket(cursor);
-
-//     buckets.set(bucket.key, {
-//       name: bucket.name,
-//       sort: bucket.sort,
-//       sum: 0,
-//       count: 0,
-//       currentMonth: null,
-//       previousMonth: null,
-//     });
-
-//     if (granularity === "daily") {
-//       cursor.setHours(cursor.getHours() + 1);
-//     } else {
-//       cursor.setDate(cursor.getDate() + 1);
-//     }
-//   }
-
-//   // Merge multiple readings into their matching hour/day.
-//   rows.forEach((item) => {
-//     const date = parseDate(item);
-//     const energy = getEnergy(item);
-
-//     if (!date || energy === null || date < from || date >= to) {
-//       return;
-//     }
-
-//     const bucket = makeBucket(date);
-//     const entry = buckets.get(bucket.key);
-
-//     if (!entry) return;
-
-//     entry.sum += energy;
-//     entry.count += 1;
-//   });
-
-//   return [...buckets.values()]
-//     .sort((a, b) => a.sort - b.sort)
-//     .map(({ name, sum, count }) => ({
-//       name,
-//       currentMonth: count
-//         ? Number((sum / count).toFixed(2))
-//         : null,
-//       previousMonth: null,
-//     }));
-// }
-
-function getBucket(date, granularity) {
-  const y = date.getFullYear();
-  const m = date.getMonth();
-  const d = date.getDate();
-
-  if (granularity === "monthly") {
-    return {
-      key: `${y}-${pad2(m + 1)}`,
-      label: `${MONTH_NAMES[m]} ${y}`,
-      sort: new Date(y, m, 1).getTime(),
-    };
-  }
-
-  if (granularity === "weekly") {
-    const start = new Date(y, m, d);
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-    return {
-      key: `${start.getFullYear()}-${pad2(start.getMonth() + 1)}-${pad2(start.getDate())}`,
-      label: `Wk ${start.getDate()} ${MONTH_NAMES[start.getMonth()]}`,
-      sort: start.getTime(),
-    };
-  }
-
-  return {
-    key: `${y}-${pad2(m + 1)}-${pad2(d)}`,
-    label: `${d} ${MONTH_NAMES[m]}`,
-    sort: new Date(y, m, d).getTime(),
-  };
-}
-
-function normalizeRows(payload) {
-  if (Array.isArray(payload)) return payload;
-  for (const key of ["results", "data", "records", "items"]) {
-    if (Array.isArray(payload?.[key])) return payload[key];
-  }
-  return [];
-}
-
-function buildChartData(rows, granularity) {
+// Keep only records inside the displayed period and group them.
+// Energy is assumed to be a cumulative meter counter, so each
+// bucket shows last reading minus first reading.
+function buildChartData(rows, granularity, now = new Date()) {
+  const { from, to } = getDisplayRange(granularity, now);
   const buckets = new Map();
 
-  rows.forEach((item) => {
-    const date = parseDate(item);
+  const sortedRows = [...rows]
+    .map((item) => ({
+      item,
+      date: parseDate(item),
+    }))
+    .filter(({ date }) => date !== null)
+    .sort((a, b) => a.date.getTime() - b.date.getTime());
+
+  sortedRows.forEach(({ item, date }) => {
+    if (date < from || date >= to) return;
+
     const energy = getEnergy(item);
-    if (!date || energy === null) return;
+    if (energy === null) return;
 
     const bucket = getBucket(date, granularity);
+
     if (!buckets.has(bucket.key)) {
       buckets.set(bucket.key, {
         name: bucket.label,
         sort: bucket.sort,
-        currentMonth: 0,
-        previousMonth: 0,
+        firstEnergy: energy,
+        lastEnergy: energy,
       });
+    } else {
+      buckets.get(bucket.key).lastEnergy = energy;
     }
-    buckets.get(bucket.key).currentMonth += energy;
   });
 
   return [...buckets.values()]
     .sort((a, b) => a.sort - b.sort)
-    .map(({ name, currentMonth, previousMonth }) => ({
+    .map(({ name, firstEnergy, lastEnergy }) => ({
       name,
-      currentMonth: Number(currentMonth.toFixed(2)),
-      previousMonth: Number(previousMonth.toFixed(2)),
+      currentMonth: Number(
+        Math.max(0, lastEnergy - firstEnergy).toFixed(2)
+      ),
     }));
 }
 
-/* ---------------- network helpers ---------------- */
+/* =========================================================
+   NETWORK HELPERS
+========================================================= */
+
+async function requestJSON(url) {
+  const token = getToken();
+
+  const response = await fetch(url, {
+    headers: {
+      ...(token
+        ? { Authorization: `Bearer ${token}` }
+        : {}),
+    },
+    cache: "no-store",
+  });
+
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(
+      result?.message ||
+      result?.detail ||
+      `HTTP ${response.status}`
+    );
+  }
+
+  return result;
+}
 
 async function fetchFromAggregates(from, to) {
   const params = new URLSearchParams({
@@ -270,42 +365,45 @@ async function fetchFromAggregates(from, to) {
     to: to.toISOString(),
   });
 
-  const token = getToken();
-  const response = await fetch(`${API_URL}?${params.toString()}`, {
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    cache: "no-store",
-  });
+  const result = await requestJSON(
+    `${API_URL}?${params.toString()}`
+  );
 
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(result?.message || result?.detail || `HTTP ${response.status}`);
-  }
   return normalizeRows(result);
 }
 
-async function fetchFromThingsBoard() {
-  const now = Date.now();
+async function fetchFromThingsBoard(deviceId, from, to) {
+  if (!deviceId) {
+    throw new Error(
+      "A ThingsBoard device ID is required to load history."
+    );
+  }
 
-  // Wide-open range. The backend clamps to what ThingsBoard actually has.
   const params = new URLSearchParams({
-    from: "0",
-    to: String(now),
+    from: String(from.getTime()),
+    to: String(to.getTime()),
+    device_id: String(deviceId),
   });
 
-  const token = getToken();
-  const response = await fetch(`${TB_HISTORY_URL}?${params.toString()}`, {
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    cache: "no-store",
-  });
+  const result = await requestJSON(
+    `${TB_HISTORY_URL}?${params.toString()}`
+  );
 
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(result?.message || result?.detail || `HTTP ${response.status}`);
-  }
-  return normalizeRows(result);
+  const rows = normalizeRows(result);
+
+  console.log("ThingsBoard historical response:", result);
+  console.log("Normalized historical rows:", rows);
+  console.log(
+    "First parsed energy:",
+    rows.length ? getEnergy(rows[0]) : null
+  );
+
+  return rows;
 }
 
-/* ---------------- UI bits ---------------- */
+/* =========================================================
+   STYLES
+========================================================= */
 
 const iconButtonStyle = {
   display: "inline-flex",
@@ -319,6 +417,7 @@ const iconButtonStyle = {
   background: "#fff",
   color: "#475569",
   cursor: "pointer",
+  flexShrink: 0,
 };
 
 const overlayStyle = {
@@ -346,7 +445,12 @@ const modalStyle = {
   overflow: "hidden",
 };
 
-function EnergyConsumptionChart({ data }) {
+/* =========================================================
+   ENERGY CONSUMPTION TREND
+========================================================= */
+
+// function EnergyConsumptionChart({ data, deviceId }) {
+  function EnergyConsumptionChart({ data, deviceId }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [granularity, setGranularity] = useState("daily");
   const [historyRows, setHistoryRows] = useState([]);
@@ -354,61 +458,104 @@ function EnergyConsumptionChart({ data }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // Cache for the expensive ThingsBoard “all history” query.
-  const fallbackCacheRef = useRef({ rows: [], ts: 0 });
+  const fallbackCacheRef = useRef({
+    key: "",
+    rows: [],
+    ts: 0,
+  });
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
     setError("");
 
     try {
-      const now = new Date();
-      const start = new Date(now.getTime() - PRIMARY_WINDOW_MS);
+        const now = new Date();
+        const start = new Date(
+            now.getTime() - PRIMARY_WINDOW_MS
+        );
 
-      // 1. Try the last 31 days (local aggregate table).
-      const primaryRows = await fetchFromAggregates(start, now);
+        // An individual device must use its own history.
+        if (deviceId) {
+            const rows = await fetchFromThingsBoard(
+                deviceId,
+                start,
+                now
+            );
 
-      if (primaryRows.length > 0) {
-        setHistoryRows(primaryRows);
+            fallbackCacheRef.current = {
+                key: `${deviceId}:${start.getTime()}:${now.getTime()}`,
+                rows,
+                ts: Date.now(),
+            };
+
+            setHistoryRows(rows);
+            setUsingFallback(true);
+            return;
+        }
+
+        // Organization/branch view: use available aggregates.
+        const primaryRows = await fetchFromAggregates(
+            start,
+            now
+        );
+
+        const hasUsableEnergy = primaryRows.some(
+            (row) =>
+                parseDate(row) &&
+                getEnergy(row) !== null
+        );
+
+        if (hasUsableEnergy) {
+            setHistoryRows(primaryRows);
+            setUsingFallback(false);
+            return;
+        }
+
+        setHistoryRows([]);
         setUsingFallback(false);
-        return;
-      }
 
-      // 2. No local data in the last month → use ThingsBoard “all history”.
-      //    Guard with a short cache so 60s polling doesn’t hammer TB.
-      const cache = fallbackCacheRef.current;
-      const nowTs = Date.now();
-
-      if (cache.rows.length > 0 && nowTs - cache.ts < FALLBACK_REFRESH_MS) {
-        setHistoryRows(cache.rows);
-        setUsingFallback(true);
-        return;
-      }
-
-      const fallbackRows = await fetchFromThingsBoard();
-      fallbackCacheRef.current = { rows: fallbackRows, ts: nowTs };
-      setHistoryRows(fallbackRows);
-      setUsingFallback(true);
+        setError(
+            "No usable aggregate energy history was returned. " +
+            "Select an individual device to load its ThingsBoard history, " +
+            "or configure the backend to return branch/organization history."
+        );
     } catch (err) {
-      setError(err.message || "Unable to load historical energy data.");
-      setHistoryRows([]);
-      setUsingFallback(false);
+        console.error(
+            "Energy trend loading failed:",
+            err
+        );
+
+        setError(
+            err.message ||
+            "Unable to load historical energy data."
+        );
+
+        setHistoryRows([]);
+        setUsingFallback(false);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  }, []);
+}, [deviceId]);
 
   useEffect(() => {
     fetchHistory();
-    const timer = window.setInterval(fetchHistory, STALE_REFRESH_MS);
+
+    const timer = window.setInterval(
+      fetchHistory,
+      STALE_REFRESH_MS
+    );
+
     return () => window.clearInterval(timer);
   }, [fetchHistory]);
 
+  // Close the expanded chart with Escape and prevent background scrolling.
   useEffect(() => {
     if (!isExpanded) return;
 
     const onKeyDown = (event) => {
-      if (event.key === "Escape") setIsExpanded(false);
+      if (event.key === "Escape") {
+        setIsExpanded(false);
+      }
     };
 
     const oldOverflow = document.body.style.overflow;
@@ -421,25 +568,36 @@ function EnergyConsumptionChart({ data }) {
     };
   }, [isExpanded]);
 
+  const sourceRows =
+    Array.isArray(data) && data.length > 0
+      ? data
+      : historyRows;
+
   const chartData = useMemo(
-    () =>
-      buildChartData(
-        Array.isArray(data) && data.length ? data : historyRows,
-        granularity
-      ),
-    [data, historyRows, granularity]
+    () => buildChartData(sourceRows, granularity),
+    [sourceRows, granularity]
   );
 
   const renderChart = (height) => (
     <ResponsiveContainer width="100%" height={height}>
       <LineChart
         data={chartData}
-        margin={{ top: 8, right: 16, bottom: 0, left: 0 }}
+        margin={{ top: 8, right: 16, bottom: 4, left: 8 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke="#e5e7eb"
+        />
+
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: 11 }}
+          minTickGap={12}
+        />
+
         <YAxis
           tick={{ fontSize: 11 }}
+          width={65}
           label={{
             value: "Energy (kWh)",
             angle: -90,
@@ -447,8 +605,17 @@ function EnergyConsumptionChart({ data }) {
             fontSize: 11,
           }}
         />
-        <Tooltip />
+
+        <Tooltip
+          formatter={(value) => [
+            `${Number(value).toFixed(2)} kWh`,
+            "Energy consumed",
+          ]}
+          labelFormatter={(label) => `Period: ${label}`}
+        />
+
         <Legend />
+
         <Line
           type="monotone"
           dataKey="currentMonth"
@@ -456,16 +623,45 @@ function EnergyConsumptionChart({ data }) {
           stroke="#3182BD"
           strokeWidth={3}
           dot={{ r: 3 }}
+          activeDot={{ r: 5 }}
+          connectNulls={false}
         />
       </LineChart>
     </ResponsiveContainer>
   );
 
   const fallbackNote = usingFallback ? (
-    <small style={{ color: "#b45309", display: "block", marginTop: 4 }}>
-      No data in the last 31 days — showing all available ThingsBoard history.
+    <small
+      style={{
+        color: "#b45309",
+        display: "block",
+        marginTop: 4,
+      }}
+    >
+      Showing historical data from ThingsBoard.
     </small>
   ) : null;
+
+  const renderContent = (height) => {
+    if (loading) {
+      return <p>Loading historical energy data...</p>;
+    }
+
+    if (error) {
+      return <p role="alert">{error}</p>;
+    }
+
+    if (chartData.length === 0) {
+      return (
+        <p>
+          No usable energy readings were found for the selected period.
+          Check the API response, timestamps, and energy values.
+        </p>
+      );
+    }
+
+    return renderChart(height);
+  };
 
   return (
     <>
@@ -473,38 +669,58 @@ function EnergyConsumptionChart({ data }) {
         <div className="chart-header">
           <h3>▥ Energy Consumption Trend</h3>
 
-          <button
-            type="button"
-            style={iconButtonStyle}
-            onClick={() => setIsExpanded(true)}
-            title="Expand chart"
-            aria-label="Expand chart"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 3 21 3 21 9" />
-              <polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" />
-              <line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <select
+              className="chart-select"
+              value={granularity}
+              onChange={(event) =>
+                setGranularity(event.target.value)
+              }
+              aria-label="Trend time period"
+            >
+              {GRANULARITY_OPTIONS.map((option) => (
+                <option
+                  key={option.value}
+                  value={option.value}
+                >
+                  {option.label}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              style={iconButtonStyle}
+              onClick={() => setIsExpanded(true)}
+              title="Expand chart"
+              aria-label="Expand chart"
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {fallbackNote}
-
-        {loading ? (
-          <p>Loading historical energy data...</p>
-        ) : error ? (
-          <p role="alert">{error}</p>
-        ) : chartData.length === 0 ? (
-          <p>No historical energy data available for this period.</p>
-        ) : (
-          renderChart(250)
-        )}
+        {renderContent(250)}
       </div>
 
       {isExpanded && (
-        <div style={overlayStyle} onClick={() => setIsExpanded(false)}>
+        <div
+          style={overlayStyle}
+          onClick={() => setIsExpanded(false)}
+        >
           <div
             style={modalStyle}
             role="dialog"
@@ -515,43 +731,21 @@ function EnergyConsumptionChart({ data }) {
             <div className="chart-header">
               <h3>▥ Energy Consumption Trend</h3>
 
-              <div style={{ display: "flex", gap: 10 }}>
-                <select
-                  className="chart-select"
-                  value={granularity}
-                  onChange={(event) => setGranularity(event.target.value)}
-                >
-                  {GRANULARITY_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-
-                <button
-                  type="button"
-                  style={iconButtonStyle}
-                  onClick={() => setIsExpanded(false)}
-                  aria-label="Close chart"
-                >
-                  ×
-                </button>
-              </div>
+              <button
+                type="button"
+                style={iconButtonStyle}
+                onClick={() => setIsExpanded(false)}
+                aria-label="Close chart"
+              >
+                ×
+              </button>
             </div>
 
             {fallbackNote}
 
-            {loading ? (
-              <p>Loading historical energy data...</p>
-            ) : error ? (
-              <p role="alert">{error}</p>
-            ) : chartData.length === 0 ? (
-              <p>No historical energy data available.</p>
-            ) : (
-              <div style={{ flex: 1, minHeight: 0 }}>
-                {renderChart("100%")}
-              </div>
-            )}
+            <div style={{ flex: 1, minHeight: 0 }}>
+              {renderContent("100%")}
+            </div>
           </div>
         </div>
       )}
