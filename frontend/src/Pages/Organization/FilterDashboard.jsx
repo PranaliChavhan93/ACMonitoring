@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://192.168.1.7:8000/api/v1/filters/locations/";
+const API_BASE = "http://192.168.1.4:8000/api/v1/filters/locations/";
 
 const DEFAULT_COUNTRY = "India";
 
@@ -275,12 +275,20 @@ const getDeviceName = (device) => {
 const getDevicesFromBranch = (branch) => {
   if (!branch) return [];
 
-  const devices = Array.isArray(branch.devices)
-    ? branch.devices
-    : [];
+  // New direct branch assignments are stored in `devices`. Include legacy
+  // site-based entries as a compatibility fallback for existing deployments.
+  const candidates = [
+    ...(Array.isArray(branch.devices) ? branch.devices : []),
+    ...(Array.isArray(branch.sites) ? branch.sites : []),
+  ];
+  const seen = new Set();
 
-  // Only devices with a usable ThingsBoard UUID are selectable.
-  return devices.filter((device) => getDeviceId(device));
+  return candidates.filter((device) => {
+    const id = getDeviceId(device);
+    if (!id || seen.has(String(id))) return false;
+    seen.add(String(id));
+    return true;
+  });
 };
 
 
@@ -723,6 +731,7 @@ const FilterDashboard = ({
         result.device = devices.map((device) => ({
           value: getDeviceId(device),
           label: getDeviceName(device),
+          ac_id: device?.ac_id || (typeof device === "string" ? device : ""),
         }));
       }
     } else {
@@ -761,6 +770,7 @@ const FilterDashboard = ({
       result.device = devices.map((device) => ({
         value: getDeviceId(device),
         label: getDeviceName(device),
+        ac_id: device?.ac_id || (typeof device === "string" ? device : ""),
       }));
     }
 
@@ -830,6 +840,10 @@ const FilterDashboard = ({
 
   useEffect(() => {
     const deviceId = selected.device || "";
+    const selectedDevice = (optionsByLevel.device || []).find(
+      (option) => String(option?.value || "") === String(deviceId)
+    );
+    const acId = selectedDevice?.ac_id || "";
 
     const nextFilters = {
       hierarchy,
@@ -837,13 +851,15 @@ const FilterDashboard = ({
       device: deviceId,
       device_id: deviceId,
       selectedDeviceId: deviceId,
+      ac_id: acId,
+      selectedAcId: acId,
     };
 
     console.log("[FilterDashboard] Selected AC:", selected.device);
     console.log("[FilterDashboard] Sending filters:", nextFilters);
 
     onFilterChange?.(nextFilters);
-  }, [hierarchy, selected, onFilterChange]);
+  }, [hierarchy, selected, optionsByLevel.device, onFilterChange]);
   
   const changeHierarchy = (nextHierarchy) => {
     if (!allowedKeys.includes(nextHierarchy)) {

@@ -56,7 +56,7 @@ export async function analyzeDashboard({
 Example:
 
 const result = await analyzeDashboard({
-  analyzerUrl: "http://192.168.1.7:9000",
+  analyzerUrl: "http://192.168.1.4:9000",
   filters: {
     state: selectedState,
     city: selectedCity,

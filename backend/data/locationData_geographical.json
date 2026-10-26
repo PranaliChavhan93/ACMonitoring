@@ -30221,6 +30221,24 @@
                                         "customer_id": 12,
                                         "admin_ids": [],
                                         "engineer_ids": []
+                                    },
+                                    {
+                                        "branch_id": "NB-01",
+                                        "branch_name": "Navle Bridge",
+                                        "address": "Walhekar Complex, Narhe, Taluka Haveli, Pune",
+                                        "pincode": "411041",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T01",
+                                        "taluka_name": "Pune Taluka",
+                                        "customer_id": 10,
+                                        "admin_ids": [],
+                                        "engineer_ids": []
                                     }
                                 ]
                             },

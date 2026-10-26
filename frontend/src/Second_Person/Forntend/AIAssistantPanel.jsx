@@ -6,15 +6,15 @@ const AI_BASE =
     import.meta.env.VITE_AI_API_BASE || "http://127.0.0.1:9000";
 
 const ANALYSIS_SECTIONS = [
-    "KPI",
+    // "KPI",
     "Energy",
     "Power",
-    "Trend",
-    "Zone",
-    "State",
-    "City",
-    "Branch",
-    "Floor",
+    // "Trend",
+    // "Zone",
+    // "State",
+    // "City",
+    // "Branch",
+    // "Floor",
     "AC Health",
     "Alerts",
 ];
@@ -293,8 +293,8 @@ function AIAssistantPanel({
                     {model && <span>Model: {model}</span>}
                 </div>
                 
-                {/* <div className="ai-view-toggle">
-                    <button
+                <div className="ai-view-toggle">
+                    {/* <button
                         type="button"
                         className={analysisMode === "short" ? "active" : ""}
                         onClick={() => setAnalysisMode("short")}
@@ -308,8 +308,8 @@ function AIAssistantPanel({
                         onClick={() => setAnalysisMode("descriptive")}
                     >
                         Descriptive
-                    </button>
-                </div> */}
+                    </button> */}
+                </div>
 
                 <div className="ai-analysis-grid">
                     {ANALYSIS_SECTIONS.map((section) => (

@@ -1,7 +1,9 @@
+import Org_Dashboard from "../Organization/Org_Dashboard";
+
 function Admin_Dashboard() {
     return(
         <div>
-            <h1>Admin Dashboard (Br. Admin) </h1>
+            <Org_Dashboard />
         </div>
     )
 }

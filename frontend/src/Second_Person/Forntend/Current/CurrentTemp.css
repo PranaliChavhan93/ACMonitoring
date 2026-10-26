@@ -1,0 +1,154 @@
+/* ============================================================
+   Current & Temperature chart card
+   ============================================================ */
+.chart-box {
+  width: 100%;
+  box-sizing: border-box;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px 16px 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04),
+              0 4px 12px rgba(15, 23, 42, 0.05);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #0f172a;
+  overflow: hidden;
+}
+
+/* ---------- Header ---------- */
+.chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.chart-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  color: #0f172a;
+}
+
+.chart-header span {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #64748b;
+}
+
+/* ---------- Loading / error / empty states ---------- */
+.chart-box > div[style*="padding: 24"] {
+  padding: 32px 16px !important;
+  font-size: 13px;
+  color: #64748b;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+/* ---------- "Waiting for telemetry" hint ---------- */
+.chart-box small {
+  display: block;
+  margin-top: 6px;
+  padding: 0 4px 4px !important;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: #94a3b8 !important;
+  font-style: italic;
+}
+
+/* ============================================================
+   Recharts overrides (scoped to .chart-box only)
+   ============================================================ */
+.chart-box .recharts-wrapper {
+  font-size: 11px;
+}
+
+/* Let labels breathe at the edges */
+.chart-box .recharts-surface {
+  overflow: visible;
+}
+
+/* Axis ticks */
+.chart-box .recharts-cartesian-axis-tick-value {
+  fill: #475569;
+}
+
+/* Grid lines */
+.chart-box .recharts-cartesian-grid line {
+  stroke: #e2e8f0;
+}
+
+/* Legend */
+.chart-box .recharts-legend-wrapper {
+  bottom: -4px !important;
+  font-size: 12px;
+}
+
+.chart-box .recharts-legend-item {
+  margin-right: 18px !important;
+}
+
+.chart-box .recharts-legend-item-text {
+  color: #334155 !important;
+  font-weight: 500;
+}
+
+/* Tooltip */
+.chart-box .recharts-tooltip-wrapper {
+  outline: none;
+}
+
+.chart-box .recharts-default-tooltip {
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08) !important;
+  font-size: 12px;
+  padding: 8px 10px !important;
+}
+
+.chart-box .recharts-tooltip-label {
+  color: #0f172a !important;
+  font-weight: 600;
+  margin-bottom: 4px !important;
+}
+
+.chart-box .recharts-tooltip-item {
+  color: #334155 !important;
+  padding: 2px 0 !important;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 640px) {
+  .chart-box {
+    padding: 12px 10px 8px;
+    border-radius: 10px;
+  }
+
+  .chart-header h3 {
+    font-size: 14px;
+  }
+
+  .chart-header span {
+    font-size: 11px;
+  }
+
+  .chart-box .recharts-legend-wrapper {
+    font-size: 11px;
+  }
+
+  /* Give the two Y-axes a bit more room on small screens */
+  .chart-box .recharts-yAxis .recharts-cartesian-axis-tick-value {
+    font-size: 10px;
+  }
+}

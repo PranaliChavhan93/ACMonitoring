@@ -4,7 +4,6 @@ import { ROLES, ROLE_DASHBOARD } from "./Pages/Layout/MenuConfig";
 import ProtectedRoute from "./Pages/Layout/ProtectedRoute";
 
 import Layout from "./Pages/Layout/Layout";
-
 import Login from "./Pages/Layout/Login";
 
 import Org_Dashboard from "./Pages/Organization/Org_Dashboard";
@@ -22,6 +21,8 @@ import HierarchySiteCreation from "./Pages/Organization/HierarchySiteCreation";
 
 import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
 import SuperAdminLogin from "./Pages/Layout/SuperAdminLogin";
+import Trends from "./Second_Person/Forntend/Treands";
+import ProfilePage from "./Pages/Profile/ProfilePage";
 
 function RootRedirect() {
   const { user } = useAuth();
@@ -47,10 +48,22 @@ export default function App() {
           <Route path="/org/login" element={<SuperAdminLogin />} />
 
           <Route
+            path="/profile"
+            element={
+              <Page>
+                <ProfilePage />
+                {/* <Trends /> */}
+              </Page>
+            }
+          />
+
+
+          <Route
             path="/org/dashboard"
             element={
               <Page roles={[ROLES.ORG_SUPER_ADMIN]}>
                 <Org_Dashboard />
+                {/* <Trends /> */}
               </Page>
             }
           />
@@ -111,7 +124,7 @@ export default function App() {
           />
 
           <Route
-            path="/customer/dashboard"
+            path="/dashboard"
             element={
               <Page roles={[ROLES.CUSTOMER]}>
                 <Cust_Dashboard />
@@ -182,7 +195,7 @@ export default function App() {
           <Route path="/reports"
             element={
               <Page roles={[ROLES.CUSTOMER]}>
-                null
+                Report Page
               </Page>
             }
           />
@@ -190,7 +203,7 @@ export default function App() {
           <Route path="/settings"
             element={
               <Page roles={[ROLES.CUSTOMER]}>
-                null
+                Setting Page
               </Page>
             }
           />

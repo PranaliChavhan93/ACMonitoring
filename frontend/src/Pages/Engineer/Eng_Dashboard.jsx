@@ -1,7 +1,9 @@
+import Org_Dashboard from "../Organization/Org_Dashboard";
+
 function Eng_Dashboard() {
     return(
         <div>
-            <h1>Engineer Dashboard (Br. Engineer) </h1>
+            <Org_Dashboard />
         </div>
     )
 }

@@ -5,7 +5,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from .models import TelemetryAggregate, ACDevice
+from .models import TelemetryAggregate, ACDevice, LatestTelemetry
 
 METRICS = {
     "voltage": ("voltage", "latest_voltage", "sum_voltage", "avg_voltage", "min_voltage", "max_voltage"),
@@ -132,6 +132,39 @@ def _apply_reading(device_id, ts, values, interval_seconds=60):
         if row.first_timestamp is None: row.first_timestamp = ts
         row.last_timestamp = ts
         row.save()
+
+        # Maintain one latest-state row per registered device. Do not let a
+        # delayed/older reading replace a newer snapshot. Historical aggregation
+        # remains unchanged and telemetry for unknown devices is still accepted
+        # by the existing aggregate path.
+        device = ACDevice.objects.filter(ac_id=device_id).first()
+        if device is not None:
+            latest, latest_created = LatestTelemetry.objects.select_for_update().get_or_create(
+                device=device,
+                defaults={"device_timestamp": ts},
+            )
+            if latest_created or ts > latest.device_timestamp:
+                field_map = {
+                    "voltage": "voltage", "current": "current",
+                    "power": "active_power", "energy": "energy_consumption",
+                    "frequency": "frequency", "power_factor": "power_factor",
+                    "indoor_temperature": "temperature",
+                    "indoor_humidity": "humidity",
+                }
+                for source, target in field_map.items():
+                    value = _number(values.get(source))
+                    if value is not None:
+                        setattr(latest, target, value)
+                alarm = _number(values.get("alarm_status"))
+                relay_value = _number(values.get("relay"))
+                if alarm is not None:
+                    latest.alarm_status = int(alarm)
+                if relay_value is not None:
+                    latest.relay = int(relay_value)
+                latest.device_timestamp = ts
+                # Only JSON-compatible payload data is accepted by the ingest API.
+                latest.raw_payload = values
+                latest.save()
     return True
 
 def ingest_payload(payload):
@@ -192,18 +225,51 @@ def _record_from_row(row, device_name=None):
 
 
 def get_latest_records():
-    """Return one newest aggregate bucket per device in the legacy dashboard shape."""
-    from django.db.models import OuterRef, Subquery
-    newest_bucket = (TelemetryAggregate.objects
-        .filter(device_id=OuterRef("device_id"), interval_seconds=60)
-        .order_by("-bucket_start")
-        .values("bucket_start")[:1])
-    rows = list(TelemetryAggregate.objects
-        .filter(interval_seconds=60, bucket_start=Subquery(newest_bucket))
-        .order_by("device_id"))
-    names = dict(ACDevice.objects.filter(ac_id__in=[r.device_id for r in rows])
-         .values_list("ac_id", "device_name"))
-    return [_record_from_row(row, names.get(row.device_id)) for row in rows]
+    """Return latest snapshots in the legacy dashboard response shape.
+
+    Historical aggregate rows are used as a compatibility fallback for older
+    devices that predate the latest_telemetry table.
+    """
+    stale_seconds = int(getattr(settings, "TELEMETRY_STALE_SECONDS", 120))
+    latest_rows = list(LatestTelemetry.objects.select_related("device").all().order_by("device__ac_id"))
+    records = []
+    seen = set()
+    for row in latest_rows:
+        device_id = row.device.ac_id
+        seen.add(device_id)
+        age = (timezone.now() - row.device_timestamp).total_seconds()
+        relay = int(row.relay or 0)
+        status = "OFFLINE" if age > stale_seconds else ("ON" if relay else "OFF")
+        records.append({
+            "ac_id": device_id, "site_id": device_id,
+            "device_name": row.device.device_name or device_id,
+            "voltage": row.voltage or 0, "current": row.current or 0,
+            "active_power": row.active_power or 0,
+            "energy_consumption": row.energy_consumption or 0,
+            "frequency": row.frequency or 0, "power_factor": row.power_factor or 0,
+            "ac_on_time": None, "ac_off_time": None,
+            "temperature": row.temperature or 0, "humidity": row.humidity or 0,
+            "alarm_status": row.alarm_status or 0, "relay": relay, "status": status,
+            "timestamp": row.device_timestamp.isoformat(timespec="seconds"),
+            "source": "local_latest", "sample_count": 1,
+            "energy_delta": 0.0,
+            "latest_energy_counter": row.energy_consumption,
+        })
+
+    # Preserve compatibility for aggregate records whose device has not yet
+    # been registered in ACDevice / migrated to the latest snapshot table.
+    if True:
+        from django.db.models import OuterRef, Subquery
+        newest_bucket = (TelemetryAggregate.objects
+            .filter(device_id=OuterRef("device_id"), interval_seconds=60)
+            .order_by("-bucket_start").values("bucket_start")[:1])
+        fallback_rows = list(TelemetryAggregate.objects
+            .filter(interval_seconds=60, bucket_start=Subquery(newest_bucket))
+            .exclude(device_id__in=seen).order_by("device_id"))
+        names = dict(ACDevice.objects.filter(ac_id__in=[r.device_id for r in fallback_rows])
+            .values_list("ac_id", "device_name"))
+        records.extend(_record_from_row(row, names.get(row.device_id)) for row in fallback_rows)
+    return records
 
 
 def query_aggregates(start, end, device_ids=None, interval_seconds=60):

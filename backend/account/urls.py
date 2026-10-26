@@ -1,9 +1,11 @@
 from django.urls import path
-from .telemetry_aggregate_views import save_production_type, telemetry_aggregates
+from .telemetry_aggregate_views import save_production_type
+from .history_views import current_history, telemetry_aggregates
 
 from .hierarchy_site_views import create_hierarchy_site, create_hierarchy_branch
 from .cloud_views import CloudCustomerListView, CloudUserListView
 from .views import (
+    profile,
     AdminDetailView, 
     AdminListView, 
     BranchListView, 
@@ -30,13 +32,13 @@ from .views import (
     ai_dashboard_analysis, 
     assign_customer_to_site,
     assign_device_to_customer, 
+    assign_device_to_admin,
     assign_device_to_site, 
     assign_device_to_branch,
     control_device_relay, 
     create_branch_or_floor, 
     create_device, 
     create_site,
-    current_history,
     pincode_lookup, 
     search_site_branches, 
     site_assignment, 
@@ -67,6 +69,7 @@ urlpatterns = [
     path("telemetry-aggregates/", telemetry_aggregates),
     path("auth/login/", login_view),
     path("auth/logout/", logout_view),
+    path("profile/", profile),
 
     path("ac-data/", ac_data),
     path("ac-data/latest/", latest_ac_data),
@@ -85,6 +88,7 @@ urlpatterns = [
     path("devices/relay/", control_device_relay),
     path("devices/create/", DeviceCreateView.as_view()),
     path("devices/assign/customer/", assign_device_to_customer),
+    path("devices/assign/admin/", assign_device_to_admin),
     path("devices/assign/branch/", assign_device_to_branch),
 
     path("auth/me/", me_view),

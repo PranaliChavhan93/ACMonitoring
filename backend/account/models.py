@@ -699,6 +699,10 @@ class ACDevice(models.Model):
     assigned_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="assigned_ac_devices"
     )
+    assigned_admin = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="allocated_ac_devices",
+        limit_choices_to={"role": Role.BR_ADMIN},
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -804,6 +808,33 @@ class DashboardPreference(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.name}"
+
+
+class LatestTelemetry(models.Model):
+    """Latest accepted telemetry snapshot: exactly one row per registered AC device."""
+    device = models.OneToOneField(
+        ACDevice, on_delete=models.CASCADE, related_name="latest_telemetry"
+    )
+    device_timestamp = models.DateTimeField(db_index=True)
+    voltage = models.FloatField(null=True, blank=True)
+    current = models.FloatField(null=True, blank=True)
+    active_power = models.FloatField(null=True, blank=True)
+    energy_consumption = models.FloatField(null=True, blank=True)
+    frequency = models.FloatField(null=True, blank=True)
+    power_factor = models.FloatField(null=True, blank=True)
+    temperature = models.FloatField(null=True, blank=True)
+    humidity = models.FloatField(null=True, blank=True)
+    alarm_status = models.IntegerField(default=0)
+    relay = models.IntegerField(default=0)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    received_at = models.DateTimeField(auto_now=True, db_index=True)
+
+    class Meta:
+        db_table = "latest_telemetry"
+        indexes = [models.Index(fields=["device_timestamp"], name="latest_tel_ts_idx")]
+
+    def __str__(self):
+        return f"Latest telemetry: {self.device.ac_id}"
 
 
 class TelemetryAggregate(models.Model):

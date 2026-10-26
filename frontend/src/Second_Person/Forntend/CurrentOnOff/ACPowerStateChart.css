@@ -1,0 +1,139 @@
+.ac-power-state-card {
+    background: #ffffff;
+    border-radius: 12px;
+    padding: 16px 20px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header */
+.ac-power-state-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.ac-power-state-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: #1e3a8a;
+    font-size: 14px;
+}
+
+.ac-power-state-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 11px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-item .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.legend-item .dot.on {
+    background-color: #16a34a;
+}
+
+.legend-item .dot.off {
+    background-color: #e5e7eb;
+}
+
+/* Timeline Bar */
+.ac-power-state-timeline {
+    width: 100%;
+}
+
+.ac-power-state-bar {
+    display: flex;
+    height: 32px;
+    background: #e5e7eb;
+    border-radius: 4px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.ac-power-state-bar .segment {
+    height: 100%;
+    transition: all 0.2s ease;
+}
+
+.ac-power-state-bar .segment.on {
+    background-color: #16a34a;
+}
+
+.ac-power-state-bar .segment.off {
+    background-color: #e5e7eb;
+}
+
+.ac-power-state-bar .segment.loading {
+    background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+.ac-power-state-axis {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 8px;
+    font-size: 10px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+/* KPIs */
+.ac-power-state-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.kpi-box {
+    background: #f0f7ff;
+    padding: 12px 16px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.kpi-label {
+    font-size: 11px;
+    color: #3b82f6;
+    font-weight: 600;
+}
+
+.kpi-value {
+    font-size: 16px;
+    color: #1e3a8a;
+    font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .ac-power-state-kpis {
+        grid-template-columns: 1fr;
+    }
+}

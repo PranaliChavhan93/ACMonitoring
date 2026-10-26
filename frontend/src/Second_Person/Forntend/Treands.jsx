@@ -1,9 +1,9 @@
-function Treands() {
-    return (
+function Trends() {
+    return(
         <div>
-            <h1>Trends Page</h1>
+            <h1>Trends</h1>
         </div>
     )
 }
 
-export default Treands;
+export default Trends;

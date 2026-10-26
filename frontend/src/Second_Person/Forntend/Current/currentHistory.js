@@ -289,10 +289,19 @@ export function formatTick(ts, period) {
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
 }
 
+
 export function formatLabel(ts, period) {
   const d = new Date(ts);
-  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+
+  const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(
+    d.getSeconds()
+  )}`;
+
   if (period === "today") return time;
-  if (period === "week") return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}, ${time}`;
-  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+
+  if (period === "week") {
+    return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}, ${time}`;
+  }
+
+  return `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}, ${time}`;
 }

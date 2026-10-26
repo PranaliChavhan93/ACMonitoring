@@ -68,15 +68,35 @@ def accessible_branches(user):
         )
 
     if user.role == Role.BR_ADMIN:
+        # Admin scope is assigned by the customer at state or zone level.
+        # Restrict all descendant branches to that scope; retain legacy branch
+        # assignment as a fallback for older accounts.
+        hierarchy = getattr(user.customer, "hierarchy_type", None) if user.customer_id else None
+        if hierarchy == "GEOGRAPHICAL" and user.state_id:
+            return qs.filter(
+                customer_id=user.customer_id,
+                **{
+                    "city__taluka__district__state_id": user.state_id,
+                },
+            ) | qs.filter(
+                customer_id=user.customer_id,
+                taluka__district__state_id=user.state_id,
+            )
+        if hierarchy == "ZONAL" and user.zone_id:
+            return qs.filter(
+                customer_id=user.customer_id,
+                division__region__circle__zone_id=user.zone_id,
+            )
         if user.branch_id:
-            return qs.filter(pk=user.branch_id)
-
+            return qs.filter(pk=user.branch_id, customer_id=user.customer_id)
         return qs.none()
 
     if user.role == Role.ENGINEER:
+        # Legacy fallback: engineer's branch is the maximum allowed scope.
+        # Individual AC/task assignments should be enforced by the task/device
+        # assignment layer when that model is enabled.
         if user.branch_id:
-            return qs.filter(pk=user.branch_id)
-
+            return qs.filter(pk=user.branch_id, customer_id=user.customer_id)
         return qs.none()
 
     return qs.none()
@@ -112,14 +132,12 @@ def accessible_sites(user):
         )
 
     if user.role == Role.BR_ADMIN:
-        return qs.filter(
-            branch__in=accessible_branches(user)
-        )
+        return qs.filter(branch__in=accessible_branches(user))
 
     if user.role == Role.ENGINEER:
-        return qs.filter(
-            pk=user.site_id
-        ) if user.site_id else qs.none()
+        # Do not grant all sites in the admin's scope to an engineer.
+        # Existing site assignment is retained for compatibility.
+        return qs.filter(pk=user.site_id, branch__in=accessible_branches(user)) if user.site_id else qs.none()
 
     return qs.none()
 
@@ -161,14 +179,16 @@ def accessible_devices(user):
         ).filter(~Exists(owned_by_someone_else))
 
     if user.role == Role.BR_ADMIN:
-        return qs.filter(
-            site__branch__in=accessible_branches(user)
-        )
+        legacy_scope = Q(branch__in=accessible_branches(user)) | Q(site__branch__in=accessible_branches(user))
+        # Once a device is allocated to a specific admin, hide it from other admins.
+        return qs.filter(Q(assigned_admin=user) | (Q(assigned_admin__isnull=True) & legacy_scope))
 
     if user.role == Role.ENGINEER:
-        return qs.filter(
-            site_id=user.site_id
-        ) if user.site_id else qs.none()
+        # Restrict to the engineer's directly assigned site and branch. This is
+        # deliberately narrower than the admin's state/zone scope.
+        if not user.site_id:
+            return qs.none()
+        return qs.filter(site_id=user.site_id, site__branch__in=accessible_branches(user))
 
     return qs.none()
 

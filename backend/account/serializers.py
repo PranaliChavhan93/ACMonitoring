@@ -926,12 +926,12 @@ class ACDeviceSerializer(serializers.ModelSerializer):
         fields = [
             "id", "ac_id", "device_name", "branch", "branch_id", "branch_name",
             "customer_id", "customer_name", "assignment_status",
-            "status", "capacity_ton", "installation_date", "last_maintenance_date", "assigned_by",
+            "status", "capacity_ton", "installation_date", "last_maintenance_date", "assigned_by", "assigned_admin",
             "tpt_device_id", "tpt_sync_status", "tpt_sync_error", "created_at", "updated_at",
         ]
         read_only_fields = [
             "id", "branch_id", "branch_name", "customer_id", "customer_name",
-            "assignment_status", "assigned_by", "tpt_device_id",
+            "assignment_status", "assigned_by", "assigned_admin", "tpt_device_id",
             "tpt_sync_status", "tpt_sync_error", "created_at", "updated_at",
         ]
 
@@ -1295,7 +1295,7 @@ class AdminSerializer(serializers.ModelSerializer):
             _chain_ok(zon_chain, payload, "ZONAL")
 
     def create(self, validated_data):
-        password = validated_data.pop("password", "") or "changeme123"
+        password = validated_data.pop("password", "") or "Admin@123"
         user = User(**validated_data)
         user.set_password(password)
         user._skip_scope_check = True  # ← bypass scope check on this save

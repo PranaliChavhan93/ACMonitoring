@@ -1,4 +1,3 @@
-
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useRollingAverage } from "./hooks/useRollingAverage";
@@ -29,9 +28,10 @@ import FaultDetectionPanel from "./FaultDetectionPanel"
 
 import "./dashboard.css";
 import "./dashboard-insight.css";
-// import CurrentChart from "./Current/Current";
-// import CurrentTrendChart from "./Current/Current";
 import CurrentHistoryChart from "./Current/CurrentHistoryChart";
+import VoltageHistoryChart from "./Voltage/VoltageHistoryChart";
+import ACPowerStateChart from "./CurrentOnOff/ACPowerStateChart";
+import CurrentTemperatureChart from "./Current/CurrentTemp";
 
 const numberValue = (value) => {
     if (value === null || value === undefined || value === "") {
@@ -44,9 +44,17 @@ const numberValue = (value) => {
 
 const getVoltage = (item) => numberValue(item?.voltage ?? item?.Voltage);
 
-const getCurrent = (item) => numberValue(item?.current ?? item?.Current);
+// An AC that is OFF / OFFLINE draws nothing: the backend keeps its last known
+// readings for display, so force current and power to 0 unless it is running.
+const isRunning = (item) => ["active", "running", "on", "1"].includes(
+    String(item?.status ?? item?.ac_status ?? item?.state ?? "").trim().toLowerCase()
+);
+
+const getCurrent = (item) => (isRunning(item) ? numberValue(item?.current ?? item?.Current) : 0);
 
 const getPower = (item) => {
+    if (!isRunning(item)) return 0;
+
     const value =
         item?.active_power ??
         item?.Active_Power ??
@@ -114,8 +122,14 @@ function ACDashboard({
     const navigate = useNavigate();
     const [showAIModule, setShowAIModule] = useState(false);
     const [branchWeather, setBranchWeather] = useState([]);
+    const [historicalClimate, setHistoricalClimate] = useState([]);
+    const [climateHistoryStatus, setClimateHistoryStatus] = useState("idle");
     const [weatherStatus, setWeatherStatus] = useState("idle");
     const [weatherError, setWeatherError] = useState("");
+
+    const [currentHistoryData, setCurrentHistoryData] = useState([]);
+    const [currentHistoryStatus, setCurrentHistoryStatus] = useState("idle");
+
     // const isFloorScope = Boolean(selectedFloor);
     const isFloorScope = Boolean(filters?.floor);
     const safeData = useMemo(() => {
@@ -157,8 +171,8 @@ function ACDashboard({
     const metrics = useMemo(() => {
         const totalACs = filteredData.length;
         const activeRecords = filteredData.filter(isActive);
-        const totalEnergy = filteredData.reduce( (sum, item) => sum + getEnergy(item), 0 );
-        const activeEnergy = activeRecords.reduce( (sum, item) => sum + getEnergy(item), 0 );
+        const totalEnergy = filteredData.reduce( (sum, item) => sum + getEnergy(item) / 1000, 0 );
+        const activeEnergy = activeRecords.reduce( (sum, item) => sum + getEnergy(item) / 1000, 0 );
         const totalPower = filteredData.reduce( (sum, item) => sum + getPower(item), 0 );
         const temperatures = filteredData
             .map(getTemperature)
@@ -262,15 +276,6 @@ function ACDashboard({
         navigate("/org/dashboard/trends");
     };
 
-    // Presentation adapts to the selected hierarchy without changing API polling.
-    // const hierarchyLevels = filters?.hierarchy === "ZONAL"
-    //     ? ["zone", "circle", "region", "division", "branch", "floor"]
-    //     : ["state", "district", "taluka", "city", "branch", "floor"];
-    // const selectedLevel = [...hierarchyLevels].reverse().find((key) => Boolean(filters?.[key])) || "country";
-    // const isBranchScope = ["branch", "floor"].includes(selectedLevel);
-    // const isFloorScope = selectedLevel === "floor";
-    // const isSingleDeviceScope = Boolean(filters?.ac_id || filters?.device_id || filters?.device);
-    
     const hierarchyLevels =
         filters?.hierarchy === "ZONAL"
             ? ["zone", "circle", "region", "division", "branch", "device"]
@@ -284,101 +289,159 @@ function ACDashboard({
     const isBranchScope = selectedLevel === "branch";
     const isDeviceScope = selectedLevel === "device";
 
-    // const selectedDeviceId = useMemo(() => {
-    //     const filterDeviceId =
-    //         filters?.selectedDeviceId ||
-    //         filters?.tpt_device_id ||
-    //         filters?.thingsboard_device_id ||
-    //         filters?.device_uuid ||
-    //         filters?.device_id ||
-    //         (typeof filters?.device === "string"
-    //             ? filters.device
-    //             : filters?.device?.device_id ||
-    //             filters?.device?.tpt_device_id ||
-    //             filters?.device?.thingsboard_device_id ||
-    //             filters?.device?.device_uuid ||
-    //             "");
-
-    // console.log("[Energy Chart] Filters:", filters);
-    // // console.log("[Energy Chart] Selected device ID:", selectedDeviceId);
-    // // console.log("[Energy Chart] Selected device ID:", selectedDeviceId);
-    // console.log("[Energy Chart] First device record:", filteredData[0]);
-
-    //     // When a single device is selected, inspect its telemetry record.
-    //     const recordDeviceId =
-    //         filteredData.length === 1
-    //             ? (
-    //                 filteredData[0]?.tpt_device_id ||
-    //                 filteredData[0]?.thingsboard_device_id ||
-    //                 filteredData[0]?.device_uuid ||
-    //                 filteredData[0]?.device?.device_id ||
-    //                 ""
-    //             )
-    //             : "";
-
-    //     return filterDeviceId || recordDeviceId;
-    // }, [filters, filteredData]);
-
-    // const selectedDeviceId = useMemo(() => {
-    //     const device = filters?.device;
-
-    //     const filterDeviceId =
-    //         filters?.selectedDeviceId ||
-    //         filters?.device_id ||
-    //         filters?.tpt_device_id ||
-    //         filters?.thingsboard_device_id ||
-    //         filters?.device_uuid ||
-    //         (typeof device === "string" ? device : "") ||
-    //         device?.value ||
-    //         device?.tpt_device_id ||
-    //         device?.thingsboard_device_id ||
-    //         device?.thingsboard_id ||
-    //         device?.device_id ||
-    //         device?.device_uuid ||
-    //         "";
-
-    //     // Use the record ID only when exactly one device is present.
-    //     const record = filteredData.length === 1 ? filteredData[0] : null;
-
-    //     const recordDeviceId =
-    //         record?.tpt_device_id ||
-    //         record?.thingsboard_device_id ||
-    //         record?.thingsboard_id ||
-    //         record?.device_id ||
-    //         record?.device_uuid ||
-    //         record?.device?.device_id ||
-    //         "";
-
-    //     const id = String(filterDeviceId || recordDeviceId).trim();
-
-    //     console.log("[Current Trend] Filters:", filters);
-    //     console.log("[Current Trend] Selected device ID:", id);
-
-    //     return id;
-    // }, [filters, filteredData]);
-
-
     const selectedDeviceId = String(
         filters?.selectedDeviceId ||
         filters?.device_id ||
         (typeof filters?.device === "string"
             ? filters.device
             : filters?.device?.value || "")
-        ).trim();
+    ).trim();
 
-        console.log("[Current Trend] Selected device ID:", selectedDeviceId);
+    const filtersKey = JSON.stringify(filters || {});
 
     const isSingleDeviceScope =
         isDeviceScope || Boolean(filters?.ac_id || selectedDeviceId);
 
     const selectedState = filters?.state || "";
-    const showWidget = (key) => visibleWidgets?.[key] !== false;
-    
-    // const selectedState = filters?.state || "";
-    // const showWidget = (key) => visibleWidgets?.[key] !== false;
 
-    // Local outdoor weather is fetched from Open-Meteo using the coordinates
-    // stored on the selected branch. AC telemetry and rolling averages remain unchanged.
+    const showWidget = (key) => visibleWidgets?.[key] !== false;
+
+
+    useEffect(() => {
+        if (selectedLevel !== "branch" && selectedLevel !== "device") {
+            setCurrentHistoryData([]);
+            setCurrentHistoryStatus("idle");
+        return undefined;
+    }
+
+    const controller = new AbortController();
+
+    const loadCurrentHistory = async () => {
+        try {
+        const end = new Date();
+        const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+
+        const params = new URLSearchParams({
+            period: "today",
+            from: start.toISOString(),
+            to: end.toISOString(),
+        });
+
+        const deviceId = selectedDeviceId || filters?.ac_id || "";
+        if (deviceId) params.set("ac_id", String(deviceId));
+
+        const token = [
+            "token",
+            "authToken",
+            "access_token",
+            "accessToken",
+        ]
+            .map((key) => localStorage.getItem(key))
+            .find(Boolean);
+
+        const response = await fetch(
+            `http://localhost:8000/api/current-history/?${params}`,
+            {
+            signal: controller.signal,
+            headers: token
+                ? { Authorization: `Bearer ${token}` }
+                : {},
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Current history API: HTTP ${response.status}`);
+        }
+
+        const payload = await response.json();
+        setCurrentHistoryData(
+            Array.isArray(payload?.data) ? payload.data : []
+        );
+        setCurrentHistoryStatus("loaded");
+        } catch (error) {
+        if (error.name === "AbortError") return;
+
+        console.error("Current history failed:", error);
+        setCurrentHistoryStatus("error");
+        }
+    };
+
+    loadCurrentHistory();
+
+    const intervalId = window.setInterval(loadCurrentHistory, 10000);
+
+    return () => {
+        controller.abort();
+        window.clearInterval(intervalId);
+    };
+    }, [selectedLevel, selectedDeviceId, filtersKey]);
+
+    useEffect(() => {
+        if (selectedLevel !== "branch" && selectedLevel !== "device") {
+            setHistoricalClimate([]);
+            setClimateHistoryStatus("idle");
+            return undefined;
+        }
+
+        const controller = new AbortController();
+        const loadClimateHistory = async () => {
+        // Only show "loading" the first time; 10 s refreshes update in place.
+        setClimateHistoryStatus((prev) => (prev === "loaded" || prev === "empty" ? prev : "loading"));
+        try {
+            const end = new Date();
+            const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+            const params = new URLSearchParams({
+                from: start.toISOString(),
+                to: end.toISOString(),
+                interval_seconds: "300", // 5-minute buckets keep a 24 h, multi-AC response small
+            });
+
+            // Preserve the dashboard's active hierarchy scope.
+            ["state", "district", "taluka", "city", "zone", "circle", "region", "division", "branch", "floor"].forEach((key) => {
+                if (filters?.[key] != null && String(filters[key]).trim()) {
+                    params.set(key, String(filters[key]));
+                }
+            });
+            const deviceId = selectedDeviceId || filters?.ac_id || "";
+            if (deviceId) params.set("device_id", String(deviceId));
+
+            const token = ["token", "authToken", "access_token", "accessToken"]
+                .map((key) => localStorage.getItem(key))
+                .find(Boolean);
+            const response = await fetch(
+                `http://localhost:8000/api/telemetry-aggregates/?${params.toString()}`,
+                {
+                    signal: controller.signal,
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                }
+            );
+            if (!response.ok) {
+                throw new Error(`Historical telemetry API returned HTTP ${response.status}`);
+            }
+            const payload = await response.json();
+            const rows = Array.isArray(payload?.data) ? payload.data : [];
+            setHistoricalClimate(rows.map((row) => ({
+                timestamp: row.bucket_start,
+                indoor_temperature: row.avg_temperature,
+                indoor_humidity: row.avg_humidity,
+                device_id: row.device_id,
+            })));
+            setClimateHistoryStatus(rows.length ? "loaded" : "empty");
+        } catch (error) {
+            if (error.name === "AbortError") return;
+            console.error("[Climate history] Failed to load:", error);
+            setHistoricalClimate([]);
+            setClimateHistoryStatus("error");
+        }
+    };
+    loadClimateHistory();
+    const intervalId = window.setInterval(loadClimateHistory, 10 * 1000); // refresh historical telemetry every 10 seconds
+    return () => {
+        controller.abort();
+        window.clearInterval(intervalId);
+    };
+    }, [selectedLevel, selectedDeviceId, filtersKey]);
+
     const branchCoordinates = useMemo(() => {
         const candidates = [...safeData, ...filteredData];
         const record = candidates.find((item) => {
@@ -457,68 +520,9 @@ function ACDashboard({
         branchCoordinates?.longitude,
     ]);
 
-    // useEffect(() => {
-    //     const deviceId = selected.device || "";
-
-    //     onFilterChange?.({
-    //         hierarchy,
-    //         ...selected,
-    //         device: deviceId,
-    //         device_id: deviceId,
-    //         selectedDeviceId: deviceId,
-    //     });
-    //     }, [hierarchy, selected, onFilterChange]);
-
     return (
         <div className="ac-dashboard">
-            {/* <div className="ac-dashboard-header">
-                <div>
-                    <h1>AC Energy Monitoring</h1>
-                    <p>
-                        Real-time AC performance, energy and health monitoring
-                    </p>
-                </div>
-
-                <div className="dashboard-header-actions">
-                    <button
-                        type="button"
-                        className="trends-button"
-                        onClick={handleTrendsClick}
-                    >
-                        Trends
-                    </button>
-
-                    <div className="dashboard-live-status">
-                        <span className="live-dot" />
-                        <span>LIVE</span>
-                    </div>
-                </div>
-            </div> */}
-
-            {/* <div className="dashboard-filter-info">
-                <span className="filter-label">Current View:</span>
-
-                <span className="filter-value">
-                {Object.entries(filters || {})
-                    .filter(
-                    ([key, value]) =>
-                        key !== "hierarchy" &&
-                        value !== null &&
-                        value !== undefined &&
-                        value !== ""
-                    )
-                    .map(([, value]) => value)
-                    .join(" > ") || "All Locations"}
-                </span>
-
-                <span className="record-count">
-                    {filteredData.length} AC
-                    {filteredData.length !== 1 ? "s" : ""}
-                </span>
-            </div> */}
-
             <br />
-
             {filteredData.length === 0 ? (
                 <div className="dashboard-no-data">
                     <div className="no-data-icon">📊</div>
@@ -540,22 +544,22 @@ function ACDashboard({
 
                     {showAIModule && (
                         <div id="ai-module-panel" className="ai-module-panel">
-                        <AIAssistantPanel dashboardData={dashboardPayload} />
+                            <AIAssistantPanel dashboardData={dashboardPayload} />
                         </div>
                     )}
                 </section>
-                
+
                 <br />
 
-                {selectedLevel === "branch" && (
+                {/* {selectedLevel === "branch" && (
                     <section className="dashboard-section">
                         <FaultDetectionPanel
                             data={filteredData}
                             refreshMs={2000}
                         />
                     </section>
-                )}
-                
+                )} */}
+
                 <br />
 
                 <section className="dashboard-section">
@@ -568,7 +572,7 @@ function ACDashboard({
                     </div>
                     <div className="kpi-grid">
                         {showWidget("total_acs") && <Total_Acs value={metrics.totalACs} />}
-                        {showWidget("active_acs") && <Active_Acs value={metrics.activeACs} />}
+                        <Active_Acs value={metrics.activeACs} />
                         {showWidget("total_energy") && <Total_Energy value={metrics.totalEnergy} />}
                         {showWidget("active_energy") && <Active_Energy value={metrics.activeEnergy} />}
                         {selectedLevel === "branch" && showWidget("active_power") && (
@@ -582,55 +586,63 @@ function ACDashboard({
                         {selectedLevel === "branch" && showWidget("humidity") && (
                             <Average_Humidity value={metrics.averageHumidity} />
                         )}
-                        
-                        {showWidget("alerts") && <Alerts data={safeData} active={cardFilters?.alerts?.active === true} onClick={() => onCardFilterChange?.({ alerts: { active: !cardFilters?.alerts?.active } })} />}
-                        {selectedState && showWidget("cost_card") && <EnergyCostCard stateName={selectedState} energyKwh={metrics.totalEnergy} />}
-                    </div>
+
+                        {showWidget("alerts") && 
+                            <Alerts data={safeData} active={cardFilters?.alerts?.active === true} onClick={() => onCardFilterChange?.({ alerts: { active: !cardFilters?.alerts?.active } })} />
+                        }
+                        {selectedState && showWidget("cost_card") && 
+                            <EnergyCostCard stateName={selectedState} energyKwh={metrics.totalEnergy} />
+                        }
+                        </div>
                 </section>
 
                 <section className="dashboard-grid dashboard-grid--primary">
-                    {showWidget("energy_chart") && <EnergyConsumptionChart deviceId={selectedDeviceId} /> }
-                    {showWidget("power_chart") && <CurrentFluctuationChart value={metrics.totalPower} />}
-                    {showWidget("health_chart") && <ACHealthChart data={deviceData} />}
-                </section>
+                    {showWidget("energy_chart") && 
+                        <EnergyConsumptionChart deviceId={selectedDeviceId} scope={filters} />
+                    }
+                    {selectedLevel !== "branch" && showWidget("power_chart") && (
+                        <CurrentFluctuationChart value={metrics.totalPower} deviceId={selectedDeviceId} scope={filters} />
+                    )}
+                    
+                    <ACHealthChart data={deviceData} />
+                    <PowerConsumptionChart data={deviceData}/>
 
-                <section className="dashboard-grid dashboard-grid--secondary">
-                    {selectedLevel === "branch" && showWidget("temperature") && ( 
-                        <TemperatureChart data={branchWeather} indoorData={trendHistory} locationName={filters?.branch} status={weatherStatus} error={weatherError} /> 
+                    {selectedLevel === "branch" && showWidget("health_chart") && (
+                        <>
+                            <CurrentTemperatureChart
+                                currentData={currentHistoryData}
+                                indoorData={
+                                    historicalClimate.length
+                                    ? historicalClimate
+                                    : trendHistory
+                                }
+                                loading={
+                                    currentHistoryStatus === "idle" ||
+                                    currentHistoryStatus === "loading"
+                                }
+                            />
+                            {/* <ACHealthChart data={deviceData} /> */}
+                            <CurrentHistoryChart
+                                deviceId={selectedDeviceId}
+                                scope={filters}
+                            />
+                            <VoltageHistoryChart
+                                deviceId={selectedDeviceId}
+                                scope={filters}
+                            />
+                            <TemperatureChart data={branchWeather} indoorData={historicalClimate.length ? historicalClimate : trendHistory} locationName={filters?.branch} status={climateHistoryStatus === "loading" ? "loading" : weatherStatus} error={climateHistoryStatus === "error" ? "Unable to load historical device telemetry. Check API URL/token." : weatherError} /> 
+                            <HumidityChart data={branchWeather} indoorData={historicalClimate.length ? historicalClimate : trendHistory} locationName={filters?.branch} status={climateHistoryStatus === "loading" ? "loading" : weatherStatus} error={climateHistoryStatus === "error" ? "Unable to load historical device telemetry. Check API URL/token." : weatherError} />
+                            <ACPowerStateChart 
+                                data={filteredData}
+                                deviceId={selectedDeviceId || filters?.ac_id || ""}
+                                scope={filters}
+                            />
+                        </>
                     )}
-                    {showWidget("zone_chart") && <ZoneEnergyChart data={deviceData} filters={filters} />}
-                    {selectedLevel === "branch" && showWidget("humidity") && (
-                        <HumidityChart data={branchWeather} indoorData={trendHistory} locationName={filters?.branch} status={weatherStatus} error={weatherError} />
-                    )}
-                    {showWidget("current_chart") && (
-                        <CurrentHistoryChart
-                            data={filteredData}
-                            deviceId={selectedDeviceId}
-                            scope={filters}
-                        />
-                    )}
-                </section>
-                
-                {!isBranchScope && !isSingleDeviceScope && (
-                    <section className="dashboard-grid dashboard-grid--regional">
-                        {/* {showWidget("zone_chart") && <ZoneEnergyChart data={deviceData} filters={filters} />} */}
-                        {showWidget("energy_map") && <EnergyMap data={deviceData} filters={filters} />}
-                        <div className="chart-box dashboard-context-card">
-                            <div className="chart-header"><div><h3>Regional Energy Snapshot</h3><span>Aggregated for the current filter</span></div></div>
-                            <div className="dashboard-context-stats">
-                                <div><span>AC units</span><strong>{metrics.totalACs}</strong></div>
-                                <div><span>Running</span><strong>{metrics.activeACs}</strong></div>
-                                <div><span>Active power</span><strong>{metrics.totalPower.toFixed(2)} W</strong></div>
-                                <div><span>Alerts</span><strong>{metrics.alertCount}</strong></div>
-                            </div>
-                        </div>
-                    </section>
-                )}
-
-                {(isBranchScope || isSingleDeviceScope) && (
-                    <section className="dashboard-grid dashboard-grid--devices">
-                        <PowerConsumptionChart data={deviceData} />
-                        {showWidget("ac_table") && <ACDeviceTable data={filteredData} />}
+                    {/* {showWidget("energy_chart") && 
+                        <ZoneEnergyChart deviceId={selectedDeviceId} scope={filters} />
+                    } */}
+                    <ACDeviceTable data={filteredData} />
                         <div className="chart-box dashboard-context-card">
                             <div className="chart-header"><div><h3>{isSingleDeviceScope ? "Selected AC Details" : "Branch Device Summary"}</h3><span>Current filter scope</span></div></div>
                             <div className="dashboard-context-stats">
@@ -641,8 +653,23 @@ function ACDashboard({
                             </div>
                             {isSingleDeviceScope && <p className="dashboard-context-note">One telemetry record is currently in scope. Confirm its device ID and timestamp before treating it as a live individual-device view.</p>}
                         </div>
-                    </section>
-                )}
+                </section>
+                
+                <section className="dashboard-grid">
+                    <CurrentTemperatureChart
+                                currentData={currentHistoryData}
+                                indoorData={
+                                    historicalClimate.length
+                                    ? historicalClimate
+                                    : trendHistory
+                                }
+                                loading={
+                                    currentHistoryStatus === "idle" ||
+                                    currentHistoryStatus === "loading"
+                                }
+                            />
+                </section>
+
                 </>
             )}
         </div>
