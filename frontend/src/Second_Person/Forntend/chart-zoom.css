@@ -1,0 +1,81 @@
+.chart-zoom-shell {
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  position: relative;
+  box-sizing: border-box;
+}
+
+.chart-zoom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-height: 28px;
+  padding: 2px 8px 5px;
+  box-sizing: border-box;
+}
+
+.chart-zoom-toolbar button {
+  width: 28px;
+  height: 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #d7dee8;
+  border-radius: 6px;
+  background: #fff;
+  color: #344256;
+  cursor: pointer;
+  padding: 0;
+  flex: 0 0 auto;
+}
+
+.chart-zoom-toolbar button:hover:not(:disabled) {
+  background: #eef4ff;
+  border-color: #9bb8ef;
+}
+
+.chart-zoom-toolbar button:disabled {
+  opacity: .38;
+  cursor: not-allowed;
+}
+
+.chart-zoom-toolbar span {
+  min-width: 42px;
+  text-align: right;
+  color: #64748b;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-zoom-viewport {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  position: relative;
+  box-sizing: border-box;
+  overscroll-behavior-x: contain;
+}
+
+.chart-zoom-content {
+  min-width: 100%;
+  box-sizing: border-box;
+  /* Do not set a zoom transform here: growing width only keeps Y geometry fixed. */
+}
+
+.chart-zoom-content > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chart-zoom-content .recharts-responsive-container {
+  max-width: none !important;
+  min-width: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-zoom-content { transition: none; }
+}

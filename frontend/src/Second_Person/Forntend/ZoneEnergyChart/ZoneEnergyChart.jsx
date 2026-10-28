@@ -1,5 +1,6 @@
 
 import React, { useMemo } from "react";
+import { IndexZoomFrame } from "../shared/chartZoom";
 import {
     ResponsiveContainer,
     BarChart,
@@ -130,12 +131,16 @@ function ZoneEnergyChart({ data = [], filters = {} }) {
                     No zone data available
                 </div>
             ) : (
+                <IndexZoomFrame data={chartData} resetKey={level.title}>
+                {(visible, { chartProps }) => (
                 <ResponsiveContainer
                     width="100%"
                     height={280}
                 >
                     <BarChart
-                        data={chartData}
+                        data={visible}
+                        onMouseMove={chartProps.onMouseMove}
+                        onMouseLeave={chartProps.onMouseLeave}
                         layout="vertical"
                         margin={{
                             top: 10,
@@ -193,6 +198,8 @@ function ZoneEnergyChart({ data = [], filters = {} }) {
                     </BarChart>
 
                 </ResponsiveContainer>
+                )}
+                </IndexZoomFrame>
 
             )}
 

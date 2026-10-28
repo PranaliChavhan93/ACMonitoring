@@ -9,7 +9,9 @@ import {
     XAxis,
     YAxis,
     Tooltip,
+    ReferenceArea,
 } from "recharts";
+import { IndexZoomFrame } from "../shared/chartZoom";
 
 
 function PowerConsumptionChart({ data = [] }) {
@@ -83,13 +85,16 @@ function PowerConsumptionChart({ data = [] }) {
             </div>
 
 
+            <IndexZoomFrame data={chartData}>
+            {(visible, { chartProps, selection }) => (
             <ResponsiveContainer
                 width="100%"
                 height={280}
             >
 
                 <BarChart
-                    data={chartData}
+                    data={visible}
+                    {...chartProps}
                     margin={{
                         top: 10,
                         right: 20,
@@ -119,6 +124,17 @@ function PowerConsumptionChart({ data = [] }) {
                     />
 
 
+                    {selection && (
+                        <ReferenceArea
+                            x1={selection.x1}
+                            x2={selection.x2}
+                            fill="#2563eb"
+                            fillOpacity={0.12}
+                            stroke="#2563eb"
+                            strokeOpacity={0.35}
+                        />
+                    )}
+
                     <Bar
                         dataKey="power"
                         name="Active Power"
@@ -129,6 +145,8 @@ function PowerConsumptionChart({ data = [] }) {
                 </BarChart>
 
             </ResponsiveContainer>
+            )}
+            </IndexZoomFrame>
 
         </div>
 

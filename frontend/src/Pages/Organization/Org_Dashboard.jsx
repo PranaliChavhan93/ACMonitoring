@@ -583,7 +583,7 @@ function Org_Dashboard() {
                                 border: 0,
                                 borderRadius: "8px",
                                 padding: "10px 16px",
-                                background: "#0f766e",
+                                background: "#2563eb",
                                 color: "#fff",
                                 fontWeight: 700,
                                 cursor: "pointer",
@@ -610,7 +610,7 @@ function Org_Dashboard() {
                         {isLive ? (
                             "LIVE"
                         ) : (
-                            <strong style={{ marginLeft: "6px" }}>{lastTelemetryText}</strong>
+                            <strong style={{ marginLeft: "6px" }}>Last Updated : {lastTelemetryText}</strong>
                         )}
                     </span>
                 </div>

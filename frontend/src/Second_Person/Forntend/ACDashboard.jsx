@@ -1256,7 +1256,7 @@ function ACDashboard({
                             <h2>{isSingleDeviceScope ? "AC Performance" : isFloorScope ? "Floor Overview" : isBranchScope ? "Branch Overview" : selectedLevel === "city" ? "City Overview" : selectedLevel === "country" ? "Organization Overview" : "Regional Overview"}</h2>
                             <p>{Object.entries(filters || {}).filter(([key, value]) => key !== "hierarchy" && value).map(([, value]) => value).join(" · ") || "All Locations"}</p>
                         </div>
-                        <button type="button" className="trends-button" onClick={handleTrendsClick}>View Trends</button>
+                        {/* <button type="button" className="trends-button" onClick={handleTrendsClick}>View Trends</button> */}
                     </div>
                     <div className="kpi-grid">
                         {showWidget("total_acs") && <Total_Acs value={metrics.totalACs} />}
@@ -1294,13 +1294,7 @@ function ACDashboard({
                         )
                     ) : (
                         showWidget("power_chart") && (
-                            // <CurrentFluctuationChart
-                            //     value={metrics.totalPower}
-                            //     deviceId={selectedDeviceId}
-                            //     scope={filters}
-                            // />
                             <PowerConsumptionChart data={deviceData} />
-
                         )
                     )}
 
@@ -1310,7 +1304,11 @@ function ACDashboard({
                     {selectedLevel === "branch" && showWidget("health_chart") && (
                         <>
                             {/* <PowerConsumptionChart data={deviceData} /> */}
-                            
+                            <ACPowerStateChart 
+                                data={filteredData}
+                                deviceId={selectedDeviceId || filters?.ac_id || ""}
+                                scope={filters}
+                            />
                             <CurrentTemperatureChart
                                 deviceId={selectedDeviceId || filters?.ac_id || ""}
                                 scope={filters}
@@ -1324,9 +1322,6 @@ function ACDashboard({
                                 deviceId={selectedDeviceId}
                                 scope={filters}
                             />
-                            {/* <TemperatureChart data={branchWeather} indoorData={historicalClimate.length ? historicalClimate : trendHistory} locationName={filters?.branch} status={climateHistoryStatus === "loading" ? "loading" : weatherStatus} error={climateHistoryStatus === "error" ? "Unable to load historical device telemetry. Check API URL/token." : weatherError} /> 
-                            <HumidityChart data={branchWeather} indoorData={historicalClimate.length ? historicalClimate : trendHistory} locationName={filters?.branch} status={climateHistoryStatus === "loading" ? "loading" : weatherStatus} error={climateHistoryStatus === "error" ? "Unable to load historical device telemetry. Check API URL/token." : weatherError} /> */}
-                            
                             <TemperatureChart
                                 deviceId={selectedDeviceId || filters?.ac_id || ""}
                                 scope={filters}
@@ -1345,11 +1340,11 @@ function ACDashboard({
                                 error={weatherError}
                             />
                             
-                            <ACPowerStateChart 
+                            {/* <ACPowerStateChart 
                                 data={filteredData}
                                 deviceId={selectedDeviceId || filters?.ac_id || ""}
                                 scope={filters}
-                            />
+                            /> */}
                         </>
                     )}
                     {showWidget("energy_chart") && 

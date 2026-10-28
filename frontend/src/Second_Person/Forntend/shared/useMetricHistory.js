@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { HISTORY_URL, getJSON, scopeToParams } from "./api";
 import { getViewRange, refreshMsFor, requestFor, rowsToPoints } from "./metricHistory";
+import { zoomPlan } from "./chartZoom";
 
 /**
  * Reads one metric's history from the backend database and keeps it fresh.
@@ -24,6 +25,8 @@ export function useMetricHistory({
   agg = "avg",
   windowMs = 0,   // > 0: rolling "last N ms" window (live graphs) instead of viewMode
   refreshMs = 0,  // override the polling interval
+  zoomFrom = 0,   // > 0: graph is zoomed to [zoomFrom, zoomTo] (ms) -> fetch just that span, finer
+  zoomTo = 0,
 }) {
   const [points, setPoints] = useState([]);
   const [range, setRange] = useState(() => getViewRange(viewMode, selectedHour, new Date(), customFrom, customTo));
@@ -33,13 +36,17 @@ export function useMetricHistory({
 
   const scopeJson = JSON.stringify(scope || {});
 
+  // Changing the filters clears the chart; zooming keeps the old points on screen
+  // until the finer data for the new span arrives.
   useEffect(() => {
-    let controller = null;
-    let disposed = false;
-
     setPoints([]);
     setError("");
     setLoading(true);
+  }, [metric, viewMode, selectedHour, customFrom, customTo, deviceId, scopeJson, agg, windowMs]);
+
+  useEffect(() => {
+    let controller = null;
+    let disposed = false;
 
     const run = async () => {
       controller?.abort();
@@ -47,10 +54,16 @@ export function useMetricHistory({
       const { signal } = controller;
 
       const now = new Date();
-      const nextRange = windowMs
+      const zoomed = zoomFrom > 0 && zoomTo > zoomFrom;
+      const nextRange = zoomed
+        ? { from: zoomFrom, to: zoomTo }
+        : windowMs
         ? { from: now.getTime() - windowMs, to: now.getTime() }
         : getViewRange(viewMode, selectedHour, now, customFrom, customTo);
-      const { period, intervalSeconds } = requestFor(windowMs ? "today" : viewMode);
+      const plan = zoomed ? zoomPlan(zoomTo - zoomFrom) : null;
+      const { period, intervalSeconds } = zoomed
+        ? { period: plan.mode === "today" ? "today" : plan.mode, intervalSeconds: plan.intervalSeconds }
+        : requestFor(windowMs ? "today" : viewMode);
       const params = new URLSearchParams({
         key: metric,
         agg,
@@ -93,7 +106,7 @@ export function useMetricHistory({
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [metric, viewMode, selectedHour, customFrom, customTo, deviceId, scopeJson, agg, windowMs, refreshMs]);
+  }, [metric, viewMode, selectedHour, customFrom, customTo, deviceId, scopeJson, agg, windowMs, refreshMs, zoomFrom, zoomTo]);
 
   return { points, range, loading, error, updatedAt };
 }

@@ -236,6 +236,7 @@
 // export default ACPowerStateChart;
 
 import React, { useEffect, useMemo, useState } from "react";
+import { ZoomToolbar, useTimeZoom } from "../shared/chartZoom";
 import "./ACPowerStateChart.css";
 
 // Same endpoint CurrentHistoryChart already uses.
@@ -267,6 +268,16 @@ const ACPowerStateChart = ({
 
   // Stable dependency — plain object `scope` would re-fire on every render.
   const scopeKey = useMemo(() => JSON.stringify(scope || {}), [scope]);
+
+  // Graph zoom over the 24 h timeline (Ctrl+scroll / pinch / drag on the bar / toolbar).
+  // The 24 h of 1-minute buckets is already loaded, so zooming needs no new request.
+  const nowMs = Date.now();
+  const zoomState = useTimeZoom({
+    baseFrom: nowMs - 24 * 60 * 60 * 1000,
+    baseTo: nowMs,
+    resetKey: `${deviceId}|${scopeKey}`,
+  });
+  const zoom = zoomState.zoom;
 
   /* ---------------- Fetch last 24 h from /api/current-history/ ---------------- */
   useEffect(() => {
@@ -361,83 +372,97 @@ const ACPowerStateChart = ({
   }, [deviceId, scopeKey, endpoint]);
 
   /* ---------------- Build the timeline bar + KPIs ---------------- */
-  const { segments, totalOnMs, totalOffMs, onEvents, axisLabels } = useMemo(() => {
+  const { segments, totalOnMs, totalOffMs, onEvents, axisLabels, view } = useMemo(() => {
     const now = Date.now();
     const windowMs = 24 * 60 * 60 * 1000;
     const windowStart = now - windowMs;
-    const BINS = 96; // 15-minute bins
-    const binMs = windowMs / BINS;
-    const binStates = Array(BINS).fill("OFF");
 
     // Any current above this counts as "running". Backend already pre-aggregates
     // per minute, so a bucket is ON iff its average current > 0.
     const THRESHOLD = 0.0001;
 
+    const onTimes = [];
     for (const row of rows) {
       const bucketRaw = row?.bucket ?? row?.bucket_start;
       if (!bucketRaw) continue;
-
       const ts = new Date(bucketRaw).getTime();
       if (!Number.isFinite(ts)) continue;
-      if (ts < windowStart || ts > now) continue;
-
       const avg = Number(row?.avg ?? 0);
       if (!Number.isFinite(avg) || avg <= THRESHOLD) continue;
-
-      const binIndex = Math.floor((ts - windowStart) / binMs);
-      if (binIndex >= 0 && binIndex < BINS) {
-        binStates[binIndex] = "ON";
-      }
+      onTimes.push(ts);
     }
 
-    // KPIs
+    // ON/OFF state per bin for a window.  Bins are never shorter than the 1-minute
+    // buckets, otherwise a zoomed-in bin could miss its bucket and look OFF.
+    const binsFor = (from, to) => {
+      const span = to - from;
+      const binMs = Math.max(span / 96, 60_000);
+      const BINS = Math.max(1, Math.ceil(span / binMs));
+      const states = Array(BINS).fill("OFF");
+      for (const ts of onTimes) {
+        if (ts < from || ts > to) continue;
+        const i = Math.min(Math.floor((ts - from) / binMs), BINS - 1);
+        if (i >= 0) states[i] = "ON";
+      }
+      return { states, binMs, BINS };
+    };
+
+    // KPIs always describe the whole 24 h (unchanged by zoom).
+    const full = binsFor(windowStart, now);
     let onBins = 0;
     let offBins = 0;
     let events = 0;
-    for (let i = 0; i < BINS; i++) {
-      if (binStates[i] === "ON") onBins++;
+    for (let i = 0; i < full.BINS; i++) {
+      if (full.states[i] === "ON") onBins++;
       else offBins++;
-      if (i > 0 && binStates[i] === "ON" && binStates[i - 1] === "OFF") {
-        events++;
-      }
+      if (i > 0 && full.states[i] === "ON" && full.states[i - 1] === "OFF") events++;
     }
+
+    // The timeline bar shows the zoomed window (or the whole 24 h).
+    const view = zoom ? { from: zoom.from, to: zoom.to } : { from: windowStart, to: now };
+    const win = zoom ? binsFor(view.from, view.to) : full;
 
     // Collapse adjacent same-state bins into one flex segment.
     const builtSegments = [];
-    let curState = binStates[0];
+    let curState = win.states[0];
     let run = 1;
-    for (let i = 1; i < BINS; i++) {
-      if (binStates[i] === curState) {
+    for (let i = 1; i < win.BINS; i++) {
+      if (win.states[i] === curState) {
         run++;
       } else {
         builtSegments.push({ state: curState, flex: run });
-        curState = binStates[i];
+        curState = win.states[i];
         run = 1;
       }
     }
     builtSegments.push({ state: curState, flex: run });
 
-    // 7 axis labels, one every 4 hours.
+    // 7 axis labels evenly across the visible window.
     const labels = [];
     for (let i = 0; i <= 6; i++) {
-      const t = new Date(windowStart + i * 4 * 60 * 60 * 1000);
+      const t = new Date(view.from + (i * (view.to - view.from)) / 6);
       labels.push(
-        t.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: false,
-        })
+        t.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })
       );
     }
 
     return {
       segments: builtSegments,
-      totalOnMs: onBins * binMs,
-      totalOffMs: offBins * binMs,
+      totalOnMs: onBins * full.binMs,
+      totalOffMs: offBins * full.binMs,
       onEvents: events,
       axisLabels: labels,
+      view,
     };
-  }, [rows]);
+  }, [rows, zoom]);
+
+  // Pointer position on the bar -> time, for drag-to-zoom and wheel-zoom anchoring.
+  const timeAt = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = Math.min(Math.max((e.clientX - rect.left) / Math.max(rect.width, 1), 0), 1);
+    return view.from + frac * (view.to - view.from);
+  };
+  const sel = zoomState.sel;
 
   return (
     <div className="ac-power-state-card">
@@ -459,6 +484,7 @@ const ACPowerStateChart = ({
           </svg>
           AC Runtime
         </div>
+        <ZoomToolbar z={zoomState} />
         <div className="ac-power-state-legend">
           <span className="legend-item">
             <span className="dot on" /> ON
@@ -470,7 +496,34 @@ const ACPowerStateChart = ({
       </div>
 
       {/* Timeline Bar */}
-      <div className="ac-power-state-timeline">
+      <div
+        ref={zoomState.areaProps.ref}
+        className="ac-power-state-timeline chart-zoom-area"
+        onDoubleClick={zoomState.reset}
+        title={zoomState.areaProps.title}
+      >
+        <div
+          style={{ position: "relative" }}
+          onMouseDown={(e) => zoomState.pointer.down(timeAt(e))}
+          onMouseMove={(e) => zoomState.pointer.move(timeAt(e))}
+          onMouseUp={zoomState.pointer.up}
+          onMouseLeave={zoomState.pointer.leave}
+        >
+          {sel && sel.a !== sel.b && (
+            <div
+              style={{
+                position: "absolute",
+                top: 0,
+                bottom: 0,
+                left: `${((Math.min(sel.a, sel.b) - view.from) / (view.to - view.from)) * 100}%`,
+                width: `${(Math.abs(sel.b - sel.a) / (view.to - view.from)) * 100}%`,
+                background: "rgba(37, 99, 235, 0.18)",
+                border: "1px solid rgba(37, 99, 235, 0.45)",
+                zIndex: 2,
+                pointerEvents: "none",
+              }}
+            />
+          )}
         <div className="ac-power-state-bar">
           {status === "loading" && (
             <div className="segment loading" style={{ flex: 96 }} />
@@ -483,6 +536,7 @@ const ACPowerStateChart = ({
                 style={{ flex: seg.flex }}
               />
             ))}
+        </div>
         </div>
         <div className="ac-power-state-axis">
           {axisLabels.map((label, i) => (

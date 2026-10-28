@@ -424,134 +424,74 @@
     }
 }
 
-
-
  
-
 .dashboard-grid {
-
     display: grid;
-
     grid-template-columns:
         repeat(3, minmax(0, 1fr));
-
     gap: 14px;
-
     width: 100%;
-
     margin-bottom: 16px;
-
     box-sizing: border-box;
-
 }
 
-
 .chart-box {
-
     width: 100%;
-
     height: 100%;
-
     min-width: 0;
-
     min-height: 350px;
-
     box-sizing: border-box;
-
     padding: 16px;
-
     background: #ffffff;
-
     border: 1px solid #e5e7eb;
-
     border-radius: 10px;
-
     box-shadow:
         0 2px 8px
         rgba(15, 23, 42, 0.05);
-
     overflow: hidden;
-
 }
 
 .chart-header {
-
     display: flex;
-
     justify-content: space-between;
-
     align-items: flex-start;
-
     gap: 10px;
-
     width: 100%;
-
     min-height: 43px;
-
     margin-bottom: 4px;
-
     box-sizing: border-box;
-
 }
-
 
 .chart-header > div {
-
     min-width: 0;
-
 }
-
 
 .chart-header h3 {
-
     margin: 0;
-
     color: #1e293b;
-
     font-size: 14px;
-
     line-height: 1.3;
-
     font-weight: 700;
-
 }
-
 
 .chart-header span {
-
     display: block;
-
     margin-top: 4px;
-
     color: #94a3b8;
-
     font-size: 10px;
-
     line-height: 1.3;
-
 }
 
-
 .chart-select {
-
     flex-shrink: 0;
-
     height: 28px;
-
     padding: 0 8px;
-
     border: 1px solid #dbe2ea;
-
     border-radius: 6px;
-
     background: #ffffff;
-
     color: #475569;
-
     font-size: 10px;
-
     outline: none;
-
 }
 
 .chart-box
@@ -1870,5 +1810,74 @@
 @media (max-width: 700px) {
   .current-temp-chart {
     grid-column: span 1;
+  }
+}
+
+/* ============================================================
+   Graph zoom (zooms the chart's time axis, never the page)
+   ============================================================ */
+.chart-zoom-area {
+  position: relative;
+  width: 100%;
+  cursor: crosshair;
+  /* no text selection while drag-selecting a range */
+  -webkit-user-select: none;
+  user-select: none;
+  /* keep wheel / pinch gestures inside the chart from chaining to the page */
+  overscroll-behavior: contain;
+}
+
+/* vertical swipes still scroll the page on touch screens */
+.chart-zoom-area .recharts-wrapper {
+  touch-action: pan-y;
+}
+
+.chart-zoom-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.chart-zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #334155;
+  cursor: pointer;
+}
+
+.chart-zoom-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+}
+
+.chart-zoom-btn:focus-visible {
+  outline: 2px solid #3182bd;
+  outline-offset: 1px;
+}
+
+.chart-zoom-btn:disabled {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+/* selection rectangle drawn while dragging */
+.chart-box .recharts-reference-area-rect {
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .chart-zoom-btn {
+    width: 24px;
+    height: 24px;
   }
 }
