@@ -1938,5 +1938,33 @@
         "db_taluka_id": "f50ab3fd-5d46-4289-a270-75aa35daa9bd",
         "db_city_id": "1d5c42bf-8966-4a15-b64e-c6f5d1c40cb1",
         "db_floor_id": ""
+    },
+    {
+        "ac_id": "AC-001",
+        "site_id": "473410e2-7c5c-4246-8dd7-fecd356961d2",
+        "site_name": "Navle",
+        "site_code": "3TP-EE89C990",
+        "device_name": "AC-001",
+        "status": "OFF",
+        "capacity_ton": null,
+        "installation_date": "",
+        "last_maintenance_date": "",
+        "customer_id": "10",
+        "customer_name": "HDFC",
+        "location_type": "DIRECT_BRANCH",
+        "state_id": "aa3511b1-38e9-4426-9e45-f37e306173f0",
+        "state_name": "Tripura",
+        "district_id": "4d4979e4-3967-41f7-bfc4-5d0659c14b35",
+        "district_name": "West Tripura",
+        "taluka_id": "aab605fa-89db-44d3-bc69-48feeec873af",
+        "taluka_name": "Agartala Taluka",
+        "city_id": "4bbe4ea2-a932-40b6-b64e-2673248c0d70",
+        "city_name": "Agartala",
+        "hierarchy_type": "GEOGRAPHICAL",
+        "branch_name": "Agartala Branch 01",
+        "db_branch_id": "406d35ba-4298-47b2-a29d-5702449cbdda",
+        "branch_id": "406d35ba-4298-47b2-a29d-5702449cbdda",
+        "floor_id": "",
+        "floor_name": ""
     }
 ]

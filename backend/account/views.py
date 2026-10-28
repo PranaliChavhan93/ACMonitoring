@@ -37,6 +37,7 @@ from .access_scope import (
     accessible_branches,
     accessible_devices,
     accessible_sites,
+    device_customer,
 )
 
 from .hierarchy_persistence import persist_customer_branch_floor
@@ -137,6 +138,22 @@ class ThreeTPAPIError(APIException):
     status_code = 502
     default_detail = "3TP request failed."
 
+def _scalar_id(value):
+    """Coerce a scalar, {'id': n}, {'pk': n} or {'uuid': '…'} into a flat value."""
+    if isinstance(value, dict):
+        for key in ("id", "pk", "uuid"):
+            if value.get(key) is not None:
+                return value[key]
+        return None
+    return value
+
+
+def _safe_first(qs, ref):
+    """Return qs.filter(pk=ref).first(), or None if ref isn't a valid pk."""
+    try:
+        return qs.filter(pk=ref).first()
+    except (ValueError, TypeError, django.core.exceptions.ValidationError):
+        return None
 
 def _one_line(exc, n=300):
     return " ".join(str(exc).split())[:n]
@@ -4774,39 +4791,33 @@ class DistrictListView(generics.ListAPIView):
 #             )
 
 #         elif user.role == Role.BR_ADMIN:
-
-#             hierarchy = (
-#                 getattr(user.customer, "hierarchy_type", None)
-#                 if user.customer_id
-#                 else None
+#             assigned_branch_ids = list(
+#                 Branch.objects.filter(assigned_admin=user).values_list("pk", flat=True)
 #             )
-
-#             if hierarchy == "GEOGRAPHICAL" and user.state_id:
-
-#                 qs = qs.filter(
-#                     customer_id=user.customer_id,
-#                     city__taluka__district__state_id=user.state_id,
-#                 )
-
-#             elif hierarchy == "ZONAL" and user.zone_id:
-
-#                 qs = qs.filter(
-#                     customer_id=user.customer_id,
-#                     division__region__circle__zone_id=user.zone_id,
-#                 )
-
-#             elif user.branch_id:
-
-#                 qs = qs.filter(
-#                     pk=user.branch_id
-#                 )
-
+#             if assigned_branch_ids:
+#                 qs = qs.filter(pk__in=assigned_branch_ids)
 #             else:
-
-#                 return Branch.objects.none()
-
+#                 hierarchy = (
+#                     getattr(user.customer, "hierarchy_type", None)
+#                     if user.customer_id else None
+#                 )
+#                 if hierarchy == "GEOGRAPHICAL" and user.state_id:
+#                     qs = qs.filter(
+#                         customer_id=user.customer_id,
+#                         city__taluka__district__state_id=user.state_id,
+#                     )
+#                 elif hierarchy == "ZONAL" and user.zone_id:
+#                     qs = qs.filter(
+#                         customer_id=user.customer_id,
+#                         division__region__circle__zone_id=user.zone_id,
+#                     )
+#                 elif user.branch_id:
+#                     qs = qs.filter(pk=user.branch_id)
+#                 else:
+#                     return Branch.objects.none()
+# 
 #         elif user.role == Role.ENGINEER:
-
+# 
 #             if user.branch_id:
 #                 qs = qs.filter(
 #                     pk=user.branch_id
@@ -5001,31 +5012,30 @@ class BranchListView(generics.ListCreateAPIView):
             )
 
         elif user.role == Role.BR_ADMIN:
-            hierarchy = (
-                getattr(user.customer, "hierarchy_type", None)
-                if user.customer_id
-                else None
+            assigned_branch_ids = list(
+                Branch.objects.filter(assigned_admin=user).values_list("pk", flat=True)
             )
-
-            if hierarchy == "GEOGRAPHICAL" and user.state_id:
-                qs = qs.filter(
-                    customer_id=user.customer_id,
-                    city__taluka__district__state_id=user.state_id,
-                )
-
-            elif hierarchy == "ZONAL" and user.zone_id:
-                qs = qs.filter(
-                    customer_id=user.customer_id,
-                    division__region__circle__zone_id=user.zone_id,
-                )
-
-            elif user.branch_id:
-                qs = qs.filter(
-                    pk=user.branch_id
-                )
-
+            if assigned_branch_ids:
+                qs = qs.filter(pk__in=assigned_branch_ids)
             else:
-                return Branch.objects.none()
+                hierarchy = (
+                    getattr(user.customer, "hierarchy_type", None)
+                    if user.customer_id else None
+                )
+                if hierarchy == "GEOGRAPHICAL" and user.state_id:
+                    qs = qs.filter(
+                        customer_id=user.customer_id,
+                        city__taluka__district__state_id=user.state_id,
+                    )
+                elif hierarchy == "ZONAL" and user.zone_id:
+                    qs = qs.filter(
+                        customer_id=user.customer_id,
+                        division__region__circle__zone_id=user.zone_id,
+                    )
+                elif user.branch_id:
+                    qs = qs.filter(pk=user.branch_id)
+                else:
+                    return Branch.objects.none()
 
         elif user.role == Role.ENGINEER:
 
@@ -5062,10 +5072,16 @@ class BranchListView(generics.ListCreateAPIView):
                     "customer": "Logged-in user is not linked to a customer."
                 })
 
-            serializer.save(
-                customer_id=user.customer_id
-            )
-
+            branch = serializer.save(customer_id=user.customer_id)
+            if not branch.assigned_admin_id:
+                primary_admin = User.objects.filter(
+                    customer_id=user.customer_id, role=Role.BR_ADMIN, is_active=True
+                ).order_by("date_joined").first() or User.objects.filter(
+                    customer_id=user.customer_id, role=Role.CUSTOMER, is_active=True
+                ).order_by("date_joined").first()
+                if primary_admin:
+                    branch.assigned_admin = primary_admin
+                    branch.save(update_fields=["assigned_admin"])
             return
 
         # --------------------------------------------------
@@ -5091,10 +5107,16 @@ class BranchListView(generics.ListCreateAPIView):
                     "customer": "Invalid customer."
                 })
 
-            serializer.save(
-                customer=customer
-            )
-
+            branch = serializer.save(customer=customer)
+            if not branch.assigned_admin_id:
+                primary_admin = User.objects.filter(
+                    customer=customer, role=Role.BR_ADMIN, is_active=True
+                ).order_by("date_joined").first() or User.objects.filter(
+                    customer=customer, role=Role.CUSTOMER, is_active=True
+                ).order_by("date_joined").first()
+                if primary_admin:
+                    branch.assigned_admin = primary_admin
+                    branch.save(update_fields=["assigned_admin"])
             return
 
         # --------------------------------------------------
@@ -9998,6 +10020,19 @@ def user_can_see_ac(user, ac_id, device_map, branch_index):
         .first()
     )
 
+    # Explicit admin assignment is authoritative and lets a contact-person
+    # admin see their allocated devices even when legacy tree ownership metadata
+    # has not yet been refreshed.
+    if db_device and user.role == Role.BR_ADMIN:
+        if db_device.assigned_admin_id:
+            return db_device.assigned_admin_id == user.pk
+        branch_admin_id = (
+            db_device.branch.assigned_admin_id
+            if db_device.branch_id and db_device.branch else None
+        )
+        if branch_admin_id:
+            return branch_admin_id == user.pk
+
     # A device explicitly assigned to a customer belongs to that customer
     # only, whether or not it has been placed on a site yet.
     if db_device and user.role == Role.CUSTOMER:
@@ -10178,6 +10213,9 @@ def _local_device_row(device, cloud_item=None):
         "customer_id": str(customer.pk) if customer else "",
         "customer_name": customer.company if customer else "",
         "tpt_customer_id": (customer.tpt_customer_id or "") if customer else "",
+        "assigned_admin": str(device.assigned_admin_id or ""),
+        "assigned_admin_name": device.assigned_admin.name if device.assigned_admin_id else "",
+        "assigned_admin_email": device.assigned_admin.email if device.assigned_admin_id else "",
         "floor_id": str(site.floor_id) if site and site.floor_id else "",
         "floor_name": site.floor.name if site and site.floor_id else "",
         "status": "ASSIGNED" if branch else "UNASSIGNED",
@@ -12072,11 +12110,39 @@ class CustomerListView(CustomerScopeMixin, generics.ListCreateAPIView):
                 # failed hierarchy initialization cannot leave a partial customer.
                 initialize_customer_hierarchy(customer)
 
+                # Customer account remains available at company_email. If a
+                # distinct contact-person email is supplied, create a dedicated
+                # BR_ADMIN login for that person and assign new branches/devices
+                # to this account by default.
                 admin = User(name=contact_person or company, email=company_email, phone=phone,
                              role=Role.CUSTOMER, organization=user.organization,
                              customer=customer, is_active=True)
                 admin.set_password(raw_password)
                 admin.save()
+
+                contact_email = (d.get("contact_person_email") or "").strip().lower()
+                customer_admin = admin
+                if contact_email and contact_email != company_email:
+                    if User.objects.filter(email__iexact=contact_email).exists():
+                        raise ValueError("Contact person email is already used by another user.")
+                    customer_admin = User(
+                        name=contact_person or company,
+                        email=contact_email,
+                        phone=phone,
+                        role=Role.BR_ADMIN,
+                        organization=user.organization,
+                        customer=customer,
+                        is_active=True,
+                    )
+                    customer_admin.set_password(request.data.get("admin_password") or raw_password)
+                    customer_admin.save()
+
+                # The hierarchy initializer creates the customer's branch
+                # records before either login exists. Attach those initial
+                # branches now that the contact-person admin is available.
+                Branch.objects.filter(
+                    customer=customer, assigned_admin__isnull=True
+                ).update(assigned_admin=customer_admin)
         except Exception as exc:
             traceback.print_exc()
             _rollback_3tp_customer(auth_header, tpt_customer_id)
@@ -12094,7 +12160,12 @@ class CustomerListView(CustomerScopeMixin, generics.ListCreateAPIView):
                 "company_email": customer.company_email,
                 "tpt_customer_id": tpt_customer_id,
                 "tpt_user_id": tpt_user_id,
-                "customer_admin": {"name": admin.name, "email": admin.email, "role": admin.role},
+                "customer_admin": {
+                    "name": customer_admin.name,
+                    "email": customer_admin.email,
+                    "role": customer_admin.role,
+                    "initial_password": request.data.get("admin_password") or raw_password,
+                },
             },
         }, status=status.HTTP_201_CREATED)
 
@@ -12730,31 +12801,30 @@ class BranchListView(generics.ListCreateAPIView):
             )
 
         elif user.role == Role.BR_ADMIN:
-            hierarchy = (
-                getattr(user.customer, "hierarchy_type", None)
-                if user.customer_id
-                else None
+            assigned_branch_ids = list(
+                Branch.objects.filter(assigned_admin=user).values_list("pk", flat=True)
             )
-
-            if hierarchy == "GEOGRAPHICAL" and user.state_id:
-                qs = qs.filter(
-                    customer_id=user.customer_id,
-                    city__taluka__district__state_id=user.state_id,
-                )
-
-            elif hierarchy == "ZONAL" and user.zone_id:
-                qs = qs.filter(
-                    customer_id=user.customer_id,
-                    division__region__circle__zone_id=user.zone_id,
-                )
-
-            elif user.branch_id:
-                qs = qs.filter(
-                    pk=user.branch_id
-                )
-
+            if assigned_branch_ids:
+                qs = qs.filter(pk__in=assigned_branch_ids)
             else:
-                return Branch.objects.none()
+                hierarchy = (
+                    getattr(user.customer, "hierarchy_type", None)
+                    if user.customer_id else None
+                )
+                if hierarchy == "GEOGRAPHICAL" and user.state_id:
+                    qs = qs.filter(
+                        customer_id=user.customer_id,
+                        city__taluka__district__state_id=user.state_id,
+                    )
+                elif hierarchy == "ZONAL" and user.zone_id:
+                    qs = qs.filter(
+                        customer_id=user.customer_id,
+                        division__region__circle__zone_id=user.zone_id,
+                    )
+                elif user.branch_id:
+                    qs = qs.filter(pk=user.branch_id)
+                else:
+                    return Branch.objects.none()
 
         elif user.role == Role.ENGINEER:
 
@@ -12791,10 +12861,16 @@ class BranchListView(generics.ListCreateAPIView):
                     "customer": "Logged-in user is not linked to a customer."
                 })
 
-            serializer.save(
-                customer_id=user.customer_id
-            )
-
+            branch = serializer.save(customer_id=user.customer_id)
+            if not branch.assigned_admin_id:
+                primary_admin = User.objects.filter(
+                    customer_id=user.customer_id, role=Role.BR_ADMIN, is_active=True
+                ).order_by("date_joined").first() or User.objects.filter(
+                    customer_id=user.customer_id, role=Role.CUSTOMER, is_active=True
+                ).order_by("date_joined").first()
+                if primary_admin:
+                    branch.assigned_admin = primary_admin
+                    branch.save(update_fields=["assigned_admin"])
             return
 
         # --------------------------------------------------
@@ -12820,10 +12896,16 @@ class BranchListView(generics.ListCreateAPIView):
                     "customer": "Invalid customer."
                 })
 
-            serializer.save(
-                customer=customer
-            )
-
+            branch = serializer.save(customer=customer)
+            if not branch.assigned_admin_id:
+                primary_admin = User.objects.filter(
+                    customer=customer, role=Role.BR_ADMIN, is_active=True
+                ).order_by("date_joined").first() or User.objects.filter(
+                    customer=customer, role=Role.CUSTOMER, is_active=True
+                ).order_by("date_joined").first()
+                if primary_admin:
+                    branch.assigned_admin = primary_admin
+                    branch.save(update_fields=["assigned_admin"])
             return
 
         # --------------------------------------------------
@@ -14364,6 +14446,18 @@ def create_device(request):
                 status=400
             )
 
+        # Optional branch placement makes a newly created AC immediately
+        # available in the customer's hierarchy/filter tree.
+        branch_ref = str(body.get("branch_id") or "").strip()
+        target_branch = None
+        if branch_ref:
+            try:
+                target_branch = Branch.objects.select_related("customer").filter(pk=uuid.UUID(branch_ref)).first()
+            except (ValueError, TypeError):
+                target_branch = Branch.objects.select_related("customer").filter(code__iexact=branch_ref).first()
+            if target_branch is None:
+                return JsonResponse({"error": "Selected branch was not found."}, status=400)
+
         # ---------------- CREATE DEVICE IN 3TP ----------------
 
         payload = {
@@ -14410,8 +14504,23 @@ def create_device(request):
         device = ACDevice.objects.create(
             ac_id=ac_id,
             device_name=device_name or ac_id,
-            tpt_device_id=device_id
+            tpt_device_id=device_id,
+            branch=target_branch,
+            assigned_admin=(
+                target_branch.assigned_admin
+                or User.objects.filter(customer_id=target_branch.customer_id, role=Role.CUSTOMER, is_active=True).order_by("date_joined").first()
+                if target_branch else None
+            ),
         )
+
+        if target_branch:
+            CustomerDeviceMapping.objects.update_or_create(
+                customer=target_branch.customer, device=device, defaults={"is_active": True}
+            )
+            try:
+                _place_direct_branch_device_in_tree(device, target_branch)
+            except Exception:
+                traceback.print_exc()
 
         return JsonResponse({
             "message": "Device created successfully",
@@ -14600,145 +14709,137 @@ def assign_device_to_customer(request):
 
 @csrf_exempt
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def assign_device_to_site(request):
-    """Assign/reassign an existing device to a site and refresh its hierarchy."""
+    """Assign a device to a local Site and sync the 3TP relation when possible.
+
+    Accepts local IDs as well as 3TP IDs. The local DB remains the source of
+    truth for dashboard hierarchy filters, so a cloud sync issue must not
+    leave the device detached from the selected site's hierarchy.
+    """
+    body = request.data if hasattr(request, "data") else {}
+
+    site_ref = str(
+        _scalar_id(body.get("site_id"))
+        or _scalar_id(body.get("asset_id"))
+        or _scalar_id(body.get("tpt_site_id"))
+        or ""
+    ).strip()
+
+    device_ref = str(
+        _scalar_id(body.get("local_device_id"))
+        or _scalar_id(body.get("device_id"))
+        or _scalar_id(body.get("tpt_device_id"))
+        or _scalar_id(body.get("ac_id"))
+        or ""
+    ).strip()
+    if not site_ref or not device_ref:
+        return JsonResponse({"error": "site_id/asset_id and device_id are required."}, status=400)
+
+    site_qs = Site.objects.select_related(
+        "branch__customer", "floor__branch__customer"
+    )
+    site = _safe_first(site_qs, site_ref)
+    if site is None:
+        site = site_qs.filter(tpt_site_id=site_ref).first()
+    if site is None:
+        site = site_qs.filter(code__iexact=site_ref).first()
+
+    device_qs = ACDevice.objects.all()
+    device = _safe_first(device_qs, device_ref)
+    if device is None:
+        device = device_qs.filter(tpt_device_id=device_ref).first()
+    if device is None:
+        device = device_qs.filter(ac_id=device_ref).first()
+    if site is None:
+        return JsonResponse({"error": "Local site was not found. Select a site from the local Sites list."}, status=404)
+    if device is None:
+        return JsonResponse({"error": "Local device was not found."}, status=404)
+
+    user = request.user
+    resolved_branch = site.branch or (site.floor.branch if site.floor_id else None)
+    customer = resolved_branch.customer if resolved_branch and resolved_branch.customer_id else None
+    if user.role == Role.CUSTOMER and (not customer or customer.pk != user.customer_id):
+        return JsonResponse({"error": "This site is outside your customer scope."}, status=403)
+    if user.role == Role.BR_ADMIN and (not customer or customer.pk != user.customer_id):
+        return JsonResponse({"error": "This site is outside your admin scope."}, status=403)
+    if user.role == Role.ORG_SUPER_ADMIN and customer and customer.organization_id != user.organization_id:
+        return JsonResponse({"error": "This site is outside your organization."}, status=403)
+    if user.role not in (Role.ORG_SUPER_ADMIN, Role.CUSTOMER, Role.BR_ADMIN):
+        return JsonResponse({"error": "You are not allowed to assign devices to sites."}, status=403)
+    current_owner = device_customer(device)
+    if user.role in (Role.CUSTOMER, Role.BR_ADMIN) and current_owner and current_owner.pk != user.customer_id:
+        return JsonResponse({"error": "This device belongs to a different customer."}, status=403)
+    if user.role == Role.ORG_SUPER_ADMIN and current_owner and current_owner.organization_id != user.organization_id:
+        return JsonResponse({"error": "This device is outside your organization."}, status=403)
+
+    # Persist the local relationship first so the hierarchy filters update even
+    # if the external cloud API is temporarily unavailable.
+    with transaction.atomic():
+        if resolved_branch and site.branch_id is None:
+            site.branch = resolved_branch
+            site.save(update_fields=["branch"])
+        device.site = site
+        device.branch = resolved_branch
+        device.assigned_by = user
+        if resolved_branch and not device.assigned_admin_id:
+            default_admin = resolved_branch.assigned_admin or User.objects.filter(
+                customer_id=resolved_branch.customer_id, role=Role.BR_ADMIN, is_active=True
+            ).order_by("date_joined").first() or User.objects.filter(
+                customer_id=resolved_branch.customer_id, role=Role.CUSTOMER, is_active=True
+            ).order_by("date_joined").first()
+            if default_admin:
+                device.assigned_admin = default_admin
+        device.save(update_fields=["site", "branch", "assigned_by", "assigned_admin", "updated_at"])
+        SiteDeviceMapping.objects.filter(device=device).exclude(site=site).update(is_active=False)
+        SiteDeviceMapping.objects.update_or_create(site=site, device=device, defaults={"is_active": True})
+        if customer:
+            CustomerDeviceMapping.objects.filter(device=device).exclude(customer=customer).update(is_active=False)
+            CustomerDeviceMapping.objects.update_or_create(customer=customer, device=device, defaults={"is_active": True})
+
+    hierarchy_error = ""
     try:
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return JsonResponse({"error": "Valid Bearer token required"}, status=401)
+        apply_site_hierarchy_to_device(device)
+    except Exception as exc:
+        hierarchy_error = _one_line(exc, 1000)
 
+    # The external relation needs 3TP IDs and a bearer token. If the local site
+    # has not synced yet, keep the local assignment and return a clear warning.
+    cloud_error = ""
+    cloud_site_id = str(site.tpt_site_id or body.get("tpt_site_id") or "").strip()
+    cloud_device_id = str(device.tpt_device_id or body.get("tpt_device_id") or "").strip()
+    auth_header = request.headers.get("Authorization", "")
+    if cloud_site_id and cloud_device_id and auth_header.startswith("Bearer "):
         token = auth_header.split(" ", 1)[1].strip()
-        body = request.data if hasattr(request, "data") else json.loads(request.body or "{}")
-        asset_id = str(body.get("asset_id") or body.get("tpt_site_id") or "").strip()
-        device_id = str(body.get("device_id") or body.get("tpt_device_id") or "").strip()
-        if not asset_id or not device_id:
-            return JsonResponse({"error": "asset_id and device_id are required"}, status=400)
-
-        site = Site.objects.filter(tpt_site_id=asset_id).first()
-        if site is None:
-            # Some older frontend builds send the local UUID as asset_id.
-            try:
-                site = Site.objects.filter(pk=asset_id).first()
-            except (ValueError, TypeError):
-                site = None
-        if site is None:
-            # Compatibility with deployments that used an asset_id database field.
-            try:
-                site = Site.objects.filter(asset_id=asset_id).first()
-            except Exception:
-                site = None
-        device = ACDevice.objects.filter(tpt_device_id=device_id).first()
-        if device is None:
-            device = ACDevice.objects.filter(ac_id=device_id).first()
-        if device is None:
-            try:
-                device = ACDevice.objects.filter(pk=device_id).first()
-            except (ValueError, TypeError):
-                device = None
-
-        # Create the new 3TP relation first. If it fails, leave the old mapping intact.
         payload = {
-            "from": {"entityType": "ASSET", "id": asset_id},
-            "to": {"entityType": "DEVICE", "id": device_id},
-            "type": "Contains",
-            "typeGroup": "COMMON",
+            "from": {"entityType": "ASSET", "id": cloud_site_id},
+            "to": {"entityType": "DEVICE", "id": cloud_device_id},
+            "type": "Contains", "typeGroup": "COMMON",
         }
-        response = requests.post(
-            f"{CLOUD_URL}/api/relation",
-            json=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "X-Authorization": f"Bearer {token}",
-            },
-            timeout=20,
-        )
-        if response.status_code not in (200, 201):
-            try:
-                details = response.json()
-            except Exception:
-                details = response.text
-            return JsonResponse({"error": "Failed to map device to site", "details": details}, status=response.status_code)
+        try:
+            response = requests.post(
+                f"{CLOUD_URL}/api/relation", json=payload,
+                headers={"Content-Type": "application/json", "Accept": "application/json", "X-Authorization": f"Bearer {token}"},
+                timeout=20,
+            )
+            if response.status_code not in (200, 201):
+                cloud_error = f"Local hierarchy assigned, but 3TP relation sync failed (HTTP {response.status_code})."
+        except Exception as exc:
+            cloud_error = f"Local hierarchy assigned, but 3TP relation sync failed: {_one_line(exc, 300)}"
+    elif not cloud_site_id or not cloud_device_id:
+        cloud_error = "Local hierarchy assigned. 3TP relation sync is pending until both site and device have 3TP IDs."
+    else:
+        cloud_error = "Local hierarchy assigned, but the 3TP relation was not attempted because a Bearer token was missing."
 
-        previous_site = device.site if device else None
-        previous_asset_id = str(getattr(previous_site, "tpt_site_id", "") or "")
-
-        hierarchy_sync_error = ""
-        if device and site:
-            try:
-                with transaction.atomic():
-                    # Keep the existing AC row; update its site/branch in place.
-                    # A site may be linked to its branch through the floor even if
-                    # the direct site.branch field was not populated by an older flow.
-                    resolved_branch = site.branch or (site.floor.branch if site.floor_id else None)
-                    if resolved_branch and site.branch_id is None:
-                        site.branch = resolved_branch
-                        site.save(update_fields=["branch"])
-                    device.site = site
-                    device.branch = resolved_branch
-                    device.save(update_fields=["site", "branch", "updated_at"])
-
-                    # Deactivate stale site mappings and activate the new one.
-                    SiteDeviceMapping.objects.filter(device=device).exclude(
-                        site=site
-                    ).update(is_active=False)
-                    SiteDeviceMapping.objects.update_or_create(
-                        site=site, device=device, defaults={"is_active": True}
-                    )
-
-                    # Reconcile customer mappings with the new site's customer.
-                    new_customer = resolved_branch.customer if resolved_branch else None
-                    if new_customer is None:
-                        site_customer_mapping = CustomerSiteMapping.objects.filter(site=site, is_active=True).select_related("customer").first()
-                        new_customer = site_customer_mapping.customer if site_customer_mapping else None
-                    if new_customer:
-                        CustomerDeviceMapping.objects.filter(device=device).exclude(
-                            customer=new_customer
-                        ).update(is_active=False)
-                        CustomerDeviceMapping.objects.update_or_create(
-                            customer=new_customer, device=device,
-                            defaults={"is_active": True},
-                        )
-
-                # Rebuild JSON hierarchy + DeviceLocationMap from the new site.
-                apply_site_hierarchy_to_device(device)
-            except Exception as exc:
-                hierarchy_sync_error = _one_line(exc, 1000)
-
-        # Remove the old 3TP relation only after the new relation succeeded.
-        old_relation_removed = True
-        if previous_asset_id and previous_asset_id != asset_id:
-            try:
-                delete_response = requests.delete(
-                    f"{CLOUD_URL}/api/relation",
-                    params={
-                        "fromId": previous_asset_id,
-                        "fromType": "ASSET",
-                        "relationType": "Contains",
-                        "toId": device_id,
-                        "toType": "DEVICE",
-                    },
-                    headers={"Accept": "application/json", "X-Authorization": f"Bearer {token}"},
-                    timeout=20,
-                )
-                old_relation_removed = delete_response.status_code in (200, 204, 404)
-            except Exception:
-                old_relation_removed = False
-
-        local_sync_error = hierarchy_sync_error
-        if not site or not device:
-            local_sync_error = "3TP relation was saved, but the matching local site/device was not found."
-        elif not old_relation_removed:
-            local_sync_error = (local_sync_error + "; " if local_sync_error else "") + "New site assigned, but the old 3TP relation may still exist."
-
-        return JsonResponse({
-            "message": "Device reassigned to site successfully" if not local_sync_error else "Site assignment saved with a sync warning",
-            "asset_id": asset_id,
-            "device_id": device_id,
-            "data": {"sync_error": local_sync_error} if local_sync_error else {},
-        })
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    warnings = "; ".join(value for value in (hierarchy_error, cloud_error) if value)
+    return JsonResponse({
+        "status": "success",
+        "message": "Device assigned to site and hierarchy updated." if not warnings else "Device assigned locally; sync warning available.",
+        "site_id": str(site.pk), "device_id": str(device.pk),
+        "branch_id": str(resolved_branch.pk) if resolved_branch else "",
+        "customer_id": str(customer.pk) if customer else "",
+        "data": {"sync_error": warnings} if warnings else {},
+    }, status=200)
 
 
 def get_or_create_local_site_from_3tp(request, tpt_site_id, customer, branch_id=None):
@@ -15340,7 +15441,19 @@ def assign_device_to_branch(request):
         with transaction.atomic():
             device.branch = branch
             device.assigned_by = user
-            device.save(update_fields=["branch", "assigned_by", "updated_at"])
+            if not device.assigned_admin_id:
+                default_admin = branch.assigned_admin_id or User.objects.filter(
+                    customer_id=branch.customer_id,
+                    role=Role.BR_ADMIN,
+                    is_active=True,
+                ).order_by("date_joined").values_list("pk", flat=True).first() or User.objects.filter(
+                    customer_id=branch.customer_id,
+                    role=Role.CUSTOMER,
+                    is_active=True,
+                ).order_by("date_joined").values_list("pk", flat=True).first()
+                if default_admin:
+                    device.assigned_admin_id = default_admin
+            device.save(update_fields=["branch", "assigned_by", "assigned_admin", "updated_at"])
 
             # Keep one active customer mapping for the device.
             CustomerDeviceMapping.objects.filter(device=device, is_active=True).exclude(

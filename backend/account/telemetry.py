@@ -31,6 +31,17 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 STALE_SEC = 60
 
+# --- history back-fill -------------------------------------------------------
+# While the Django process is stopped nobody polls 3TP, so the minutes in
+# between never reach telemetry_aggregate.  The back-fill pulls every sample
+# 3TP stored for the gap and feeds it through the normal ingest path.
+BACKFILL_ENABLED = os.environ.get("TPT_BACKFILL_ENABLED", "1") != "0"
+BACKFILL_DAYS = int(os.environ.get("TPT_BACKFILL_DAYS", "7"))      # first run / empty DB
+BACKFILL_PAGE = int(os.environ.get("TPT_BACKFILL_PAGE", "1000"))   # samples per 3TP request
+BACKFILL_GAP_SEC = int(os.environ.get("TPT_BACKFILL_GAP_SEC", "180"))
+BACKFILL_RETRY_SEC = int(os.environ.get("TPT_BACKFILL_RETRY_SEC", "60"))
+BACKFILL_MAX_PAGES = 500
+
 class TelemetryError(Exception):
     pass
 
@@ -106,31 +117,44 @@ def _background_loop():
             close_old_connections()
             with _lock:
                 _refresh()
-
         except Exception as e:
             log.exception("Background Refresh Failed")
             _state["last_error"] = str(e)
 
         time.sleep(CACHE_SEC)
 
-def start():
+
+def _backfill_loop():
+    """Own thread: a long back-fill must never hold up live polling."""
+    from django.db import close_old_connections
+    first = True
+    while True:
+        try:
+            close_old_connections()
+            backfill_all(force=first)
+            first = False
+        except Exception:
+            log.exception("Back-fill loop failed")
+        time.sleep(BACKFILL_RETRY_SEC)
+
+
+def start(live=True):
+    """live=False: history back-fill only (used when devices push telemetry)."""
     global _worker_started
 
     with _worker_lock:
         if _worker_started:
             return
-
         _worker_started = True
 
-        thread = threading.Thread(
-            target=_background_loop,
-            daemon=True,
-            name="3TP-Telemetry-Worker",
-        )
-
-        thread.start()
-
-        log.info("3TP telemetry worker started")
+        if live:
+            threading.Thread(target=_background_loop, daemon=True,
+                             name="3TP-Telemetry-Worker").start()
+            log.info("3TP telemetry worker started")
+        if BACKFILL_ENABLED:
+            threading.Thread(target=_backfill_loop, daemon=True,
+                             name="3TP-Backfill-Worker").start()
+            log.warning("3TP history back-fill worker started (last %s days)", BACKFILL_DAYS)
 
 def _request(url, payload=None, headers=None):
     data = json.dumps(payload).encode() if payload is not None else None
@@ -151,10 +175,10 @@ def _login(cfg):
     _token["value"] = res["token"]
 
 
-def _get_history(cfg, device_id, start_ms, end_ms):
+def _get_history(cfg, device_id, start_ms, end_ms, limit=1, order="DESC"):
     url = (f"{cfg['base_url']}/api/plugins/telemetry/DEVICE/{device_id}"
            f"/values/timeseries/history?keys=data&startTs={start_ms}&endTs={end_ms}"
-           f"&limit=1&orderBy=DESC")
+           f"&limit={limit}&orderBy={order}")
     if not _token["value"]:
         _login(cfg)
     try:
@@ -167,24 +191,36 @@ def _get_history(cfg, device_id, start_ms, end_ms):
 
 
 # ───────────────────────── parsing ─────────────────────────
+def _samples(resp):
+    """Every sample in a 3TP response (any of the response shapes it uses)."""
+    if isinstance(resp, dict) and isinstance(resp.get("data"), list):
+        return resp["data"]
+    if isinstance(resp, list):
+        return resp
+    if isinstance(resp, dict) and "values" in resp:
+        return [resp]
+    return []
+
+
+def _payload_of(sample):
+    payload = sample.get("value")
+    if payload is None:
+        payload = (sample.get("values") or {}).get("data")
+    if isinstance(payload, str):
+        try:
+            payload = json.loads(payload)
+        except ValueError:
+            return None
+    return payload if isinstance(payload, dict) else None
+
+
 def _latest_reading(resp):
     """(ts_ms, payload_dict) of the newest sample in a 3TP response, or (None, None)."""
-    samples = []
-    if isinstance(resp, dict) and isinstance(resp.get("data"), list):
-        samples = resp["data"]
-    elif isinstance(resp, list):
-        samples = resp
-    elif isinstance(resp, dict) and "values" in resp:
-        samples = [resp]
+    samples = _samples(resp)
     if not samples:
         return None, None
     best = max(samples, key=lambda s: s.get("ts", 0))
-    payload = best.get("value")
-    if payload is None:
-        payload = (best.get("values") or {}).get("data")
-    if isinstance(payload, str):
-        payload = json.loads(payload)
-    return best.get("ts"), (payload if isinstance(payload, dict) else None)
+    return best.get("ts"), _payload_of(best)
 
 
 def _num(v, default=0.0):
@@ -308,6 +344,184 @@ def _get_saved_record(device):
             device.get("ac_id"),
         )
         return None
+
+
+# ───────────────────────── history back-fill ─────────────────────────
+_backfill_tried = {}   # ac_id -> time.time() of the last attempt
+
+
+def _missing_ranges(ac_id, floor_ms, end_ms):
+    """[(start_ms, end_ms)] holes in the stored 1-minute data, anywhere in the window.
+
+    Looking only after the newest stored reading is not enough: the live poller
+    saves the newest reading as soon as the server starts, so the hole is
+    *before* it (e.g. last night) and would never be refilled.
+    """
+    from .models import TelemetryAggregate
+    from datetime import datetime, timezone as tz
+    rows = (TelemetryAggregate.objects
+            .filter(device_id=ac_id, interval_seconds=60,
+                    last_timestamp__gte=datetime.fromtimestamp(floor_ms / 1000, tz.utc))
+            .order_by("bucket_start").values_list("first_timestamp", "last_timestamp"))
+    gap_ms = BACKFILL_GAP_SEC * 1000
+    ranges, cursor = [], floor_ms
+    for first, last in rows.iterator():
+        first_ms = int((first or last).timestamp() * 1000)
+        last_ms = int(last.timestamp() * 1000)
+        if first_ms - cursor > gap_ms:
+            ranges.append((cursor + 1 if cursor > floor_ms else cursor, first_ms - 1))
+        cursor = max(cursor, last_ms)
+    if end_ms - cursor > gap_ms:
+        ranges.append((cursor + 1 if cursor > floor_ms else cursor, end_ms))
+    return ranges
+
+
+def _store_samples(ac_id, samples):
+    """Write already-sorted (ts_ms, payload) pairs straight into 1-minute rows.
+
+    Same maths as telemetry_aggregate._apply_reading (sums / avg / min / max /
+    latest / energy counter delta) but done in memory and written with one
+    bulk insert per page -- 100x faster than ingesting reading by reading.
+    Minutes that already exist are left untouched.
+    Returns (rows_created, counter_before_first_row, last_counter, last_bucket).
+    """
+    from datetime import datetime, timezone as tz
+    from .models import TelemetryAggregate as T
+    from .telemetry_aggregate import METRICS, _number
+
+    if not samples:
+        return 0, None, None, None
+    utc = tz.utc
+    first_bucket = datetime.fromtimestamp(samples[0][0] // 60_000 * 60, utc)
+    last_bucket = datetime.fromtimestamp(samples[-1][0] // 60_000 * 60, utc)
+    base = T.objects.filter(device_id=ac_id, interval_seconds=60)
+    existing = dict(base.filter(bucket_start__gte=first_bucket, bucket_start__lte=last_bucket)
+                    .values_list("bucket_start", "latest_energy_counter"))
+    anchor = prev = base.filter(bucket_start__lt=first_bucket).order_by("-bucket_start") \
+        .values_list("latest_energy_counter", flat=True).first()
+
+    groups = {}
+    for ts_ms, payload in samples:
+        groups.setdefault(ts_ms // 60_000, []).append((ts_ms, payload))
+
+    rows, last_counter = [], None
+    for minute in sorted(groups):
+        bucket = datetime.fromtimestamp(minute * 60, utc)
+        if bucket in existing:
+            if existing[bucket] is not None:
+                prev = existing[bucket]
+            continue
+        row = T(device_id=ac_id, bucket_start=bucket, interval_seconds=60,
+                first_timestamp=datetime.fromtimestamp(groups[minute][0][0] / 1000, utc),
+                last_timestamp=datetime.fromtimestamp(groups[minute][-1][0] / 1000, utc))
+        n, delta = 0, 0.0
+        for _ts, values in groups[minute]:
+            for _key, (src, latest_f, sum_f, avg_f, min_f, max_f) in METRICS.items():
+                val = _number(values.get(src))
+                if val is None:
+                    continue
+                setattr(row, latest_f, val)
+                setattr(row, sum_f, getattr(row, sum_f) + val)
+                setattr(row, avg_f, getattr(row, sum_f) / (n + 1))
+                if min_f:
+                    old = getattr(row, min_f)
+                    setattr(row, min_f, val if old is None else min(old, val))
+                if max_f:
+                    old = getattr(row, max_f)
+                    setattr(row, max_f, val if old is None else max(old, val))
+            n += 1
+            energy = _number(values.get("energy"))
+            if energy is not None:
+                if prev is not None and energy >= prev:
+                    delta += energy - prev
+                prev = last_counter = energy
+                row.latest_energy_counter = energy
+            for src, attr in (("frequency", "latest_frequency"), ("power_factor", "latest_power_factor")):
+                v = _number(values.get(src))
+                if v is not None:
+                    setattr(row, attr, v)
+            for src, attr in (("alarm_status", "latest_alarm_status"), ("relay", "latest_relay")):
+                v = _number(values.get(src))
+                if v is not None:
+                    setattr(row, attr, int(v))
+        row.sample_count, row.energy_delta = n, delta
+        rows.append(row)
+    T.objects.bulk_create(rows, batch_size=500, ignore_conflicts=True)
+    return len(rows), anchor, last_counter, last_bucket
+
+
+def _pull_range(cfg, dev, start_ms, end_ms):
+    from .models import TelemetryAggregate as T
+    ac_id, created = dev["ac_id"], 0
+    anchor, last_counter, last_bucket, first_page = None, None, None, True
+    for _ in range(BACKFILL_MAX_PAGES):
+        resp = _get_history(cfg, dev["device_id"], start_ms, end_ms,
+                            limit=BACKFILL_PAGE, order="ASC")
+        samples = sorted((s for s in _samples(resp) if s.get("ts")), key=lambda s: s["ts"])
+        if not samples:
+            break
+        pairs = [(int(s["ts"]), p) for s in samples if (p := _payload_of(s))]
+        n, a, lc, lb = _store_samples(ac_id, pairs)
+        created += n
+        if first_page:
+            anchor, first_page = a, False
+        last_counter = lc if lc is not None else last_counter
+        last_bucket = lb or last_bucket
+        newest = samples[-1]["ts"]
+        if len(samples) < BACKFILL_PAGE or newest < start_ms:
+            break
+        start_ms = newest + 1
+    # The bucket right after the hole already holds the whole hole's energy
+    # (counter jump) -- take back what the new rows now account for.
+    if created and anchor is not None and last_counter is not None and last_counter >= anchor:
+        nxt = (T.objects.filter(device_id=ac_id, interval_seconds=60, bucket_start__gt=last_bucket)
+               .order_by("bucket_start").first())
+        if nxt is not None:
+            nxt.energy_delta = max(0.0, (nxt.energy_delta or 0) - (last_counter - anchor))
+            nxt.save(update_fields=["energy_delta"])
+    return created
+
+
+def backfill_device(cfg, dev, force=False):
+    """Fill every hole in this device's stored history from 3TP.
+
+    Holes are found by scanning the stored minutes (not just "after the newest
+    one"), each is pulled oldest -> newest, and the device is always stored
+    under its registered ac_id so two devices can never share a series.
+    """
+    ac_id = dev["ac_id"]
+    now = time.time()
+    if not force and now - _backfill_tried.get(ac_id, 0) < BACKFILL_RETRY_SEC:
+        return 0
+    _backfill_tried[ac_id] = now
+
+    end_ms = int(now * 1000)
+    floor_ms = end_ms - BACKFILL_DAYS * 86_400_000
+    accepted = 0
+    for start_ms, stop_ms in _missing_ranges(ac_id, floor_ms, end_ms):
+        accepted += _pull_range(cfg, dev, start_ms, stop_ms)
+    log.warning("Back-fill %s: %s minute rows added", ac_id, accepted)
+    return accepted
+
+
+def backfill_all(force=False):
+    """Back-fill every known device; one failing device never blocks the rest."""
+    if not BACKFILL_ENABLED:
+        return
+    now = time.time()
+    if not force and now - _backfill_tried.get("__all__", 0) < 30:
+        return
+    _backfill_tried["__all__"] = now
+    try:
+        cfg, devices = _config(), _devices()
+    except Exception as exc:
+        log.warning("Back-fill skipped: %s", exc)
+        return
+    for dev in devices:
+        try:
+            backfill_device(cfg, dev, force=force)
+        except Exception:
+            log.exception("Back-fill failed for %s", dev.get("ac_id"))
 
 
 def _refresh():

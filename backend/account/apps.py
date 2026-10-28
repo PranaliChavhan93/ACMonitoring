@@ -28,7 +28,12 @@ class AccountsConfig(AppConfig):
 
         from django.conf import settings
         if getattr(settings, "TELEMETRY_STORAGE_MODE", "polling").lower() == "aggregate":
-            print("[Telemetry] database aggregate mode enabled; old cloud polling worker is disabled")
+            print("[Telemetry] database aggregate mode enabled; live polling disabled, history back-fill only")
+            try:
+                from . import telemetry
+                telemetry.start(live=False)   # still pull what 3TP stored while we were down
+            except ImportError as e:
+                print(f"[3TP] telemetry.py not found in account/ - back-fill disabled ({e})")
             return
 
         try:

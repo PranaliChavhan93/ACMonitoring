@@ -2393,7 +2393,7 @@ function CustomerCreation() {
             onClick={openAssignSite}
           >
             <span className="step-num">4</span>
-            Assign Site
+            Assign Branch
           </button>
         </li>
 
@@ -3109,7 +3109,7 @@ function CustomerCreation() {
               disabled={!form.id}
             >
               <FiMapPin />
-              Continue to Assign Site
+              Continue to Assign Branch
             </button>
           </div>
         </div>
@@ -3120,15 +3120,15 @@ function CustomerCreation() {
           <div className="admins-panel-header">
             <FiMapPin size={22} />
             <div>
-              <h2>Assign Customer to Site</h2>
+              <h2>Assign Customer to Branch</h2>
               <p>
-                Select a customer and one of its sites to create the assignment.
+                Select a customer and one of its Branch to create the assignment.
               </p>
             </div>
           </div>
 
           {assignLoading ? (
-            <div className="admins-loading">Loading customers and sites...</div>
+            <div className="admins-loading">Loading customers and branch...</div>
           ) : (
             <form onSubmit={handleAssignSite} className="admins-form">
               <div className="assign-card">
@@ -3155,7 +3155,7 @@ function CustomerCreation() {
                   </label>
 
                   <label>
-                    Select Site *
+                    Select Branch *
                     <select
                       value={assignSiteId}
                       onChange={(e) => {
@@ -3166,7 +3166,7 @@ function CustomerCreation() {
                       disabled={!assignCustomerId}
                     >
                       
-                    <option value="">Choose a site</option>
+                    <option value="">Choose a branch</option>
                       {assignSites.map((site) => {
                         const siteId = site.tpt_site_id ?? site.id;
                         const siteName = site.name || "Unnamed site";
@@ -3196,7 +3196,7 @@ function CustomerCreation() {
                     </p>
                     
                     <p>
-                      <strong>Site:</strong>{" "}
+                      <strong>Branch:</strong>{" "}
                       {assignSites.find(
                         (site) =>
                           String(site.tpt_site_id ?? site.id) === String(assignSiteId)

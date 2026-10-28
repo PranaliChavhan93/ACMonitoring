@@ -30239,6 +30239,42 @@
                                         "customer_id": 10,
                                         "admin_ids": [],
                                         "engineer_ids": []
+                                    },
+                                    {
+                                        "branch_id": "NR-01",
+                                        "branch_name": "Narhe",
+                                        "address": "Walhekar Complex, 56/12, Narhe, Taluka Haveli, Pune",
+                                        "pincode": "411051",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T01",
+                                        "taluka_name": "Pune Taluka",
+                                        "customer_id": 10,
+                                        "admin_ids": [],
+                                        "engineer_ids": []
+                                    },
+                                    {
+                                        "branch_id": "NV-01",
+                                        "branch_name": "Navle",
+                                        "address": "Walhekar Complex, 56/12, Narhe, Taluka Haveli, Pune",
+                                        "pincode": "411041",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T01",
+                                        "taluka_name": "Pune Taluka",
+                                        "customer_id": 10,
+                                        "admin_ids": [],
+                                        "engineer_ids": []
                                     }
                                 ]
                             },

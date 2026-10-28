@@ -205,7 +205,7 @@ export const MENU_CONFIG = {
         { label: "Customers", path: "/org/customers", icon: Users },
         { label: "Admins", path: "/org/admins", icon: HardHat },
         { label: "Engineers", path: "/org/engineers", icon: Wrench },
-        { label: "Sites", path: "/org/locations", icon: MapPinned },
+        { label: "Branch's", path: "/org/locations", icon: MapPinned },
         { label: "AC's", path: "/org/device", icon: AirVent },
       ],
     },
@@ -227,7 +227,7 @@ export const MENU_CONFIG = {
     { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
     { label: "Admins", path: "/admins", icon: HardHat },
     { label: "Engineers", path: "/engineers", icon: Wrench },
-    { label: "Sites", path: "/locations", icon: MapPinned },
+    { label: "Branch's", path: "/locations", icon: MapPinned },
     { label: "AC's", path: "/device", icon: AirVent },
     { label: "Reports", path: "/reports", icon: FileBarChart },
     { label: "Settings", path: "/settings", icon: Settings },
@@ -235,7 +235,7 @@ export const MENU_CONFIG = {
 
   [ROLES.BR_ADMIN]: [
     { label: "Dashboard", path: "/admin/dashboard", icon: LayoutDashboard },
-    { label: "Sites", path: "/admin/sites", icon: Radio },
+    { label: "Branch's", path: "/admin/sites", icon: Radio },
     { label: "AC's", path: "/admin/device", icon: AirVent },
     { label: "Engineers", path: "/admin/engineers", icon: HardHat },
     // { label: "Tickets", path: "/admin/tickets", icon: Ticket },
@@ -244,7 +244,7 @@ export const MENU_CONFIG = {
 
   [ROLES.ENGINEER]: [
     { label: "Dashboard", path: "/engineer/dashboard", icon: LayoutDashboard },
-    { label: "My Sites", path: "/engineer/sites", icon: MapPin },
+    { label: "My Branch's", path: "/engineer/sites", icon: MapPin },
     { label: "My Tasks", path: "/engineer/tasks", icon: ClipboardList },
     // { label: "Tickets", path: "/engineer/tickets", icon: Ticket },
     // { label: "Maintenance", path: "/engineer/maintenance", icon: Wrench },

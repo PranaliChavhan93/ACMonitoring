@@ -16,12 +16,11 @@ import Eng_Dashboard from "./Pages/Engineer/Eng_Dashboard";
 import EngCreation from "./Pages/Organization/EngCreation";
 import Locations from "./Pages/Organization/Locations";
 import ACCreation from "./Pages/Organization/ACCreation";
-import Treands from "./Second_Person/Forntend/Treands";
+import Trends from "./Second_Person/Forntend/Treands";
 import HierarchySiteCreation from "./Pages/Organization/HierarchySiteCreation";
 
 import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
 import SuperAdminLogin from "./Pages/Layout/SuperAdminLogin";
-import Trends from "./Second_Person/Forntend/Treands";
 import ProfilePage from "./Pages/Profile/ProfilePage";
 
 function RootRedirect() {
@@ -118,7 +117,7 @@ export default function App() {
             path="/org/dashboard/trends"
             element={
               <Page>
-                <Treands />
+                <Trends />
               </Page>
             }
           />

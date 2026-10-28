@@ -447,3 +447,100 @@
   white-space: nowrap;
 }
 
+/* ===== Device Allocation Table ===== */
+
+.admins-panel .admins-table-wrap {
+  width: 100%;
+  margin-top: 14px;
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.04);
+}
+
+.admins-panel .admins-table-wrap .admins-table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: separate;
+  border-spacing: 0;
+  text-align: left;
+  background: #fff;
+}
+
+.admins-panel .admins-table-wrap .admins-table thead {
+  background: #f1f5f9;
+}
+
+.admins-panel .admins-table-wrap .admins-table th {
+  padding: 15px 18px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.admins-panel .admins-table-wrap .admins-table td {
+  padding: 15px 18px;
+  color: #334155;
+  font-size: 13px;
+  vertical-align: middle;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.admins-panel .admins-table-wrap .admins-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+.admins-panel .admins-table-wrap .admins-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.admins-panel .admins-table-wrap .admins-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Current allocations heading */
+.admins-panel h3 {
+  margin: 24px 0 12px;
+  color: #0f172a;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* Allocation panel header */
+.admins-panel .admins-panel-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 22px;
+}
+
+.admins-panel .admins-panel-header h2 {
+  margin: 0 0 7px;
+  color: #0f172a;
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.admins-panel .admins-panel-header p {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Responsive table */
+@media (max-width: 768px) {
+  .admins-panel .admins-table-wrap .admins-table th,
+  .admins-panel .admins-table-wrap .admins-table td {
+    padding: 12px;
+  }
+
+  .admins-panel .admins-panel-header h2 {
+    font-size: 18px;
+  }
+}

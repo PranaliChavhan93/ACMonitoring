@@ -1850,3 +1850,25 @@
   background: #ffffff;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
+
+/* Current & Temperature chart: occupy 2 dashboard columns */
+.current-temp-chart {
+  grid-column: span 2;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Responsive: use the full row when the dashboard has 2 columns */
+@media (max-width: 1000px) {
+  .current-temp-chart {
+    grid-column: span 2;
+  }
+}
+
+/* Mobile: occupy the single available column */
+@media (max-width: 700px) {
+  .current-temp-chart {
+    grid-column: span 1;
+  }
+}

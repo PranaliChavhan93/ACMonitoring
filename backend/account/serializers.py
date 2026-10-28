@@ -846,6 +846,7 @@ class FloorSerializer(serializers.ModelSerializer):
 class SiteSerializer(serializers.ModelSerializer):
     branch_name = serializers.CharField(source="branch.name", read_only=True)
     floor_name = serializers.CharField(source="floor.name", read_only=True, default=None)
+    tpt_site_id = serializers.CharField(read_only=True, allow_null=True)
 
     customer_id = serializers.IntegerField(source="branch.customer_id", read_only=True, allow_null=True)
     customer_name = serializers.CharField(source="branch.customer.company", read_only=True, allow_null=True)
@@ -857,7 +858,7 @@ class SiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Site
         fields = [
-            "id", "name", "code", "address", "latitude", "longitude",
+            "id", "name", "code", "address", "latitude", "longitude", "tpt_site_id",
             "branch", "branch_name", "floor", "floor_name",
             "customer_id", "customer_name", "organization_id",
             "admins", "engineers", "is_active", "created_at",

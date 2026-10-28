@@ -133,12 +133,33 @@ export function buildSeries(points, viewMode, range) {
   // A device that is off sends nothing, so show those periods as 0 on one
   // continuous line.  The bucket still in progress (the last one) is not
   // zero-filled: it simply fills in as readings arrive.
+  // Missing readings stay null, so Recharts draws a gap.
+  // Never invent zero values for missing telemetry.
   const series = [];
   const seen = new Set();
+
   for (const t of bucketKeys(viewMode, range)) {
-    seen.add(t);
-    series.push(real.get(t) ?? { t, avg: 0, min: 0, max: 0, count: 0 });
+      seen.add(t);
+
+      series.push(
+          real.get(t) ?? {
+              t,
+              avg: null,
+              min: null,
+              max: null,
+              count: 0,
+          }
+      );
   }
+
+  // Keep real readings that fall outside generated bucket keys.
+  real.forEach((point, timestamp) => {
+      if (!seen.has(timestamp)) {
+          series.push(point);
+      }
+  });
+
+  return series.sort((a, b) => a.t - b.t);
   // Keep any real bucket that fell outside the generated keys (e.g. the live one).
   real.forEach((pt, t) => {
     if (!seen.has(t)) series.push(pt);

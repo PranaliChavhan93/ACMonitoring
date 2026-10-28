@@ -218,6 +218,10 @@ def current_history(request):
     them (use it for total power).  ``key=energy`` is the energy consumed per
     bucket, always summed over the ACs in scope.
 
+    ``by_device=1`` keeps every AC separate: instead of one blended ``data``
+    list the response carries ``series`` = [{device_id, device_name, data}],
+    so the chart can draw (or pick) one AC at a time and ACs never mix.
+
     Response data rows: {"bucket", "avg", "min", "max", "count"} where
     ``bucket`` is the UTC start of the bucket.
     """
@@ -247,7 +251,8 @@ def current_history(request):
 
     per_device = rollup(_fetch(ids, start, end), interval) if ids else {}
 
-    merged, with_data = {}, set()
+    by_device = str(params.get("by_device", "")).lower() in ("1", "true", "yes")
+    separate, merged, with_data = {}, {}, set()
     for (device_id, t), b in per_device.items():
         if metric == "energy":
             # kWh used in the bucket = sum of the stored per-minute energy deltas.
@@ -261,11 +266,31 @@ def current_history(request):
         else:
             continue
         with_data.add(device_id)
+        if by_device:
+            separate.setdefault(device_id, []).append({
+                "bucket": _iso(t), "avg": round(dev_avg, 4), "min": round(lo, 4),
+                "max": round(hi, 4), "count": n,
+            })
+            continue
         m = merged.setdefault(t, {"vals": [], "lo": [], "hi": [], "count": 0})
         m["vals"].append(dev_avg)
         m["lo"].append(lo)
         m["hi"].append(hi)
         m["count"] += n
+
+    if by_device:
+        names = dict(ACDevice.objects.filter(ac_id__in=list(separate))
+                     .values_list("ac_id", "device_name"))
+        series = [{"device_id": d, "device_name": names.get(d) or d,
+                   "data": sorted(rows, key=lambda r: r["bucket"])}
+                  for d, rows in sorted(separate.items())]
+        return Response({
+            "status": "success", "source": "local_aggregate", "period": period, "key": metric,
+            "by_device": True, "interval_seconds": interval,
+            "from": start.isoformat(), "to": end.isoformat(),
+            "devices_queried": len(ids), "devices_with_data": len(with_data),
+            "series": series,
+        })
 
     def combine(values):
         return sum(values) if agg == "sum" else sum(values) / len(values)
