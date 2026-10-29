@@ -345,3 +345,4 @@ export function IndexZoomFrame({
     </div>
   );
 }
+

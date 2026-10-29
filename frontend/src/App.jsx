@@ -22,6 +22,9 @@ import HierarchySiteCreation from "./Pages/Organization/HierarchySiteCreation";
 import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
 import SuperAdminLogin from "./Pages/Layout/SuperAdminLogin";
 import ProfilePage from "./Pages/Profile/ProfilePage";
+import Analytics from "./Pages/Analytics";
+import Reports from "./Pages/Reports";
+import { Settings } from "lucide-react";
 
 function RootRedirect() {
   const { user } = useAuth();
@@ -118,6 +121,33 @@ export default function App() {
             element={
               <Page>
                 <Trends />
+              </Page>
+            }
+          />
+
+          <Route
+            path="/org/analytics"
+            element={
+              <Page>
+                <Analytics />
+              </Page>
+            }
+          />
+          
+          <Route
+            path="/org/reports"
+            element={
+              <Page>
+                <Reports />
+              </Page>
+            }
+          />
+
+          <Route
+            path="/org/settings"
+            element={
+              <Page>
+                <Settings />
               </Page>
             }
           />

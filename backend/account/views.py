@@ -31,6 +31,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.permissions import AllowAny, BasePermission, SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 
 from .access_scope import (
@@ -331,17 +332,50 @@ class ThreeTPUserMixin:
         try:
             cid = getattr(inst.customer, "tpt_customer_id", "") if inst.customer_id else ""
             if cid:
-                uid = find_3tp_user_id(self.request, cid, old_email)
+                uid = getattr(inst, "tpt_user_id", "") or find_3tp_user_id(self.request, cid, old_email)
                 if uid:
                     h = _tpt_user_headers(self.request)
-                    cur = requests.get(f"{CLOUD_URL}/api/user/{uid}", headers=h, timeout=15).json()
-                    cur.update({"firstName": inst.name or cur.get("firstName"),
-                                "phone": inst.phone or cur.get("phone"),
-                                "email": inst.email})
-                    requests.post(f"{CLOUD_URL}/api/user",
-                                  params={"sendActivationMail": "false"},
-                                  json=cur, headers=h, timeout=15)
-        except Exception:
+                    current_response = requests.get(
+                        f"{CLOUD_URL}/api/user/{uid}", headers=h, timeout=15
+                    )
+                    if current_response.status_code != 200:
+                        raise ThreeTPError(
+                            f"3TP user lookup failed: {current_response.text}",
+                            status=current_response.status_code,
+                        )
+                    cur = current_response.json()
+                    cur.update({
+                        "firstName": inst.name or cur.get("firstName"),
+                        "phone": inst.phone or cur.get("phone"),
+                        "email": inst.email,
+                    })
+                    update_response = requests.post(
+                        f"{CLOUD_URL}/api/user",
+                        params={"sendActivationMail": "false"},
+                        json=cur, headers=h, timeout=15,
+                    )
+                    if update_response.status_code not in (200, 201, 204):
+                        raise ThreeTPError(
+                            f"3TP user update failed: {update_response.text}",
+                            status=update_response.status_code,
+                        )
+                    user_fields = {f.name for f in User._meta.get_fields()}
+                    sync_update = {}
+                    if "tpt_sync_status" in user_fields:
+                        sync_update["tpt_sync_status"] = "SYNCED"
+                    if "tpt_sync_error" in user_fields:
+                        sync_update["tpt_sync_error"] = ""
+                    if sync_update:
+                        User.objects.filter(pk=inst.pk).update(**sync_update)
+        except Exception as exc:
+            user_fields = {f.name for f in User._meta.get_fields()}
+            sync_update = {}
+            if "tpt_sync_status" in user_fields:
+                sync_update["tpt_sync_status"] = "FAILED"
+            if "tpt_sync_error" in user_fields:
+                sync_update["tpt_sync_error"] = _one_line(exc, 2000)
+            if sync_update:
+                User.objects.filter(pk=inst.pk).update(**sync_update)
             traceback.print_exc()
 
     def update_extra(self, serializer):
@@ -352,7 +386,7 @@ class ThreeTPUserMixin:
         cid = getattr(instance.customer, "tpt_customer_id", "") if instance.customer_id else ""
         if cid:
             try:
-                uid = find_3tp_user_id(self.request, cid, instance.email)
+                uid = getattr(instance, "tpt_user_id", "") or find_3tp_user_id(self.request, cid, instance.email)
                 if uid and not delete_3tp_user(self.request, uid):
                     raise ThreeTPError("3TP delete failed.")
             except (ThreeTPError, requests.RequestException) as exc:
@@ -3231,10 +3265,72 @@ def _scoped_tree(location_file, user):
     tree = load_location_tree(location_file)
 
     if getattr(user, "role", None) == Role.ORG_SUPER_ADMIN:
-        return ownership.attach_owner_details(tree)
+        return ownership.attach_owner_details(_attach_devices_to_tree(tree, user))
 
     tree = ownership.filter_tree_for_user(tree, user)
-    return ownership.attach_owner_details(tree)
+    return ownership.attach_owner_details(_attach_devices_to_tree(tree, user))
+
+
+def _attach_devices_to_tree(tree, user):
+    """
+    Add the current user's locally assigned AC devices to their branch nodes.
+    The filter dropdown uses branch.devices; the location JSON does not maintain
+    this relationship, so derive it from the database on each request.
+    """
+    branch_nodes = {}
+
+    def walk(nodes):
+        for node in nodes or []:
+            if not isinstance(node, dict):
+                continue
+            if node.get("branch_id"):
+                branch_nodes.setdefault(str(node.get("branch_id")), node)
+            for key in (
+                "states", "districts", "talukas", "cities", "zones",
+                "circles", "regions", "divisions", "branches", "floors", "sites",
+            ):
+                children = node.get(key)
+                if isinstance(children, list):
+                    walk(children)
+
+    walk(tree)
+
+    for node in branch_nodes.values():
+        node["devices"] = []
+
+    devices = accessible_devices(user).select_related(
+        "branch", "site", "site__branch"
+    ).order_by("ac_id")
+
+    for device in devices:
+        branch = device.branch if device.branch_id else (
+            device.site.branch if device.site_id and device.site.branch_id else None
+        )
+        if not branch:
+            continue
+
+        node = branch_nodes.get(str(branch.code))
+        if node is None:
+            # Compatibility for older tree files whose branch_id is a UUID.
+            node = branch_nodes.get(str(branch.pk))
+        if node is None:
+            continue
+
+        node.setdefault("devices", []).append({
+            # The filter selection and Trends page both identify telemetry by AC ID.
+            "id": device.ac_id,
+            "ac_id": device.ac_id,
+            "device_name": device.device_name or device.ac_id,
+            "local_device_id": str(device.pk),
+            "tpt_device_id": device.tpt_device_id or "",
+            "status": device.status,
+            "site_id": str(device.site_id or ""),
+            "site_name": device.site.name if device.site_id else "",
+            "branch_id": str(branch.code),
+            "branch_name": branch.name,
+        })
+
+    return tree
 
 
 from django.db.models import Field
@@ -4408,7 +4504,69 @@ class CustomerDetailView(CustomerScopeMixin, generics.RetrieveUpdateDestroyAPIVi
     permission_classes = [IsOrgSuperAdmin]
     lookup_field = "pk"
 
+    def perform_update(self, serializer):
+        customer = serializer.save()
+        cloud_id = getattr(customer, "tpt_customer_id", "") or ""
+        if not cloud_id:
+            return
+        try:
+            payload = {
+                "id": {"id": cloud_id, "entityType": "CUSTOMER"},
+                "title": customer.company,
+                "email": customer.company_email or customer.contact_person_email or "",
+                "phone": customer.phone or "",
+                "address": getattr(customer, "address_line_1", "") or "",
+                "city": getattr(customer, "city", "") or "",
+                "state": getattr(customer, "state", "") or "",
+                "zip": getattr(customer, "pincode", "") or "",
+                "additionalInfo": {
+                    "code": getattr(customer, "code", "") or "",
+                    "hierarchy_type": getattr(customer, "hierarchy_type", "") or "",
+                    "contact_person": getattr(customer, "contact_person", "") or "",
+                    "gstin": getattr(customer, "gstin", "") or "",
+                },
+            }
+            response = requests.put(
+                f"{CLOUD_URL}/api/customer/{cloud_id}",
+                headers=_tpt_user_headers(self.request),
+                timeout=15,
+                json=payload,
+            )
+            if response.status_code not in (200, 201, 204):
+                raise ThreeTPError(
+                    f"3TP customer update failed: {response.text}",
+                    status=response.status_code,
+                )
+            fields = {f.name for f in Customer._meta.get_fields()}
+            update = {}
+            if "tpt_sync_status" in fields:
+                update["tpt_sync_status"] = "SYNCED"
+            if "tpt_sync_error" in fields:
+                update["tpt_sync_error"] = ""
+            if update:
+                Customer.objects.filter(pk=customer.pk).update(**update)
+        except Exception as exc:
+            fields = {f.name for f in Customer._meta.get_fields()}
+            update = {}
+            if "tpt_sync_status" in fields:
+                update["tpt_sync_status"] = "FAILED"
+            if "tpt_sync_error" in fields:
+                update["tpt_sync_error"] = _one_line(exc, 2000)
+            if update:
+                Customer.objects.filter(pk=customer.pk).update(**update)
+
     def perform_destroy(self, instance):
+        cloud_id = getattr(instance, "tpt_customer_id", "") or ""
+        if cloud_id:
+            response = requests.delete(
+                f"{CLOUD_URL}/api/customer/{cloud_id}",
+                headers=_tpt_user_headers(self.request),
+                timeout=15,
+            )
+            if response.status_code not in (200, 204, 404):
+                raise ThreeTPAPIError(
+                    "3TP customer deletion failed; the local customer was kept."
+                )
         instance.delete()
 
 ADMIN_ROLES = [
@@ -4530,7 +4688,7 @@ class EngDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class EngListView(ThreeTPUserMixin, generics.ListCreateAPIView):
     serializer_class = AdminSerializer
-    permission_classes = [IsOrgSuperAdmin]
+    permission_classes = [IsOrgAdminOrCustomerAdmin]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "email", "phone"]
     ordering_fields = ["name", "email", "date_joined"]
@@ -4570,7 +4728,7 @@ class EngListView(ThreeTPUserMixin, generics.ListCreateAPIView):
 
 class EngDetailView(ThreeTPUserMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AdminSerializer
-    permission_classes = [IsOrgSuperAdmin]
+    permission_classes = [IsOrgAdminOrCustomerAdmin]
     lookup_field = "pk"
 
     def get_queryset(self):
@@ -7604,17 +7762,50 @@ class ThreeTPUserMixin:
         try:
             cid = getattr(inst.customer, "tpt_customer_id", "") if inst.customer_id else ""
             if cid:
-                uid = find_3tp_user_id(self.request, cid, old_email)
+                uid = getattr(inst, "tpt_user_id", "") or find_3tp_user_id(self.request, cid, old_email)
                 if uid:
                     h = _tpt_user_headers(self.request)
-                    cur = requests.get(f"{CLOUD_URL}/api/user/{uid}", headers=h, timeout=15).json()
-                    cur.update({"firstName": inst.name or cur.get("firstName"),
-                                "phone": inst.phone or cur.get("phone"),
-                                "email": inst.email})
-                    requests.post(f"{CLOUD_URL}/api/user",
-                                  params={"sendActivationMail": "false"},
-                                  json=cur, headers=h, timeout=15)
-        except Exception:
+                    current_response = requests.get(
+                        f"{CLOUD_URL}/api/user/{uid}", headers=h, timeout=15
+                    )
+                    if current_response.status_code != 200:
+                        raise ThreeTPError(
+                            f"3TP user lookup failed: {current_response.text}",
+                            status=current_response.status_code,
+                        )
+                    cur = current_response.json()
+                    cur.update({
+                        "firstName": inst.name or cur.get("firstName"),
+                        "phone": inst.phone or cur.get("phone"),
+                        "email": inst.email,
+                    })
+                    update_response = requests.post(
+                        f"{CLOUD_URL}/api/user",
+                        params={"sendActivationMail": "false"},
+                        json=cur, headers=h, timeout=15,
+                    )
+                    if update_response.status_code not in (200, 201, 204):
+                        raise ThreeTPError(
+                            f"3TP user update failed: {update_response.text}",
+                            status=update_response.status_code,
+                        )
+                    user_fields = {f.name for f in User._meta.get_fields()}
+                    sync_update = {}
+                    if "tpt_sync_status" in user_fields:
+                        sync_update["tpt_sync_status"] = "SYNCED"
+                    if "tpt_sync_error" in user_fields:
+                        sync_update["tpt_sync_error"] = ""
+                    if sync_update:
+                        User.objects.filter(pk=inst.pk).update(**sync_update)
+        except Exception as exc:
+            user_fields = {f.name for f in User._meta.get_fields()}
+            sync_update = {}
+            if "tpt_sync_status" in user_fields:
+                sync_update["tpt_sync_status"] = "FAILED"
+            if "tpt_sync_error" in user_fields:
+                sync_update["tpt_sync_error"] = _one_line(exc, 2000)
+            if sync_update:
+                User.objects.filter(pk=inst.pk).update(**sync_update)
             traceback.print_exc()
 
     def update_extra(self, serializer):
@@ -7625,7 +7816,7 @@ class ThreeTPUserMixin:
         cid = getattr(instance.customer, "tpt_customer_id", "") if instance.customer_id else ""
         if cid:
             try:
-                uid = find_3tp_user_id(self.request, cid, instance.email)
+                uid = getattr(instance, "tpt_user_id", "") or find_3tp_user_id(self.request, cid, instance.email)
                 if uid and not delete_3tp_user(self.request, uid):
                     raise ThreeTPError("3TP delete failed.")
             except (ThreeTPError, requests.RequestException) as exc:
@@ -10913,10 +11104,10 @@ def _scoped_tree(location_file, user, customer_id=None, hierarchy=None):
         if hierarchy and ownership.tree_has_no_locations(tree):
             from .hierarchy_tree_sync import db_location_tree
             tree = db_location_tree(hierarchy, picker_customer)
-        return ownership.attach_owner_details(tree)
+        return ownership.attach_owner_details(_attach_devices_to_tree(tree, user))
 
     tree = ownership.filter_tree_for_user(tree, user)
-    return ownership.attach_owner_details(tree)
+    return ownership.attach_owner_details(_attach_devices_to_tree(tree, user))
 
 
 def _empty_picker_message(request, data):
@@ -12174,7 +12365,69 @@ class CustomerDetailView(CustomerScopeMixin, generics.RetrieveUpdateDestroyAPIVi
     permission_classes = [IsOrgSuperAdmin]
     lookup_field = "pk"
 
+    def perform_update(self, serializer):
+        customer = serializer.save()
+        cloud_id = getattr(customer, "tpt_customer_id", "") or ""
+        if not cloud_id:
+            return
+        try:
+            payload = {
+                "id": {"id": cloud_id, "entityType": "CUSTOMER"},
+                "title": customer.company,
+                "email": customer.company_email or customer.contact_person_email or "",
+                "phone": customer.phone or "",
+                "address": getattr(customer, "address_line_1", "") or "",
+                "city": getattr(customer, "city", "") or "",
+                "state": getattr(customer, "state", "") or "",
+                "zip": getattr(customer, "pincode", "") or "",
+                "additionalInfo": {
+                    "code": getattr(customer, "code", "") or "",
+                    "hierarchy_type": getattr(customer, "hierarchy_type", "") or "",
+                    "contact_person": getattr(customer, "contact_person", "") or "",
+                    "gstin": getattr(customer, "gstin", "") or "",
+                },
+            }
+            response = requests.put(
+                f"{CLOUD_URL}/api/customer/{cloud_id}",
+                headers=_tpt_user_headers(self.request),
+                timeout=15,
+                json=payload,
+            )
+            if response.status_code not in (200, 201, 204):
+                raise ThreeTPError(
+                    f"3TP customer update failed: {response.text}",
+                    status=response.status_code,
+                )
+            fields = {f.name for f in Customer._meta.get_fields()}
+            update = {}
+            if "tpt_sync_status" in fields:
+                update["tpt_sync_status"] = "SYNCED"
+            if "tpt_sync_error" in fields:
+                update["tpt_sync_error"] = ""
+            if update:
+                Customer.objects.filter(pk=customer.pk).update(**update)
+        except Exception as exc:
+            fields = {f.name for f in Customer._meta.get_fields()}
+            update = {}
+            if "tpt_sync_status" in fields:
+                update["tpt_sync_status"] = "FAILED"
+            if "tpt_sync_error" in fields:
+                update["tpt_sync_error"] = _one_line(exc, 2000)
+            if update:
+                Customer.objects.filter(pk=customer.pk).update(**update)
+
     def perform_destroy(self, instance):
+        cloud_id = getattr(instance, "tpt_customer_id", "") or ""
+        if cloud_id:
+            response = requests.delete(
+                f"{CLOUD_URL}/api/customer/{cloud_id}",
+                headers=_tpt_user_headers(self.request),
+                timeout=15,
+            )
+            if response.status_code not in (200, 204, 404):
+                raise ThreeTPAPIError(
+                    "3TP customer deletion failed; the local customer was kept."
+                )
         instance.delete()
 
 ADMIN_ROLES = [
@@ -12296,7 +12549,7 @@ class EngDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class EngListView(ThreeTPUserMixin, generics.ListCreateAPIView):
     serializer_class = AdminSerializer
-    permission_classes = [IsOrgSuperAdmin]
+    permission_classes = [IsOrgAdminOrCustomerAdmin]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "email", "phone"]
     ordering_fields = ["name", "email", "date_joined"]
@@ -12336,7 +12589,7 @@ class EngListView(ThreeTPUserMixin, generics.ListCreateAPIView):
 
 class EngDetailView(ThreeTPUserMixin, generics.RetrieveUpdateDestroyAPIView):
     serializer_class = AdminSerializer
-    permission_classes = [IsOrgSuperAdmin]
+    permission_classes = [IsOrgAdminOrCustomerAdmin]
     lookup_field = "pk"
 
     def get_queryset(self):
@@ -13836,10 +14089,6 @@ def location_detail(request, location_type, location_id):
 def device(request):
     return Response("ACCreation page")
 
-
-# =====================================================================
-# BRANCH ASSIGNMENTS / OWNERSHIP
-# =====================================================================
 @api_view(["GET"])
 def branch_assignments(request):
     branch_id = (request.GET.get("branch_id") or "").strip()
@@ -14179,6 +14428,142 @@ class DeviceCreateView(generics.CreateAPIView):
                 f"synchronization failed: {_one_line(exc)}"
             )
 
+class DeviceDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Local AC record detail endpoint, with best-effort 3TP synchronization."""
+    serializer_class = ACDeviceSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "pk"
+
+    def get_queryset(self):
+        return accessible_devices(self.request.user)
+
+    def perform_update(self, serializer):
+        device = serializer.save()
+        if not device.tpt_device_id:
+            return
+        try:
+            # Update the cloud device metadata using the existing 3TP API helper.
+            headers = _tpt_user_headers(self.request)
+            response = requests.put(
+                f"{CLOUD_URL}/api/device/{device.tpt_device_id}",
+                headers=headers,
+                timeout=15,
+                json={
+                    "id": {"id": device.tpt_device_id, "entityType": "DEVICE"},
+                    "name": device.device_name or device.ac_id,
+                    "label": device.device_name or device.ac_id,
+                },
+            )
+            if response.status_code not in (200, 201, 204):
+                raise ThreeTPError(
+                    f"3TP device update failed: {response.text}",
+                    status=response.status_code,
+                )
+            attributes = {
+                "ac_id": device.ac_id,
+                "status": device.status,
+                "capacity_ton": device.capacity_ton,
+                "installation_date": device.installation_date.isoformat() if device.installation_date else "",
+                "last_maintenance_date": device.last_maintenance_date.isoformat() if device.last_maintenance_date else "",
+            }
+            attributes_response = requests.post(
+                f"{CLOUD_URL}/api/plugins/telemetry/DEVICE/{device.tpt_device_id}/SERVER_SCOPE",
+                headers=headers,
+                timeout=15,
+                json=attributes,
+            )
+            if attributes_response.status_code not in (200, 201, 204):
+                raise ThreeTPError(
+                    f"3TP device attributes update failed: {attributes_response.text}",
+                    status=attributes_response.status_code,
+                )
+            ACDevice.objects.filter(pk=device.pk).update(
+                tpt_sync_status="SYNCED", tpt_sync_error=""
+            )
+        except Exception as exc:
+            ACDevice.objects.filter(pk=device.pk).update(
+                tpt_sync_status="FAILED", tpt_sync_error=_one_line(exc, 2000)
+            )
+
+    def perform_destroy(self, instance):
+        if instance.tpt_device_id:
+            if not delete_3tp_device(self.request, instance.tpt_device_id):
+                raise ThreeTPAPIError(
+                    "3TP device deletion failed; the local device was kept."
+                )
+        instance.delete()
+
+
+class SiteDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Site CRUD for the local database and its linked 3TP asset."""
+    serializer_class = SiteSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    lookup_field = "pk"
+
+    def get_queryset(self):
+        return accessible_sites(self.request.user)
+
+    def perform_update(self, serializer):
+        site = serializer.save()
+        cloud_id = getattr(site, "tpt_site_id", "") or ""
+        if not cloud_id:
+            return
+        try:
+            customer = site.branch.customer
+            payload = {
+                "id": {"id": cloud_id, "entityType": "ASSET"},
+                "name": site.name,
+                "label": site.name,
+                "type": getattr(settings, "TPT_SITE_ASSET_TYPE", "SITE"),
+                "customerId": {
+                    "id": customer.tpt_customer_id,
+                    "entityType": "CUSTOMER",
+                } if getattr(customer, "tpt_customer_id", "") else None,
+                "additionalInfo": {
+                    "code": site.code,
+                    "branch_name": site.branch.name if site.branch_id else "",
+                    "floor_name": site.floor.name if site.floor_id else "",
+                    "address": site.address or "",
+                },
+            }
+            response = requests.put(
+                f"{CLOUD_URL}/api/asset/{cloud_id}",
+                headers=_tpt_user_headers(self.request),
+                timeout=15,
+                json={key: value for key, value in payload.items() if value is not None},
+            )
+            if response.status_code not in (200, 201, 204):
+                raise ThreeTPError(
+                    f"3TP site update failed: {response.text}",
+                    status=response.status_code,
+                )
+            Site.objects.filter(pk=site.pk).update(
+                tpt_sync_status="SYNCED", tpt_sync_error=""
+            )
+        except Exception as exc:
+            fields = {f.name for f in Site._meta.get_fields()}
+            update = {}
+            if "tpt_sync_status" in fields:
+                update["tpt_sync_status"] = "FAILED"
+            if "tpt_sync_error" in fields:
+                update["tpt_sync_error"] = _one_line(exc, 2000)
+            if update:
+                Site.objects.filter(pk=site.pk).update(**update)
+
+    def perform_destroy(self, instance):
+        cloud_id = getattr(instance, "tpt_site_id", "") or ""
+        if cloud_id:
+            response = requests.delete(
+                f"{CLOUD_URL}/api/asset/{cloud_id}",
+                headers=_tpt_user_headers(self.request),
+                timeout=15,
+            )
+            if response.status_code not in (200, 204, 404):
+                raise ThreeTPAPIError(
+                    "3TP site deletion failed; the local site was kept."
+                )
+        instance.delete()
+    
 def create_3tp_device_independent(
     request,
     *,
@@ -14635,76 +15020,155 @@ def _stamp_customer_on_device_map(device, customer):
 
 @csrf_exempt
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def assign_device_to_customer(request):
-    """Assign or reassign an existing 3TP device to a customer.
+    """Assign an AC to a customer locally first, then best-effort sync to 3TP.
 
-    The device itself is never recreated. The local mapping is updated only
-    after 3TP confirms the assignment.
+    Accepts both local identifiers and 3TP identifiers. Local mappings are the
+    source of truth for dashboard visibility, so a temporary 3TP failure must
+    not make an otherwise valid assignment disappear from the customer view.
     """
-    try:
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return JsonResponse({"error": "Valid Bearer token required"}, status=401)
+    body = request.data if hasattr(request, "data") else {}
+    local_device_ref = str(body.get("local_device_id") or "").strip()
+    cloud_device_ref = str(
+        body.get("tpt_device_id") or body.get("device_id") or ""
+    ).strip()
+    local_customer_ref = str(body.get("local_customer_id") or "").strip()
+    customer_ref = str(body.get("tpt_customer_id") or body.get("customer_id") or "").strip()
 
-        token = auth_header.split(" ", 1)[1].strip()
-        body = request.data if hasattr(request, "data") else json.loads(request.body or "{}")
-        customer_id = str(body.get("customer_id") or "").strip()
-        device_id = str(body.get("device_id") or "").strip()
-        if not customer_id or not device_id:
-            return JsonResponse({"error": "customer_id and device_id are required"}, status=400)
+    if not (local_device_ref or cloud_device_ref):
+        return JsonResponse({"error": "device_id or local_device_id is required."}, status=400)
+    if not (local_customer_ref or customer_ref):
+        return JsonResponse({"error": "customer_id or local_customer_id is required."}, status=400)
 
-        response = requests.post(
-            f"{CLOUD_URL}/api/customer/{customer_id}/device/{device_id}",
-            headers={"Accept": "application/json", "X-Authorization": f"Bearer {token}"},
-            timeout=20,
-        )
-        if response.status_code not in (200, 201):
-            try:
-                details = response.json()
-            except Exception:
-                details = response.text
-            return JsonResponse({"error": "Failed to map device to customer", "details": details}, status=response.status_code)
-
-        # Keep local customer-device mapping in sync; support UUID or 3TP ID.
-        device = ACDevice.objects.filter(tpt_device_id=device_id).first()
+    device = None
+    for ref in (local_device_ref, cloud_device_ref):
+        if not ref or device:
+            continue
+        device = ACDevice.objects.filter(tpt_device_id=ref).first()
         if device is None:
-            device = ACDevice.objects.filter(ac_id=device_id).first()
+            device = ACDevice.objects.filter(ac_id=ref).first()
+        if device is None:
+            try:
+                device = ACDevice.objects.filter(pk=uuid.UUID(ref)).first()
+            except (ValueError, TypeError, AttributeError):
+                pass
+    if device is None and cloud_device_ref:
+        device = _ensure_local_device(request, cloud_device_ref)
+    if device is None:
+        return JsonResponse({"error": "Local AC device was not found."}, status=404)
 
-        customer = Customer.objects.filter(tpt_customer_id=customer_id).first()
+    customer = None
+    if local_customer_ref:
+        try:
+            customer = Customer.objects.filter(pk=int(local_customer_ref)).first()
+        except (ValueError, TypeError):
+            # Cloud customer UUIDs are not local integer primary keys.
+            customer = Customer.objects.filter(tpt_customer_id=local_customer_ref).first()
+    if customer is None and customer_ref:
+        customer = Customer.objects.filter(tpt_customer_id=customer_ref).first()
         if customer is None:
             try:
-                customer = Customer.objects.filter(pk=customer_id).first()
+                customer = Customer.objects.filter(pk=int(customer_ref)).first()
             except (ValueError, TypeError):
-                customer = None
+                pass
+    if customer is None:
+        return JsonResponse({"error": "Local customer was not found."}, status=404)
 
-        local_sync_error = ""
-        if device and customer:
-            try:
-                # Deactivate mappings to other customers, then activate/create
-                # the selected mapping. This makes reassignment deterministic.
-                CustomerDeviceMapping.objects.filter(device=device).exclude(
-                    customer=customer
-                ).update(is_active=False)
-                mapping, _ = CustomerDeviceMapping.objects.get_or_create(
-                    customer=customer, device=device,
-                    defaults={"is_active": True},
-                )
-                if not mapping.is_active:
-                    mapping.is_active = True
-                    mapping.save(update_fields=["is_active", "updated_at"])
-            except Exception as exc:
-                local_sync_error = str(exc)
-        elif not device or not customer:
-            local_sync_error = "3TP assignment succeeded, but the matching local device/customer was not found."
+    user = request.user
+    current_owner_before_assignment = device_customer(device)
+    if user.role == Role.ORG_SUPER_ADMIN:
+        if customer.organization_id != user.organization_id:
+            return JsonResponse({"error": "Customer is outside your organization."}, status=403)
+        if current_owner_before_assignment and current_owner_before_assignment.organization_id != user.organization_id:
+            return JsonResponse({"error": "Device is outside your organization."}, status=403)
+    elif user.role == Role.CUSTOMER:
+        if customer.pk != user.customer_id:
+            return JsonResponse({"error": "You can only assign devices to your own customer."}, status=403)
+        if current_owner_before_assignment and current_owner_before_assignment.pk != customer.pk:
+            return JsonResponse({"error": "This device is already assigned to a different customer."}, status=403)
+    elif user.role == Role.BR_ADMIN:
+        if customer.pk != user.customer_id:
+            return JsonResponse({"error": "Customer is outside your admin scope."}, status=403)
+        if current_owner_before_assignment and current_owner_before_assignment.pk != customer.pk:
+            return JsonResponse({"error": "This device is already assigned to a different customer."}, status=403)
+    else:
+        return JsonResponse({"error": "You are not allowed to assign devices to customers."}, status=403)
 
-        return JsonResponse({
-            "message": "Device reassigned to customer successfully" if local_sync_error == "" else "Device assigned in 3TP; local mapping needs attention",
-            "customer_id": customer_id,
-            "device_id": device_id,
-            "data": {"sync_error": local_sync_error} if local_sync_error else {},
-        })
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=500)
+    # If the AC was attached to a different customer's branch, clear that
+    # hierarchy link before changing ownership. A same-customer branch link is
+    # preserved, so customer reassignment does not disturb a valid branch.
+    branch_belongs_elsewhere = bool(
+        device.branch_id and device.branch.customer_id != customer.pk
+    )
+    try:
+        with transaction.atomic():
+            current_owner = device_customer(device)
+            owner_changed = bool(current_owner and current_owner.pk != customer.pk)
+            if branch_belongs_elsewhere:
+                device.branch = None
+                device.site = None
+                SiteDeviceMapping.objects.filter(device=device, is_active=True).update(is_active=False)
+            if owner_changed or branch_belongs_elsewhere:
+                # Prevent an old customer's admin allocation from hiding the AC
+                # from the new customer's branch admins.
+                device.assigned_admin = None
+            if branch_belongs_elsewhere or owner_changed:
+                update_fields = ["updated_at", "assigned_admin"]
+                if branch_belongs_elsewhere:
+                    update_fields.extend(["branch", "site"])
+                device.save(update_fields=update_fields)
+
+            CustomerDeviceMapping.objects.filter(device=device).exclude(
+                customer=customer
+            ).update(is_active=False)
+            mapping, _ = CustomerDeviceMapping.objects.get_or_create(
+                customer=customer,
+                device=device,
+                defaults={"is_active": True},
+            )
+            if not mapping.is_active:
+                mapping.is_active = True
+                mapping.save(update_fields=["is_active", "updated_at"])
+    except Exception as exc:
+        return JsonResponse({"error": f"Local customer assignment failed: {_one_line(exc)}"}, status=500)
+
+    cloud_sync_error = ""
+    # Never send local database identifiers to 3TP as if they were cloud IDs.
+    cloud_customer_id = str(customer.tpt_customer_id or body.get("tpt_customer_id") or "").strip()
+    cloud_device_id = str(device.tpt_device_id or body.get("tpt_device_id") or "").strip()
+    if cloud_customer_id and cloud_device_id:
+        try:
+            response = requests.post(
+                f"{CLOUD_URL}/api/customer/{cloud_customer_id}/device/{cloud_device_id}",
+                headers={"Accept": "application/json", "X-Authorization": f"Bearer {str(request.headers.get('Authorization', '')).removeprefix('Bearer ').strip()}"},
+                timeout=20,
+            )
+            if response.status_code not in (200, 201, 204):
+                try:
+                    details = response.json()
+                except Exception:
+                    details = response.text
+                cloud_sync_error = f"3TP customer-device mapping failed ({response.status_code}): {details}"
+        except Exception as exc:
+            cloud_sync_error = f"3TP customer-device mapping failed: {_one_line(exc, 500)}"
+    else:
+        cloud_sync_error = "Local assignment saved; customer or device is missing its 3TP ID, so cloud mapping was skipped."
+
+    return JsonResponse({
+        "status": "success",
+        "message": "Device assigned to customer locally." if cloud_sync_error else "Device assigned to customer and synchronized with 3TP.",
+        "customer_id": str(customer.pk),
+        "customer_name": customer.company,
+        "device_id": str(device.pk),
+        "ac_id": device.ac_id,
+        "data": {
+            "sync_error": cloud_sync_error,
+            "local_assignment_saved": True,
+            "tpt_device_id": device.tpt_device_id or "",
+            "tpt_customer_id": customer.tpt_customer_id or "",
+        },
+    }, status=200)
 
 
 @csrf_exempt
@@ -15400,7 +15864,13 @@ def assign_device_to_branch(request):
     if user.role not in (Role.ORG_SUPER_ADMIN, Role.CUSTOMER, Role.BR_ADMIN):
         return JsonResponse({"error": "You are not allowed to assign devices to branches."}, status=403)
 
-    device_ref = str(request.data.get("device_id") or "").strip()
+    device_ref = str(
+        request.data.get("local_device_id")
+        or request.data.get("device_id")
+        or request.data.get("tpt_device_id")
+        or request.data.get("ac_id")
+        or ""
+    ).strip()
     branch_ref = str(request.data.get("branch_id") or "").strip()
     if not device_ref or not branch_ref:
         return JsonResponse({"error": "device_id and branch_id are required."}, status=400)
@@ -15424,36 +15894,43 @@ def assign_device_to_branch(request):
         if branch is None:
             return JsonResponse({"error": "Branch not found."}, status=404)
 
+        if not branch.customer_id:
+            return JsonResponse({"error": "The selected branch is not assigned to a customer."}, status=400)
+
+        current_owner = device_customer(device)
         if user.role == Role.CUSTOMER:
             if not user.customer_id or branch.customer_id != user.customer_id:
                 return JsonResponse({"error": "This branch is outside your customer scope."}, status=403)
-            if not device_customer(device) or device_customer(device).pk != user.customer_id:
-                return JsonResponse({"error": "This device is not assigned to your customer."}, status=403)
+            if current_owner and current_owner.pk != user.customer_id:
+                return JsonResponse({"error": "This device belongs to a different customer."}, status=403)
         elif user.role == Role.BR_ADMIN:
             if not user.customer_id or branch.customer_id != user.customer_id:
                 return JsonResponse({"error": "This branch is outside your customer scope."}, status=403)
-            if not device_customer(device) or device_customer(device).pk != user.customer_id:
-                return JsonResponse({"error": "This device is not assigned to your customer."}, status=403)
+            if not accessible_branches(user).filter(pk=branch.pk).exists():
+                return JsonResponse({"error": "This branch is outside your assigned state/zone/branch scope."}, status=403)
+            if current_owner and current_owner.pk != user.customer_id:
+                return JsonResponse({"error": "This device belongs to a different customer."}, status=403)
         elif user.role == Role.ORG_SUPER_ADMIN:
             if not user.organization_id or branch.customer.organization_id != user.organization_id:
                 return JsonResponse({"error": "This branch is outside your organization."}, status=403)
+            if current_owner and current_owner.organization_id != user.organization_id:
+                return JsonResponse({"error": "This device is outside your organization."}, status=403)
 
         with transaction.atomic():
             device.branch = branch
+            device.site = None  # canonical hierarchy is Branch -> AC; Site is legacy only
             device.assigned_by = user
-            if not device.assigned_admin_id:
-                default_admin = branch.assigned_admin_id or User.objects.filter(
-                    customer_id=branch.customer_id,
-                    role=Role.BR_ADMIN,
-                    is_active=True,
-                ).order_by("date_joined").values_list("pk", flat=True).first() or User.objects.filter(
-                    customer_id=branch.customer_id,
-                    role=Role.CUSTOMER,
-                    is_active=True,
-                ).order_by("date_joined").values_list("pk", flat=True).first()
-                if default_admin:
-                    device.assigned_admin_id = default_admin
-            device.save(update_fields=["branch", "assigned_by", "assigned_admin", "updated_at"])
+            # A branch admin assigning a device must be able to see it after
+            # assignment. For customer/super-admin assignments, only use an
+            # explicitly configured branch admin; do not silently assign the
+            # AC to an arbitrary first admin and hide it from the rest.
+            if user.role == Role.BR_ADMIN:
+                device.assigned_admin = user
+            elif branch.assigned_admin_id:
+                device.assigned_admin_id = branch.assigned_admin_id
+            device.save(update_fields=["branch", "site", "assigned_by", "assigned_admin", "updated_at"])
+            # Retire any legacy site mapping for this AC; new assignments are direct to branch.
+            SiteDeviceMapping.objects.filter(device=device, is_active=True).update(is_active=False)
 
             # Keep one active customer mapping for the device.
             CustomerDeviceMapping.objects.filter(device=device, is_active=True).exclude(
@@ -15658,3 +16135,100 @@ def ac_faults_from_3tp(request):
 @permission_classes([IsAuthenticated])
 def profile(request):
     return Response("Profile Page")
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def analytics(request):
+    return Response("Analytics Page")
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def settings(request):
+    return Response("Settings Page")
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def reports(request):
+    return Response("Reports Page")
+
+
+class CloudDeviceDetailView(APIView):
+    """CRUD for 3TP-only devices visible to the organization super admin.
+
+    These devices have no local ACDevice row yet, so operations apply to 3TP
+    only. Once assigned/created locally, use DeviceDetailView instead.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _check_admin(self, request):
+        return request.user.role == Role.ORG_SUPER_ADMIN
+
+    def patch(self, request, device_id):
+        if not self._check_admin(request):
+            return Response(
+                {"detail": "Only the organization super admin can edit an unlinked 3TP device."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        name = str(request.data.get("device_name") or request.data.get("ac_id") or "").strip()
+        if not name:
+            return Response({"detail": "device_name or ac_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        headers = _tpt_user_headers(request)
+        response = requests.get(
+            f"{CLOUD_URL}/api/device/{device_id}", headers=headers, timeout=15
+        )
+        if response.status_code != 200:
+            return Response(
+                {"detail": f"Could not load the 3TP device: {response.text}"},
+                status=response.status_code,
+            )
+        entity = response.json()
+        entity["name"] = name
+        entity["label"] = name
+        updated = requests.put(
+            f"{CLOUD_URL}/api/device/{device_id}",
+            headers=headers,
+            json=entity,
+            timeout=15,
+        )
+        if updated.status_code not in (200, 201, 204):
+            return Response(
+                {"detail": f"3TP device update failed: {updated.text}"},
+                status=updated.status_code,
+            )
+        attributes = {
+            key: request.data[key]
+            for key in ("status", "capacity_ton", "installation_date", "last_maintenance_date")
+            if key in request.data
+        }
+        if attributes:
+            attribute_response = requests.post(
+                f"{CLOUD_URL}/api/plugins/telemetry/DEVICE/{device_id}/SERVER_SCOPE",
+                headers=headers,
+                json=attributes,
+                timeout=15,
+            )
+            if attribute_response.status_code not in (200, 201, 204):
+                return Response(
+                    {"detail": f"3TP device attributes update failed: {attribute_response.text}"},
+                    status=attribute_response.status_code,
+                )
+        return Response({
+            "status": "success",
+            "message": "Unlinked 3TP device updated. Local AC details will be available after it is mapped locally.",
+            "tpt_device_id": device_id,
+            "device_name": name,
+        })
+
+    def delete(self, request, device_id):
+        if not self._check_admin(request):
+            return Response(
+                {"detail": "Only the organization super admin can delete an unlinked 3TP device."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if not delete_3tp_device(request, device_id):
+            return Response(
+                {"detail": "3TP device deletion failed."},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        return Response(status=status.HTTP_204_NO_CONTENT)

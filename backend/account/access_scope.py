@@ -30,6 +30,12 @@ def device_customer(device):
     if mapping:
         return mapping.customer
 
+    # New canonical hierarchy: ACDevice -> Branch -> Customer.
+    if device.branch_id and device.branch and device.branch.customer_id:
+        return device.branch.customer
+
+    # Legacy compatibility for devices assigned through a Site before the
+    # hierarchy was flattened. New assignments should never require a Site.
     site = device.site if device.site_id else None
     if site and site.branch_id and site.branch.customer_id:
         return site.branch.customer
@@ -144,6 +150,8 @@ def accessible_sites(user):
 
 def accessible_devices(user):
     qs = ACDevice.objects.select_related(
+        "branch",
+        "branch__customer",
         "site",
         "site__branch",
         "site__branch__customer",
@@ -151,13 +159,10 @@ def accessible_devices(user):
 
     if user.role == Role.ORG_SUPER_ADMIN:
         return qs.filter(
-            Q(
-                site__branch__customer__organization_id=
-                user.organization_id
-            )
+            Q(branch__customer__organization_id=user.organization_id)
+            | Q(site__branch__customer__organization_id=user.organization_id)
             | Q(
-                customer_mappings__customer__organization_id=
-                user.organization_id,
+                customer_mappings__customer__organization_id=user.organization_id,
                 customer_mappings__is_active=True,
             )
         )
@@ -171,7 +176,8 @@ def accessible_devices(user):
         ).exclude(customer_id=user.customer_id)
 
         return qs.filter(
-            Q(site__branch__customer_id=user.customer_id)
+            Q(branch__customer_id=user.customer_id)
+            | Q(site__branch__customer_id=user.customer_id)
             | Q(
                 customer_mappings__customer_id=user.customer_id,
                 customer_mappings__is_active=True,
@@ -184,11 +190,17 @@ def accessible_devices(user):
         return qs.filter(Q(assigned_admin=user) | (Q(assigned_admin__isnull=True) & legacy_scope))
 
     if user.role == Role.ENGINEER:
-        # Restrict to the engineer's directly assigned site and branch. This is
-        # deliberately narrower than the admin's state/zone scope.
-        if not user.site_id:
-            return qs.none()
-        return qs.filter(site_id=user.site_id, site__branch__in=accessible_branches(user))
+        # New hierarchy: engineer's branch is the direct AC scope. Keep the
+        # legacy site path so older assignments continue to work.
+        branches = accessible_branches(user)
+        if user.branch_id:
+            return qs.filter(
+                Q(branch__in=branches)
+                | Q(site_id=user.site_id, site__branch__in=branches)
+            )
+        if user.site_id:
+            return qs.filter(site_id=user.site_id, site__branch__in=branches)
+        return qs.none()
 
     return qs.none()
 

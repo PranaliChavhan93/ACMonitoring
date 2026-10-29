@@ -3,7 +3,7 @@ import MetricHistoryChart from "../shared/MetricHistoryChart";
 
 const CONFIG = {
   metric: "current",
-  title: "⚡ Current Consumption",
+  title: "⚡ Current History",
   subtitleDevice: "Current drawn by the selected AC",
   subtitleScope: "Average current per AC in the selected scope",
   seriesName: "Current",

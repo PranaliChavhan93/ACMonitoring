@@ -850,12 +850,6 @@ export default function MetricHistoryChart({
         </div>
       </div>
 
-      {/* {hasData && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-          <ZoomToolbar z={zoomState} />
-        </div>
-      )} */}
-
       {hasData ? (
         <div {...zoomState.areaProps}>
         <ResponsiveContainer width="100%" height={expanded ? 520 : height}>

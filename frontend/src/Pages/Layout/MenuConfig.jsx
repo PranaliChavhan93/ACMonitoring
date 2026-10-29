@@ -145,6 +145,7 @@ import {
   Radio,
   MapPinned,
   AirVent,
+  ChartNoAxesCombined,
 } from "lucide-react";
 
 // ── Under-development visual style (single source of truth) ────────────────
@@ -153,7 +154,7 @@ export const UNDER_DEV_LABEL_STYLE = {
   fontSize: "0.75rem",  // smaller than normal menu text
 };
 
-export const UNDER_DEV_ICON_SIZE = 14;
+export const UNDER_DEV_ICON_SIZE = 18;
 
 export const ROLES = {
   ORG_SUPER_ADMIN: "ORG_SUPER_ADMIN",
@@ -208,6 +209,12 @@ export const MENU_CONFIG = {
         { label: "Branch's", path: "/org/locations", icon: MapPinned },
         { label: "AC's", path: "/org/device", icon: AirVent },
       ],
+    },
+    {
+      label: "Analytics (Under Development)",
+      path: "/org/analytics",
+      icon: ChartNoAxesCombined,
+      underDevelopment: true,
     },
     {
       label: "Reports (Under Development)",

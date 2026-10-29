@@ -5,6 +5,10 @@ from .history_views import current_history, telemetry_aggregates
 from .hierarchy_site_views import create_hierarchy_site, create_hierarchy_branch
 from .cloud_views import CloudCustomerListView, CloudUserListView
 from .views import (
+    DeviceDetailView,
+    CloudDeviceDetailView,
+    SiteDetailView,
+    analytics,
     profile,
     AdminDetailView, 
     AdminListView, 
@@ -39,8 +43,10 @@ from .views import (
     create_branch_or_floor, 
     create_device, 
     create_site,
-    pincode_lookup, 
-    search_site_branches, 
+    pincode_lookup,
+    reports, 
+    search_site_branches,
+    settings, 
     site_assignment, 
     ac_data, 
     branch_assignments,
@@ -84,6 +90,8 @@ urlpatterns = [
     path("v1/filters/locations/<str:location_type>/<int:location_id>/", location_detail),
 
     path("devices/", devices),
+    path("devices/cloud/<str:device_id>/", CloudDeviceDetailView.as_view(), name="cloud-device-detail"),
+    path( "devices/<uuid:pk>/", DeviceDetailView.as_view()),
     path("devices/unassigned/", unassigned_devices),
     path("devices/relay/", control_device_relay),
     path("devices/create/", DeviceCreateView.as_view()),
@@ -99,9 +107,14 @@ urlpatterns = [
     path("admins/<uuid:pk>/", AdminDetailView.as_view()),
     path("engineers/", EngListView.as_view()),
     path("engineer/<uuid:pk>/", EngDetailView.as_view()),
+    path("engineers/<uuid:pk>/", EngDetailView.as_view(), name="engineer-detail"),
     path("org/device/", device),
     path("org/dashboard/trends/", treands),
 
+    path("org/analytics/", analytics),
+    path("org/settings/", settings),
+    path("org/reports/", reports),
+    
     path("countries/", CountryListAPIView.as_view()),
     path("zones/", ZoneListView.as_view()),
     path("circles/", CircleListView.as_view()),
@@ -122,6 +135,7 @@ urlpatterns = [
 
     path("sites/<uuid:pk>/assignment/", site_assignment),
     path("sites/", SiteListView.as_view()),
+    path("sites/<uuid:pk>/", SiteDetailView.as_view(), name="site-detail"),
     path("sites/create/", create_site),
     path("pincode/<str:pincode>/", pincode_lookup),
 
