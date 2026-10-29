@@ -18,39 +18,7 @@
                                     {
                                         "city_id": "AP-D01-T01-C01",
                                         "city_name": "Amaravati",
-                                        "branches": [
-                                            {
-                                                "branch_id": "AP-B01",
-                                                "branch_name": "Amaravati Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "AP-B01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-AP-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-AP-B01-01"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "floor_id": "AP-B01-F02",
-                                                        "floor_name": "Floor-02",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-AP-B01-02",
-                                                                "device_name": "AC-02",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-AP-B01-02"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             },
@@ -4317,31 +4285,7 @@
                                 "taluka_id": "AR-D01-T01",
                                 "taluka_name": "Itanagar Taluka",
                                 "cities": [
-                                    {
-                                        "city_id": "AR-D01-T01-C01",
-                                        "city_name": "Itanagar",
-                                        "branches": [
-                                            {
-                                                "branch_id": "AR-B01",
-                                                "branch_name": "Itanagar Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "AR-B01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-AR-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-AR-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
-                                    }
+                                    
                                 ]
                             },
                             {
@@ -13799,34 +13743,7 @@
                                     {
                                         "city_id": "GJ-D01-T01-C01",
                                         "city_name": "Ahmedabad",
-                                        "branches": [
-                                            {
-                                                "branch_id": "GJ-B01",
-                                                "branch_name": "Ahmedabad Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "GJ-B01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-GJ-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-GJ-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": [
-                                                    {
-                                                        "site_id": "AC-GJ-B01-02",
-                                                        "device_name": "AC-02",
-                                                        "status": "ON",
-                                                        "ac_id": "AC-GJ-B01-02"
-                                                    }
-                                                ]
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             }
@@ -35904,27 +35821,7 @@
                                     {
                                         "city_id": "MZ-D01-T01-C01",
                                         "city_name": "Aizawl",
-                                        "branches": [
-                                            {
-                                                "branch_id": "MZ-B01",
-                                                "branch_name": "Aizawl Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "MZ-B01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-MZ-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-MZ-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             },
@@ -54989,27 +54886,7 @@
                                     {
                                         "city_id": "TR-D01-T01-C01",
                                         "city_name": "Agartala",
-                                        "branches": [
-                                            {
-                                                "branch_id": "TR-B01",
-                                                "branch_name": "Agartala Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "TR-B01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-TR-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-TR-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             },
@@ -55305,51 +55182,7 @@
                                     {
                                         "city_id": "UP-D01-T01-C01",
                                         "city_name": "Lucknow",
-                                        "branches": [
-                                            {
-                                                "branch_id": "UP-B01",
-                                                "branch_name": "Lucknow Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "UP-B01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-UP-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-UP-B01-01"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "floor_id": "UP-B01-F02",
-                                                        "floor_name": "Floor-02",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-UP-B01-02",
-                                                                "device_name": "AC-02",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-UP-B01-02"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "floor_id": "UP-B01-F03",
-                                                        "floor_name": "Floor-03",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-UP-B01-03",
-                                                                "device_name": "AC-03",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-UP-B01-03"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             },

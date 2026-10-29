@@ -91,7 +91,7 @@ function displayMetricName(value) {
   const normalized = value.toLowerCase().replace(/[\s_-]/g, "");
 
   const names = { 
-    latestenergycounter: "Current Energy Reading",
+    latestenergycounter: "Current Energy Consumption",
     // energydelta: "Energy",
   };
 

@@ -18,27 +18,7 @@
                                     {
                                         "division_id": "HR-C01-R01-D01",
                                         "division_name": "Gurugram Division",
-                                        "branches": [
-                                            {
-                                                "branch_id": "HR-ZB01",
-                                                "branch_name": "Gurugram Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "HR-ZB01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-HR-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-HR-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             }
@@ -55,27 +35,7 @@
                                     {
                                         "division_id": "HP-C01-R01-D01",
                                         "division_name": "Shimla Division",
-                                        "branches": [
-                                            {
-                                                "branch_id": "HP-ZB01",
-                                                "branch_name": "Shimla Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "HP-ZB01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-HP-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-HP-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             }
@@ -92,27 +52,7 @@
                                     {
                                         "division_id": "PB-C01-R01-D01",
                                         "division_name": "Ludhiana Division",
-                                        "branches": [
-                                            {
-                                                "branch_id": "PB-ZB01",
-                                                "branch_name": "Ludhiana Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "PB-ZB01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-PB-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-PB-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             }
@@ -129,39 +69,7 @@
                                     {
                                         "division_id": "RJ-C01-R01-D01",
                                         "division_name": "Jaipur Division",
-                                        "branches": [
-                                            {
-                                                "branch_id": "RJ-ZB01",
-                                                "branch_name": "Jaipur Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "RJ-ZB01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-RJ-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-RJ-B01-01"
-                                                            }
-                                                        ]
-                                                    },
-                                                    {
-                                                        "floor_id": "RJ-ZB01-F02",
-                                                        "floor_name": "Floor-02",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-RJ-B01-02",
-                                                                "device_name": "AC-02",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-RJ-B01-02"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             }
@@ -1147,27 +1055,7 @@
                                     {
                                         "division_id": "TR-C01-R01-D01",
                                         "division_name": "Agartala Division",
-                                        "branches": [
-                                            {
-                                                "branch_id": "TR-ZB01",
-                                                "branch_name": "Agartala Branch 01",
-                                                "floors": [
-                                                    {
-                                                        "floor_id": "TR-ZB01-F01",
-                                                        "floor_name": "Floor-01",
-                                                        "sites": [
-                                                            {
-                                                                "site_id": "AC-TR-B01-01",
-                                                                "device_name": "AC-01",
-                                                                "status": "ON",
-                                                                "ac_id": "AC-TR-B01-01"
-                                                            }
-                                                        ]
-                                                    }
-                                                ],
-                                                "sites": []
-                                            }
-                                        ]
+                                        "branches": []
                                     }
                                 ]
                             }
