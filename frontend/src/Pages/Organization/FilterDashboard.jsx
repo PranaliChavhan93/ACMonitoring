@@ -1,7 +1,7 @@
 
 // // // import React, { useEffect, useMemo, useState } from "react";
 
-// // // const API_BASE = "http://192.168.1.4:8000/api/v1/filters/locations/";
+// // // const API_BASE = "http://192.168.1.6:8000/api/v1/filters/locations/";
 
 // // // const DEFAULT_COUNTRY = "India";
 
@@ -1129,7 +1129,7 @@
 
 // // import React, { useEffect, useMemo, useState } from "react";
 
-// // const API_BASE = "http://192.168.1.4:8000/api/v1/filters/locations/";
+// // const API_BASE = "http://192.168.1.6:8000/api/v1/filters/locations/";
 
 // // const DEFAULT_COUNTRY = "India";
 

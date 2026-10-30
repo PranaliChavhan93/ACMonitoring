@@ -1318,30 +1318,30 @@ function CurrentTemperatureChart({ deviceId = "", scope = {}, height = 320 }) {
 
             <YAxis
               yAxisId="left"
-              tick={{ fontSize: 11, fill: "#2563eb" }}
-              axisLine={{ stroke: "#2563eb" }}
-              tickLine={{ stroke: "#2563eb" }}
+              tick={{ fontSize: 11, fill: "#3182BD" }}
+              axisLine={{ stroke: "#3182BD" }}
+              tickLine={{ stroke: "#3182BD" }}
               domain={[0, "auto"]}
               label={{
                 value: "Current (A)",
                 angle: -90,
                 position: "insideLeft",
-                style: { textAnchor: "middle", fontSize: 11, fill: "#2563eb" },
+                style: { textAnchor: "middle", fontSize: 11, fill: "#3182BD" },
               }}
             />
 
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ fontSize: 11, fill: "#f97316" }}
-              axisLine={{ stroke: "#f97316" }}
-              tickLine={{ stroke: "#f97316" }}
+              tick={{ fontSize: 11, fill: "#F44336 " }}
+              axisLine={{ stroke: "#F44336 " }}
+              tickLine={{ stroke: "#F44336 " }}
               domain={["auto", "auto"]}
               label={{
                 value: "Temperature (°C)",
                 angle: 90,
                 position: "insideRight",
-                style: { textAnchor: "middle", fontSize: 11, fill: "#f97316" },
+                style: { textAnchor: "middle", fontSize: 11, fill: "#F44336 " },
               }}
             />
 
@@ -1361,9 +1361,9 @@ function CurrentTemperatureChart({ deviceId = "", scope = {}, height = 320 }) {
                 yAxisId="left"
                 x1={Math.min(sel.a, sel.b)}
                 x2={Math.max(sel.a, sel.b)}
-                fill="#2563eb"
+                fill="#3182BD"
                 fillOpacity={0.12}
-                stroke="#2563eb"
+                stroke="#3182BD"
                 strokeOpacity={0.35}
               />
             )}
@@ -1373,7 +1373,7 @@ function CurrentTemperatureChart({ deviceId = "", scope = {}, height = 320 }) {
               type="linear"
               dataKey="current"
               name="Current"
-              stroke="#2563eb"
+              stroke="#3182BD"
               strokeWidth={2}
               dot={false}
               connectNulls={false}
@@ -1385,7 +1385,7 @@ function CurrentTemperatureChart({ deviceId = "", scope = {}, height = 320 }) {
               type="linear"
               dataKey="temperature"
               name="Temperature"
-              stroke="#f97316"
+              stroke="#F44336 "
               strokeWidth={2}
               dot={false}
               connectNulls={false}

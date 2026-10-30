@@ -13,7 +13,7 @@
 
 // import "./CustomerCreation.css";
 
-// const API_BASE = "http://192.168.1.4:8000/api";
+// const API_BASE = "http://192.168.1.6:8000/api";
 // const LOCATIONS_URL = `${API_BASE}/v1/filters/locations/`;
 
 // const CUSTOMERS_URL = `${API_BASE}/customers/`;

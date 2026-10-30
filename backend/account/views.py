@@ -15714,6 +15714,18 @@ def control_device_relay(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
+    # The dashboards / Trends page identify an AC by its ac_id (e.g. "AC-002"), but 3TP
+    # only understands its own device UUID. Resolve ac_id -> tpt_device_id first.
+    raw_id = str(device_id).strip()
+    ac = ACDevice.objects.filter(Q(ac_id=raw_id) | Q(tpt_device_id=raw_id)).first()
+    if ac and ac.tpt_device_id:
+        device_id = ac.tpt_device_id
+    elif ac:
+        return Response(
+            {"status": "error", "message": f"{ac.ac_id} is not synced to 3TP yet (no tpt_device_id)."},
+            status=status.HTTP_409_CONFLICT,
+        )
+
     try:
         response = requests.post(
             f"{CLOUD_URL}/api/rpc/oneway/{device_id}",
@@ -15729,7 +15741,7 @@ def control_device_relay(request):
             return Response(
                 {
                     "status": "error",
-                    "message": "Cloud rejected the relay command.",
+                    "message": f"Cloud rejected the relay command (HTTP {response.status_code}).",
                     "details": response.text[:500],
                 },
                 status=status.HTTP_502_BAD_GATEWAY,

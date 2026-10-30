@@ -14,8 +14,8 @@ import ACDashboard from "./ACDashboard";
 // import { useAuth } from "../../Pages/Layout/Layout.css";
 import { useAuth } from '../../Pages/Layout/AuthContext'
 
-const API_BASE = "http://192.168.1.4:8000/api";
-// const API_BASE = "http://192.168.1.4:8000/api/v1/filters/locations/";
+const API_BASE = "http://192.168.1.6:8000/api";
+// const API_BASE = "http://192.168.1.6:8000/api/v1/filters/locations/";
 const API_URL = `${API_BASE}/ac-data/`;
 const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 

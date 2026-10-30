@@ -484,7 +484,6 @@ const ACPowerStateChart = ({
           </svg>
           AC Runtime
         </div>
-        <ZoomToolbar z={zoomState} />
         <div className="ac-power-state-legend">
           <span className="legend-item">
             <span className="dot on" /> ON
@@ -493,6 +492,15 @@ const ACPowerStateChart = ({
             <span className="dot off" /> OFF
           </span>
         </div>
+        {/* <ZoomToolbar z={zoomState} /> */}
+        {/* <div className="ac-power-state-legend">
+          <span className="legend-item">
+            <span className="dot on" /> ON
+          </span>
+          <span className="legend-item">
+            <span className="dot off" /> OFF
+          </span>
+        </div> */}
       </div>
 
       {/* Timeline Bar */}

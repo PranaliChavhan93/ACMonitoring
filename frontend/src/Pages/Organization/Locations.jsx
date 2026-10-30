@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { RefreshCw, Search, MapPin, Building2 } from "lucide-react";
 import "./Locations.css";
 
-const API_BASE = "http://192.168.1.4:8000/api";
+const API_BASE = "http://192.168.1.6:8000/api";
 const FILTER_LOCATIONS_URL = `${API_BASE}/v1/filters/locations/`;
 const BRANCHES_URL = `${API_BASE}/branches/`;
 

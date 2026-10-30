@@ -717,8 +717,6 @@ import "./dashboard.css";
 import "./dashboard-insight.css";
 import CurrentHistoryChart from "./Current/CurrentHistoryChart";
 import VoltageHistoryChart from "./Voltage/VoltageHistoryChart";
-import ACPowerStateChart from "./CurrentOnOff/ACPowerStateChart";
-import CurrentTemperatureChart from "./Current/CurrentTemp";
 import Inactive_Acs from "./KPI Cards/InactiveAcs";
 
 const numberValue = (value) => {
@@ -1304,15 +1302,6 @@ function ACDashboard({
                     {selectedLevel === "branch" && showWidget("health_chart") && (
                         <>
                             {/* <PowerConsumptionChart data={deviceData} /> */}
-                            <ACPowerStateChart 
-                                data={filteredData}
-                                deviceId={selectedDeviceId || filters?.ac_id || ""}
-                                scope={filters}
-                            />
-                            <CurrentTemperatureChart
-                                deviceId={selectedDeviceId || filters?.ac_id || ""}
-                                scope={filters}
-                            />
                             {/* <ACHealthChart data={deviceData} /> */}
                             <CurrentHistoryChart
                                 deviceId={selectedDeviceId}
@@ -1339,12 +1328,6 @@ function ACDashboard({
                                 status={weatherStatus}
                                 error={weatherError}
                             />
-                            
-                            {/* <ACPowerStateChart 
-                                data={filteredData}
-                                deviceId={selectedDeviceId || filters?.ac_id || ""}
-                                scope={filters}
-                            /> */}
                         </>
                     )}
                     {showWidget("energy_chart") && 

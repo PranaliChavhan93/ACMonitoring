@@ -1,5 +1,5 @@
 // Single place for the backend address and auth token.
-// Set VITE_API_BASE in .env (e.g. VITE_API_BASE=http://192.168.1.4:8000/api) to override.
+// Set VITE_API_BASE in .env (e.g. VITE_API_BASE=http://192.168.1.6:8000/api) to override.
 export const API_BASE =
   (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
   "http://localhost:8000/api";

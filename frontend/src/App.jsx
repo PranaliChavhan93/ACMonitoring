@@ -16,7 +16,7 @@ import Eng_Dashboard from "./Pages/Engineer/Eng_Dashboard";
 import EngCreation from "./Pages/Organization/EngCreation";
 import Locations from "./Pages/Organization/Locations";
 import ACCreation from "./Pages/Organization/ACCreation";
-import Trends from "./Second_Person/Forntend/Treands";
+import Trends from "./Second_Person/Forntend/Trends";
 import HierarchySiteCreation from "./Pages/Organization/HierarchySiteCreation";
 
 import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
