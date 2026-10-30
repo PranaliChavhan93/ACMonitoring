@@ -4124,17 +4124,6 @@ const FilterDashboard = ({
     });
   }, [loading, tree, levels, optionsByLevel]);
 
-  // useEffect(() => { const deviceId = selected.device || "";
-  //   onFilterChange?.({
-  //     hierarchy,
-  //     ...selected,
-  //     device: deviceId,
-  //     device_id: deviceId,
-  //     selectedDeviceId: deviceId,
-  //   });
-  // }, [hierarchy, selected, onFilterChange]);
-
-
   useEffect(() => {
     const deviceId = selected.device || "";
     const selectedDevice = (optionsByLevel.device || []).find(
@@ -4151,9 +4140,6 @@ const FilterDashboard = ({
       ac_id: acId,
       selectedAcId: acId,
     };
-
-    console.log("[FilterDashboard] Selected AC:", selected.device);
-    console.log("[FilterDashboard] Sending filters:", nextFilters);
 
     onFilterChange?.(nextFilters);
   }, [hierarchy, selected, optionsByLevel.device, onFilterChange]);
@@ -4208,9 +4194,6 @@ const FilterDashboard = ({
     });
   };
 
-  /*
-   * Reset filters but preserve locked values.
-   */
   const reset = () => {
     setSelected(
       buildSelection(
@@ -4279,62 +4262,6 @@ const FilterDashboard = ({
       )}
 
       {/* Hierarchy Dropdowns */}
-      {/* {levels.map((level, index) => {
-        const locked = lockedValues?.[level.name];
-
-        const parent =
-          index > 0 ? levels[index - 1] : null;
-
-        const isDirectTalukaBranch =
-          hierarchy === "GEOGRAPHICAL" &&
-          level.name === "branch" &&
-          Boolean(selected.taluka);
-
-        const disabled =
-          Boolean(locked) ||
-          (index === 0
-            ? loading
-            : !selected[parent.name] &&
-              !isDirectTalukaBranch);
-
-        const options = locked
-          ? [locked]
-          : optionsByLevel[level.name] || [];
-
-        const placeholder =
-          loading && index === 0
-            ? "Loading..."
-            : `Select ${level.label}`;
-
-        return (
-          <select
-            key={level.name}
-            value={selected[level.name] || ""}
-            disabled={disabled}
-            className="filter-dropdown"
-            title={
-              locked
-                ? `${level.label} is fixed for your account`
-                : ""
-            }
-            onChange={(event) =>
-              changeLevel(
-                level.name,
-                event.target.value
-              )
-            }
-          >
-            <option value="">{placeholder}</option>
-
-            {options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        );
-      })} */}
-
       {levels.map((level, index) => {
         const locked = lockedValues?.[level.name];
         const parent = index > 0 ? levels[index - 1] : null;
@@ -4348,13 +4275,13 @@ const FilterDashboard = ({
             : index > 0 && !selected[parent.name]);
 
         const options = isDevice
-        ? optionsByLevel.device || []
-        : (optionsByLevel[level.name] || []).map((value) => ({
-            value: String(value),
-            label: String(value),
-          }));
+          ? optionsByLevel.device || []
+          : (optionsByLevel[level.name] || []).map((value) => ({
+              value: String(value),
+              label: String(value),
+            }));
 
-      const deviceCount = (optionsByLevel.device || []).length;
+        const deviceCount = (optionsByLevel.device || []).length;
 
         return (
           <select
@@ -4366,14 +4293,21 @@ const FilterDashboard = ({
               changeLevel(level.name, event.target.value)
             }
           >
+            {/* 1. "All" is now the first option and the default */}
             <option value="">
-              {loading
-                ? "Loading..."
-                : isDevice
-                  ? `Available ACs (${deviceCount})`
-                  : `Select ${level.label}`}
+              {loading ? "Loading..." : "All"}
             </option>
 
+            {/* 2. "Select..." is now the second option (disabled) */}
+            {!loading && (
+              <option value="" disabled>
+                {isDevice
+                  ? `Available ACs (${deviceCount})`
+                  : `Select ${level.label}`}
+              </option>
+            )}
+
+            {/* 3. The actual data options */}
             {options.map((option) => (
               <option
                 key={option.value}
@@ -4385,7 +4319,6 @@ const FilterDashboard = ({
           </select>
         );
       })}
-
 
       {/* Reset Button */}
       <button

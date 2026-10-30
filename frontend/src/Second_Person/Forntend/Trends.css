@@ -302,6 +302,56 @@
   color: #64748b;         /* Muted slate color */
 }
 
+
+/* Last telemetry update indicator in the filter toolbar */
+.trends-last-updated {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-left: auto;
+  padding: 8px 12px;
+  /* border: 1px solid #dbeafe; */
+  border-radius: 10px;
+  background: #f8fbff;
+  white-space: nowrap;
+}
+
+.trends-live-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #16a34a;
+  box-shadow: 0 0 0 3px #dcfce7;
+}
+
+.trends-last-updated-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trends-live-label {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.trends-last-updated-text strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .trends-last-updated {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+}
+
+
 @media (max-width: 900px) {
   .trends-chart-grid {
     grid-template-columns: 1fr;
