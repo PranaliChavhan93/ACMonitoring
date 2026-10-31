@@ -1898,7 +1898,7 @@ function Org_Dashboard() {
     return (
         <div className="organization-dashboard">
             <div className="organization-filter-card">
-                                <FilterDashboard
+                <FilterDashboard
                     initialValue={filters}
                     restoreVersion={restoreVersion}
                     allowedHierarchies={filterAccess.allowed}
@@ -1924,7 +1924,7 @@ function Org_Dashboard() {
                             >
                                 <BrainCircuit size={16} /> AI Module
                             </button>
-                            {filters?.branch && 
+                            {/* {filters?.branch && 
                                 <button type="button" onClick={() => { localStorage.setItem("acMonitoringTrendsFilters", JSON.stringify(filters)); 
                                 navigate("/org/dashboard/trends", { state: { filters } }); }} 
                                 title="View branch trends" 
@@ -1932,7 +1932,7 @@ function Org_Dashboard() {
                                 >
                                     <ChartNoAxesCombined size={16} /> Branch Trends
                                 </button>
-                            }
+                            } */}
                             {dashboardMessage &&
                                 <span style={{ fontSize: "12px", color: "#2563eb" }}>
                                     {dashboardMessage}
@@ -1941,16 +1941,6 @@ function Org_Dashboard() {
                         </>
                     }
                 />
-
-                <div className="filter-summary-bar">
-                    {/* <span className="filter-summary-text">{filterSummary}</span> */}
-                    <span className="filter-last-updated">
-                    <span className="last-updated-dot" 
-                        style={{ backgroundColor: isLive ? "#22c55e" : "#9ca3af" }} 
-                    />
-                    {isLive ? ( "LIVE" ) : ( <strong style={{ marginLeft: "6px" }}>Last Updated : {lastTelemetryText}</strong> )}
-                    </span>
-                </div>
             </div>
 
             {error && (
@@ -1972,6 +1962,8 @@ function Org_Dashboard() {
                         filters={filters}
                         cardFilters={cardFilters}
                         visibleWidgets={visibleWidgets}
+                        isLive={isLive}
+                        lastTelemetryText={lastTelemetryText}
                         onCardFilterChange={handleCardFilterChange}
                         onWidgetVisibilityChange={(next) =>
                             setVisibleWidgets(

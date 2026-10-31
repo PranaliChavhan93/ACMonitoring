@@ -1382,11 +1382,12 @@ import EnergyCostCard from "./KPI Cards/EnergyCostCard";
 import AIAssistantPanel from "./AIAssistantPanel";
 import FaultDetectionPanel from "./FaultDetectionPanel"
 
-import "./dashboard.css";
-import "./dashboard-insight.css";
 import CurrentHistoryChart from "./Current/CurrentHistoryChart";
 import VoltageHistoryChart from "./Voltage/VoltageHistoryChart";
 import Inactive_Acs from "./KPI Cards/InactiveAcs";
+
+import "./dashboard.css";
+import "./dashboard-insight.css";
 
 const numberValue = (value) => {
     if (value === null || value === undefined || value === "") {
@@ -1473,6 +1474,8 @@ function ACDashboard({
     cardFilters = {},
     visibleWidgets = {},
     onCardFilterChange,
+    isLive,
+    lastTelemetryText = "--",
 }) {
     const navigate = useNavigate();
     const [showAIModule, setShowAIModule] = useState(false);
@@ -1884,7 +1887,6 @@ function ACDashboard({
 
     return (
         <div className="ac-dashboard">
-            <br />
             {filteredData.length === 0 ? (
                 <div className="dashboard-no-data">
                     <div className="no-data-icon">📊</div>
@@ -1899,8 +1901,6 @@ function ACDashboard({
                     </section>
                 )}
 
-                <br />
-
                 {/* {selectedLevel === "branch" && (
                     <section className="dashboard-section">
                         <FaultDetectionPanel
@@ -1910,15 +1910,48 @@ function ACDashboard({
                     </section>
                 )} */}
 
-                {/* <br /> */}
-
                 <section className="dashboard-section">
                     <div className="section-title dashboard-scope-heading">
-                        <div>
-                            <h2>{isSingleDeviceScope ? "AC Performance" : isFloorScope ? "Floor Overview" : isBranchScope ? "Branch Overview" : selectedLevel === "city" ? "City Overview" : selectedLevel === "country" ? "Organization Overview" : "Regional Overview"}</h2>
-                            <p>{Object.entries(filters || {}).filter(([key, value]) => key !== "hierarchy" && value).map(([, value]) => value).join(" · ") || "All Locations"}</p>
-                        </div>
-                    </div>
+
+    {/* OVERVIEW TITLE */}
+    <div className="overview-heading-content">
+        <h2>
+            {isSingleDeviceScope
+                ? "AC Performance"
+                : isFloorScope
+                    ? "Floor Overview"
+                    : isBranchScope
+                        ? "Branch Overview"
+                        : selectedLevel === "city"
+                            ? "City Overview"
+                            : selectedLevel === "country"
+                                ? "Organization Overview"
+                                : "Regional Overview"}
+        </h2>
+
+        <p>
+            {Object.entries(filters || {})
+                .filter(([key, value]) => key !== "hierarchy" && value)
+                .map(([, value]) => value)
+                .join(" · ") || "All Locations"}
+        </p>
+    </div>
+    {/* LIVE / LAST UPDATED */}
+    <div className="overview-live-status">
+        <span
+            className={`last-updated-dot ${isLive ? "live" : "offline"}`}
+        />
+
+        {isLive ? (
+            <span className="live-text">LIVE</span>
+        ) : (
+            <span className="last-updated-text">
+                Last Updated: <strong>{lastTelemetryText}</strong>
+            </span>
+        )}
+    </div>
+
+</div>
                     <div className="kpi-grid">
                         {showWidget("total_acs") && <Total_Acs value={metrics.totalACs} />}
                         <Active_Acs value={metrics.activeACs} />

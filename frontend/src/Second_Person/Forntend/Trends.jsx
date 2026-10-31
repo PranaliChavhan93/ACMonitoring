@@ -2776,13 +2776,13 @@ export default function Trends() {
     <main className="trends-page">
       <header className="trends-header">
         <div>
-          <button className="trends-back" onClick={() => navigate(-1)}><ArrowLeft size={16} /> Back</button>
+          {/* <button className="trends-back" onClick={() => navigate(-1)}><ArrowLeft size={16} /> Back</button> */}
           <p className="trends-eyebrow"><ChartNoAxesCombined size={16} /> GENAI TREND EXPLORER</p>
-          <h1>AC Device Trends</h1>
-          <p className="trends-subtitle">
+          {/* <h1>AC Device Trends</h1> */}
+          {/* <p className="trends-subtitle">
             {filters.hierarchy || "Hierarchy"} · {filters.state || filters.zone || "All areas"} · {filters.branch}
             {selectedDeviceId ? ` · AC ${selectedDeviceId}` : " · Select an AC to view its individual history"}
-          </p>
+          </p> */}
         </div>
         <button className="trends-secondary" onClick={fetchRows} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh data"}</button>
       </header>
@@ -2796,13 +2796,13 @@ export default function Trends() {
             ))}
           </div>
         </div>
-        <div className="trends-control">
+        {/* <div className="trends-control">
           <label htmlFor="trends-device-select">AC device</label>
           <select id="trends-device-select" value={selectedDeviceId} onChange={(event) => { setSelectedDeviceId(event.target.value); setAnalysis(""); setAnalysisError(""); }} disabled={loading || !deviceOptions.length}>
             <option value="">Select an AC device</option>
             {deviceOptions.map((deviceId) => <option key={deviceId} value={deviceId}>{deviceId}</option>)}
           </select>
-        </div>
+        </div> */}
         
         <div className="trends-control">
           <label>Aggregation</label>
@@ -2815,24 +2815,24 @@ export default function Trends() {
 
         <div className="trends-toolbar-right">
           <RelayControl deviceId={selectedDeviceId} telemetryRelay={telemetryRelay} disabled={loading} />
-        <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span
-            className="trends-live-dot"
-            style={{
-              width: "8px",
-              height: "8px",
-              borderRadius: "50%",
-              backgroundColor: isLive ? "#22c55e" : "#9ca3af",
-            }}
-          />
-          {isLive ? (
-            <span style={{ fontWeight: 600, color: "#22c55e" }}>LIVE</span>
-          ) : (
-            <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
-              Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
-            </strong>
-          )}
-        </div>
+          <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <span
+              className="trends-live-dot"
+              style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                backgroundColor: isLive ? "#22c55e" : "#9ca3af",
+              }}
+            />
+            {isLive ? (
+              <span style={{ fontWeight: 600, color: "#22c55e" }}>LIVE</span>
+            ) : (
+              <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+                Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+              </strong>
+            )}
+          </div>
         </div>
       </section>
 

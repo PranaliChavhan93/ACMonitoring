@@ -1820,14 +1820,11 @@
   position: relative;
   width: 100%;
   cursor: crosshair;
-  /* no text selection while drag-selecting a range */
   -webkit-user-select: none;
   user-select: none;
-  /* keep wheel / pinch gestures inside the chart from chaining to the page */
   overscroll-behavior: contain;
 }
 
-/* vertical swipes still scroll the page on touch screens */
 .chart-zoom-area .recharts-wrapper {
   touch-action: pan-y;
 }
@@ -1880,4 +1877,63 @@
     width: 24px;
     height: 24px;
   }
+}
+
+/* Overview heading and telemetry status */
+.dashboard-scope-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between !important;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.overview-live-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    background: #fff;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.overview-live-status .last-updated-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.overview-live-status .last-updated-dot.live {
+    background: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.12);
+}
+
+.overview-live-status .last-updated-dot.offline {
+    background: #9ca3af;
+}
+
+.overview-live-status .live-text {
+    color: #16a34a;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.overview-live-status .last-updated-text {
+    color: #64748b;
+    font-size: 11px;
+}
+
+.overview-heading-content {
+    min-width: 0;
+}
+
+@media (max-width: 600px) {
+    .dashboard-scope-heading {
+        align-items: flex-start;
+        gap: 8px;
+    }
 }
