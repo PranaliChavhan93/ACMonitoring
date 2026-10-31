@@ -847,6 +847,12 @@ class TelemetryAggregate(models.Model):
     bucket_start = models.DateTimeField(db_index=True)
     interval_seconds = models.PositiveIntegerField(default=60)
     sample_count = models.PositiveIntegerField(default=0)
+    # Per-metric counts keep averages correct when a telemetry packet omits fields.
+    voltage_sample_count = models.PositiveIntegerField(default=0)
+    current_sample_count = models.PositiveIntegerField(default=0)
+    power_sample_count = models.PositiveIntegerField(default=0)
+    temperature_sample_count = models.PositiveIntegerField(default=0)
+    humidity_sample_count = models.PositiveIntegerField(default=0)
     first_timestamp = models.DateTimeField(null=True, blank=True)
     last_timestamp = models.DateTimeField(db_index=True)
 

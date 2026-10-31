@@ -1,4 +1,3 @@
-
 .trends-page {
   padding: 24px;
   max-width: 1600px;
@@ -302,7 +301,6 @@
   color: #64748b;         /* Muted slate color */
 }
 
-
 /* Last telemetry update indicator in the filter toolbar */
 .trends-last-updated {
   display: flex;
@@ -351,7 +349,6 @@
   }
 }
 
-
 @media (max-width: 900px) {
   .trends-chart-grid {
     grid-template-columns: 1fr;
@@ -384,6 +381,7 @@
     height: 245px;
   }
 }
+
 /* AC on/off timeline + current/temperature charts (moved from the dashboard) */
 .trends-device-charts {
   margin-bottom: 18px;
@@ -395,42 +393,200 @@
 }
 
 /* Relay ON/OFF control (toggle switch, sits above "Last Updated") */
-.trends-toolbar-right { 
-  margin-left: auto; 
-  display: flex; 
-  flex-direction: column; 
-  align-items: flex-end; 
-  gap: 10px; 
+.trends-toolbar-right {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
 }
 
-.trends-toolbar-right .trends-last-updated { 
-  margin-left: 0; 
+.trends-toolbar-right .trends-last-updated {
+  margin-left: 0;
 }
-
-.trends-relay { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-.trends-relay-wrap { display: flex; align-items: center; gap: 12px; }
-.trends-relay-label { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #4b5563; }
-.trends-relay-switch { position: relative; width: 56px; height: 28px; border: 0; border-radius: 999px; background: #9ca3af; cursor: pointer; padding: 0; transition: background .2s; flex: none; }
-.trends-relay-switch.on { background: #22c55e; }
-.trends-relay-switch.busy { opacity: .7; }
-.trends-relay-switch:disabled { opacity: .5; cursor: not-allowed; }
-.trends-relay-knob { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .2s; }
-.trends-relay-switch.on .trends-relay-knob { transform: translateX(28px); }
-.trends-relay-hint { font-size: 12px; font-weight: 600; color: #6b7280; min-width: 52px; }
-.trends-relay-msg { font-size: 12px; max-width: 320px; text-align: right; }
-.trends-relay-msg.ok { color: #166534; }
-.trends-relay-msg.error { color: #b91c1c; }
+.trends-relay {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.trends-relay-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.trends-relay-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #4b5563;
+}
+.trends-relay-switch {
+  position: relative;
+  width: 56px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: #9ca3af;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+  flex: none;
+}
+.trends-relay-switch.on {
+  background: #22c55e;
+}
+.trends-relay-switch.busy {
+  opacity: 0.7;
+}
+.trends-relay-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.trends-relay-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+.trends-relay-switch.on .trends-relay-knob {
+  transform: translateX(28px);
+}
+.trends-relay-hint {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  min-width: 52px;
+}
+.trends-relay-msg {
+  font-size: 12px;
+  max-width: 320px;
+  text-align: right;
+}
+.trends-relay-msg.ok {
+  color: #166534;
+}
+.trends-relay-msg.error {
+  color: #b91c1c;
+}
 @media (max-width: 768px) {
-  .trends-toolbar-right { margin-left: 0; width: 100%; align-items: flex-start; }
-  .trends-relay { align-items: flex-start; }
+  .trends-toolbar-right {
+    margin-left: 0;
+    width: 100%;
+    align-items: flex-start;
+  }
+  .trends-relay {
+    align-items: flex-start;
+  }
 }
 
-/* KPI cards that carry their own graph, laid out in a single row */
-.trends-kpi-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); align-items: stretch; }
-.trends-kpi-card { gap: 10px; padding: 14px 16px; }
-.trends-kpi-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-.trends-kpi-values { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
-.trends-kpi-head .chart-zoom-toolbar { flex: none; transform: scale(.85); transform-origin: top right; }
-.trends-kpi-chart { height: 190px; }
-.trends-kpi-foot { color: #94a3b8; font-size: 11px; }
-@media (max-width: 560px) { .trends-kpi-grid { grid-template-columns: 1fr; } }
+/* KPI cards: values on the left, a compact graph on the right, cards in one row */
+.trends-kpi-grid {
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  align-items: stretch;
+}
+.trends-kpi-card {
+  flex-direction: row;
+  gap: 12px;
+  padding: 14px;
+  align-items: stretch;
+}
+.trends-kpi-values {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* vertically centred in the card */
+  align-items: center;       /* horizontally centred */
+  text-align: center;
+  gap: 6px;
+  flex: 0 0 110px;
+  min-width: 0;
+}
+.trends-kpi-values strong {
+  font-size: 22px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.trends-kpi-graph {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.trends-kpi-tools {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+}
+.trends-kpi-tools .chart-zoom-toolbar {
+  transform: scale(0.75);
+  transform-origin: right center;
+  margin: 0 -14px 0 0;
+}
+.trends-kpi-tools .chart-expand-btn {
+  padding: 4px 7px;
+}
+.trends-kpi-chart {
+  height: 140px;
+}
+.trends-kpi-foot {
+  color: #94a3b8;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.trends-kpi-expanded {
+  overflow: auto;
+}
+/* Expanded: hide the KPI info and give the whole card to the graph */
+.trends-kpi-expanded .trends-kpi-values {
+  display: none;
+}
+.trends-kpi-expanded .trends-kpi-graph {
+  width: 100%;
+  justify-content: flex-start;
+}
+.trends-kpi-expanded .trends-kpi-chart {
+  height: calc(100vh - 140px);
+}
+.trends-kpi-expanded .trends-kpi-tools .chart-zoom-toolbar {
+  transform: none;
+  margin: 0;
+}
+.trends-kpi-expanded .trends-kpi-tools .chart-expand-btn {
+  padding: 7px 12px;
+}
+
+/* Small tooltips on the KPI graphs */
+.trends-kpi-card .recharts-default-tooltip {
+  padding: 3px 7px !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  border-radius: 6px !important;
+}
+.trends-kpi-card .recharts-tooltip-label,
+.trends-kpi-card .recharts-tooltip-item {
+  font-size: 11px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+@media (max-width: 560px) {
+  .trends-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .trends-kpi-card {
+    flex-direction: column;
+  }
+  .trends-kpi-values {
+    flex-basis: auto;
+  }
+}
