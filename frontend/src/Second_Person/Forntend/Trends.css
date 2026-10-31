@@ -590,3 +590,22 @@
     flex-basis: auto;
   }
 }
+
+.trends-embedded {
+    margin-top: 20px;
+    width: 100%;
+    min-height: auto;
+    padding: 20px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.trends-embedded .trends-header {
+    margin-top: 0;
+}
+
+.organization-trends-section {
+    width: 100%;
+    margin-bottom: 20px;
+}

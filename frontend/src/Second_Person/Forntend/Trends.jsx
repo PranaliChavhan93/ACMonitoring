@@ -2531,10 +2531,17 @@ function RelayControl({ deviceId, telemetryRelay, disabled }) {
   );
 }
 
-export default function Trends() {
+// export default function Trends() {
+export default function Trends({
+  embedded = false,
+  dashboardFilters = null,
+}) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [filters, setFilters] = useState(() => location.state?.filters || readSavedFilters());
+  // const [filters, setFilters] = useState(() => location.state?.filters || readSavedFilters());
+  const [filters, setFilters] = useState(
+    () => dashboardFilters || location.state?.filters || readSavedFilters()
+  );
   const [rows, setRows] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [loading, setLoading] = useState(false);
@@ -2546,10 +2553,31 @@ export default function Trends() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState("");
 
+  // useEffect(() => {
+  //   const nextFilters = location.state?.filters || readSavedFilters();
+  //   if (nextFilters) setFilters(nextFilters);
+  // }, [location.state]);
+
   useEffect(() => {
-    const nextFilters = location.state?.filters || readSavedFilters();
-    if (nextFilters) setFilters(nextFilters);
-  }, [location.state]);
+    const nextFilters =
+        dashboardFilters ||
+        location.state?.filters ||
+        readSavedFilters();
+
+    if (nextFilters) {
+        setFilters(nextFilters);
+
+        const deviceId = String(
+            nextFilters.selectedDeviceId ||
+            nextFilters.device_id ||
+            nextFilters.device ||
+            nextFilters.ac_id ||
+            ""
+        ).trim();
+
+        setSelectedDeviceId(deviceId);
+    }
+  }, [dashboardFilters, location.state]);
 
   const branchSelected = Boolean(String(filters?.branch || "").trim());
 
@@ -2761,7 +2789,8 @@ export default function Trends() {
 
   if (!branchSelected) {
     return (
-      <main className="trends-page">
+      // <main className="trends-page">
+      <main className={`trends-page ${embedded ? "trends-embedded" : ""}`}>
         <section className="trends-empty">
           <AlertCircle size={42} />
           <h1>Choose a branch first</h1>
