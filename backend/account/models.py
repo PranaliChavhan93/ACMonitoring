@@ -677,6 +677,12 @@ class ACDevice(models.Model):
     device_name = models.CharField(max_length=255, blank=True)
     # New direct hierarchy relationship. Keep nullable during migration so
     # existing devices can be backfilled from their legacy Site.branch.
+    
+    is_simulated = models.BooleanField(
+        default=False,
+        db_index=True
+    )
+
     branch = models.ForeignKey(
         "Branch",
         on_delete=models.SET_NULL,

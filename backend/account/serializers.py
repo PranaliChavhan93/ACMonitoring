@@ -929,11 +929,13 @@ class ACDeviceSerializer(serializers.ModelSerializer):
             "customer_id", "customer_name", "assignment_status",
             "status", "capacity_ton", "installation_date", "last_maintenance_date", "assigned_by", "assigned_admin",
             "tpt_device_id", "tpt_sync_status", "tpt_sync_error", "created_at", "updated_at",
+            "is_simulated",
         ]
         read_only_fields = [
             "id", "branch_id", "branch_name", "customer_id", "customer_name",
             "assignment_status", "assigned_by", "assigned_admin", "tpt_device_id",
             "tpt_sync_status", "tpt_sync_error", "created_at", "updated_at",
+            "is_simulated",
         ]
 
     def get_assignment_status(self, obj):

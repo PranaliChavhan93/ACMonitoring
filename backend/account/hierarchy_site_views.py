@@ -1,4 +1,3 @@
-
 import uuid
 from decimal import Decimal, InvalidOperation
 
@@ -552,45 +551,13 @@ def create_hierarchy_branch(request):
         # Import at runtime to avoid a module import cycle (views imports shared models).
         cloud_error = ""
         try:
-            from .views import _tpt_enabled, _tpt_request, _tpt_extract_id, sync_customer
+            from .views import _tpt_enabled, ensure_branch_asset
 
             if _tpt_enabled():
-                if not getattr(customer, "tpt_customer_id", ""):
-                    sync_customer(customer)
-                    customer.refresh_from_db()
-                if not getattr(customer, "tpt_customer_id", ""):
-                    raise RuntimeError("Customer has no 3TP customer ID; could not link branch asset.")
-
-                # Existing Site creation used /api/asset. Reuse the same 3TP asset API,
-                # but name the asset for this Branch and do not create a Site record.
-                _, asset_data = _tpt_request(
-                    "POST", "site", payload={"name": branch.name, "type": "default"}
-                )
-                asset_id = _tpt_extract_id(asset_data)
-                if not asset_id:
-                    raise RuntimeError("3TP did not return an asset ID for the branch.")
-
-                # Persist the returned ID immediately so a customer-link failure can
-                # be retried without creating a duplicate ASSET.
-                branch.tpt_asset_id = asset_id
-                branch.tpt_sync_status = "PENDING"
-                branch.tpt_sync_error = ""
-                branch.save(update_fields=["tpt_asset_id", "tpt_sync_status", "tpt_sync_error"])
-
-                # Link the branch asset to the 3TP customer using the same endpoint
-                # previously used by Site creation.
-                _tpt_request(
-                    "POST",
-                    f"/api/customer/{customer.tpt_customer_id}/asset/{asset_id}",
-                )
-                branch.tpt_sync_status = "SYNCED"
-                branch.tpt_sync_error = ""
-                branch.save(update_fields=["tpt_sync_status", "tpt_sync_error"])
+                ensure_branch_asset(branch)
         except Exception as exc:
             cloud_error = str(exc)[:1000]
-            branch.tpt_sync_status = "FAILED"
-            branch.tpt_sync_error = cloud_error
-            branch.save(update_fields=["tpt_sync_status", "tpt_sync_error"])
+            branch.refresh_from_db()
 
         sync_branch_to_tree(branch)
         is_cloud_synced = bool(branch.tpt_asset_id and branch.tpt_sync_status == "SYNCED")

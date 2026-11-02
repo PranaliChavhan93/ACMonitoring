@@ -46,7 +46,7 @@ from .views import (
     pincode_lookup,
     reports, 
     search_site_branches,
-    settings, 
+    settings_view, 
     site_assignment, 
     ac_data, 
     branch_assignments,
@@ -112,7 +112,7 @@ urlpatterns = [
     path("org/dashboard/trends/", treands),
 
     path("org/analytics/", analytics),
-    path("org/settings/", settings),
+    path("org/settings/", settings_view),
     path("org/reports/", reports),
     
     path("countries/", CountryListAPIView.as_view()),

@@ -4284,9 +4284,7 @@
                             {
                                 "taluka_id": "AR-D01-T01",
                                 "taluka_name": "Itanagar Taluka",
-                                "cities": [
-                                    
-                                ]
+                                "cities": []
                             },
                             {
                                 "taluka_id": "AR-D01-T02",
@@ -30347,7 +30345,93 @@
                             {
                                 "taluka_id": "MH-D01-T12",
                                 "taluka_name": "Pune City",
-                                "cities": []
+                                "cities": [],
+                                "branches": [
+                                    {
+                                        "branch_id": "KD-01",
+                                        "branch_name": "Kothrud",
+                                        "address": "Plot No 58, 59, Mayur Colony, Kothrud, Pune",
+                                        "pincode": "411029",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D01",
+                                        "district_name": "Pune",
+                                        "taluka_id": "MH-D01-T12",
+                                        "taluka_name": "Pune City",
+                                        "customer_id": 12,
+                                        "admin_ids": [],
+                                        "engineer_ids": [],
+                                        "devices": [
+                                            {
+                                                "ac_id": "TEST-AC-02",
+                                                "device_name": "TEST-AC-02",
+                                                "name": "TEST-AC-02",
+                                                "label": "TEST-AC-02",
+                                                "tpt_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "thingsboard_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "local_device_id": "23ad582d-d1f5-4dbb-9603-72ee7dfd546f",
+                                                "branch_id": "KD-01",
+                                                "db_branch_id": "ad28e867-87c6-4cdf-a3fd-23430ec2ac8d",
+                                                "customer_id": "12",
+                                                "customer_name": "ICICI",
+                                                "status": "ON"
+                                            },
+                                            {
+                                                "ac_id": "TEST-AC-02",
+                                                "device_name": "TEST-AC-02",
+                                                "name": "TEST-AC-02",
+                                                "label": "TEST-AC-02",
+                                                "tpt_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "thingsboard_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "local_device_id": "23ad582d-d1f5-4dbb-9603-72ee7dfd546f",
+                                                "branch_id": "KD-01",
+                                                "db_branch_id": "ad28e867-87c6-4cdf-a3fd-23430ec2ac8d",
+                                                "customer_id": "12",
+                                                "customer_name": "ICICI",
+                                                "status": "ON"
+                                            },
+                                            {
+                                                "ac_id": "TEST-AC-02",
+                                                "device_name": "TEST-AC-02",
+                                                "name": "TEST-AC-02",
+                                                "label": "TEST-AC-02",
+                                                "tpt_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "thingsboard_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "local_device_id": "23ad582d-d1f5-4dbb-9603-72ee7dfd546f",
+                                                "branch_id": "KD-01",
+                                                "db_branch_id": "ad28e867-87c6-4cdf-a3fd-23430ec2ac8d",
+                                                "customer_id": "12",
+                                                "customer_name": "ICICI",
+                                                "status": "ON"
+                                            },
+                                            {
+                                                "ac_id": "TEST-AC-01",
+                                                "device_name": "TEST-AC-01",
+                                                "name": "TEST-AC-01",
+                                                "label": "TEST-AC-01",
+                                                "tpt_device_id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "thingsboard_device_id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "device_id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "local_device_id": "2fed1e6b-7916-404f-9d6a-a71d255b03df",
+                                                "branch_id": "KD-01",
+                                                "db_branch_id": "ad28e867-87c6-4cdf-a3fd-23430ec2ac8d",
+                                                "customer_id": "12",
+                                                "customer_name": "ICICI",
+                                                "status": "ON"
+                                            }
+                                        ]
+                                    }
+                                ]
                             },
                             {
                                 "taluka_id": "MH-D01-T13",
@@ -33052,6 +33136,60 @@
                                         "city_id": "MH-D22-T06-C01",
                                         "city_name": "Talode",
                                         "branches": []
+                                    }
+                                ],
+                                "branches": [
+                                    {
+                                        "branch_id": "TL-01",
+                                        "branch_name": "Taloda",
+                                        "address": "Ground Floor, BCM Fitness Club Building, Babanrao Pehlwan Nagar, Taloda",
+                                        "pincode": "425413",
+                                        "floors": [],
+                                        "sites": [],
+                                        "hierarchy_type": "GEOGRAPHICAL",
+                                        "state_id": "MH",
+                                        "state_name": "Maharashtra",
+                                        "district_id": "MH-D22",
+                                        "district_name": "Nandurbar",
+                                        "taluka_id": "MH-D22-T06",
+                                        "taluka_name": "Talode",
+                                        "customer_id": 12,
+                                        "admin_ids": [],
+                                        "engineer_ids": [],
+                                        "devices": [
+                                            {
+                                                "ac_id": "TEST-AC-01",
+                                                "device_name": "TEST-AC-01",
+                                                "name": "TEST-AC-01",
+                                                "label": "TEST-AC-01",
+                                                "tpt_device_id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "thingsboard_device_id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "device_id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "id": "1f4d0d40-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "local_device_id": "2fed1e6b-7916-404f-9d6a-a71d255b03df",
+                                                "branch_id": "TL-01",
+                                                "db_branch_id": "079eafa8-659b-4676-acd0-e434db52b461",
+                                                "customer_id": "12",
+                                                "customer_name": "ICICI",
+                                                "status": "ON"
+                                            },
+                                            {
+                                                "ac_id": "TEST-AC-02",
+                                                "device_name": "TEST-AC-02",
+                                                "name": "TEST-AC-02",
+                                                "label": "TEST-AC-02",
+                                                "tpt_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "thingsboard_device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "device_id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "id": "937e3ae0-d6a4-11f1-b0fa-0d1a0230425c",
+                                                "local_device_id": "23ad582d-d1f5-4dbb-9603-72ee7dfd546f",
+                                                "branch_id": "TL-01",
+                                                "db_branch_id": "079eafa8-659b-4676-acd0-e434db52b461",
+                                                "customer_id": "12",
+                                                "customer_name": "ICICI",
+                                                "status": "ON"
+                                            }
+                                        ]
                                     }
                                 ]
                             }
