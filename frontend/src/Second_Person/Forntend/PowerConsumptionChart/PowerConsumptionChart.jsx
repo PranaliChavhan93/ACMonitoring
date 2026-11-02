@@ -13,77 +13,52 @@ import {
 } from "recharts";
 import { IndexZoomFrame } from "../shared/chartZoom";
 
-
 function PowerConsumptionChart({ data = [] }) {
-
     const chartData = useMemo(() => {
-
         return data.map((item, index) => {
-
             const voltage = Number(
                 item.voltage ??
                 item.Voltage ??
                 0
             );
-
             const current = Number(
                 item.current ??
                 item.Current ??
                 0
             );
-
-
             const directPower =
                 item.active_power ??
                 item.Active_Power ??
                 item.power ??
                 item.Power;
-
-
             const power =
                 directPower !== undefined &&
                 directPower !== null
                     ? Number(directPower)
                     : voltage * current;
-
-
             return {
-
                 name:
                     item.ac_id ??
                     item.unit_name ??
                     `AC ${index + 1}`,
-
                 power:
                     Number(power.toFixed(2)),
-
             };
-
         });
-
     }, [data]);
 
-
     return (
-
         <div className="chart-box">
-
             <div className="chart-header">
-
                 <div>
-
                     <h3>
                         ⚡ AC Power Consumption
                     </h3>
-
                     <span>
                         Current active power
                     </span>
-
                 </div>
-
             </div>
-
 
             <IndexZoomFrame data={chartData}>
             {(visible, { chartProps, selection }) => (
@@ -91,7 +66,6 @@ function PowerConsumptionChart({ data = [] }) {
                 width="100%"
                 height={280}
             >
-
                 <BarChart
                     data={visible}
                     {...chartProps}
@@ -102,28 +76,22 @@ function PowerConsumptionChart({ data = [] }) {
                         bottom: 5,
                     }}
                 >
-
                     <CartesianGrid
                         strokeDasharray="3 3"
                     />
-
                     <XAxis
                         dataKey="name"
                         tick={{ fontSize: 11 }}
                     />
-
                     <YAxis 
                         tick={{ fontSize: 11 }}
                     />
-
                     <Tooltip
                         formatter={(value) => [
                             `${Number(value).toFixed(2)} W`,
                             "Active Power",
                         ]}
                     />
-
-
                     {selection && (
                         <ReferenceArea
                             x1={selection.x1}
@@ -134,24 +102,18 @@ function PowerConsumptionChart({ data = [] }) {
                             strokeOpacity={0.35}
                         />
                     )}
-
                     <Bar
                         dataKey="power"
                         name="Active Power"
                         fill="#3182BD"
                         radius={[5, 5, 0, 0]}
                     />
-
                 </BarChart>
-
             </ResponsiveContainer>
             )}
             </IndexZoomFrame>
-
         </div>
-
     );
 }
-
 
 export default PowerConsumptionChart;

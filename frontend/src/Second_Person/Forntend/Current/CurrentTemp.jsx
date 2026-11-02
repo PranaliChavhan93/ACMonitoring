@@ -1293,7 +1293,7 @@ function CurrentTemperatureChart({ deviceId = "", scope = {}, height = 320 }) {
         <ResponsiveContainer width="100%" height={chartHeight}>
           <LineChart
             data={chartData}
-            margin={{ top: 10, right: 70, left: 10, bottom: 5 }}
+            margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
             onMouseDown={onDown}
             onMouseMove={onMove}
             onMouseUp={onUp}

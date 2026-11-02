@@ -1,5 +1,5 @@
 // import React, { useEffect, useMemo, useState } from "react";
-// import "./ACPowerStateChart.css";
+// import "./ACOnOff.css";
 
 // // ON / OFF detection based strictly on Active Energy
 // const rowIsOn = (row) => {
@@ -36,7 +36,7 @@
 //     return m === 0 ? `${h}h` : `${h}h ${m}m`;
 // };
 
-// const ACPowerStateChart = ({
+// const ACOnOff = ({
 //     data = [],
 //     deviceId = "",
 //     scope = {},
@@ -83,7 +83,7 @@
 //                 setStatus("loaded");
 //             } catch (e) {
 //                 if (e.name === "AbortError") return;
-//                 console.error("[ACPowerStateChart] load failed:", e);
+//                 console.error("[ACOnOff] load failed:", e);
 //                 setHistory([]);
 //                 setStatus("error");
 //             }
@@ -233,11 +233,11 @@
 //     );
 // };
 
-// export default ACPowerStateChart;
+// export default ACOnOff;
 
 import React, { useEffect, useMemo, useState } from "react";
 import { ZoomToolbar, useTimeZoom } from "../shared/chartZoom";
-import "./ACPowerStateChart.css";
+import "./ACOnOff.css";
 
 // Same endpoint CurrentHistoryChart already uses.
 const CURRENT_HISTORY_URL = "http://localhost:8000/api/current-history/";
@@ -257,7 +257,7 @@ const formatDuration = (ms) => {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 };
 
-const ACPowerStateChart = ({
+const ACOnOff = ({
   deviceId = "",
   scope = {},
   endpoint = CURRENT_HISTORY_URL,
@@ -342,7 +342,7 @@ const ACPowerStateChart = ({
 
         // TEMP diagnostic — remove once the chart is populated.
         console.log(
-          "[ACPowerStateChart] buckets:",
+          "[ACOnOff] buckets:",
           data.length,
           "first:",
           data[0]
@@ -355,7 +355,7 @@ const ACPowerStateChart = ({
         }
       } catch (e) {
         if (e.name === "AbortError" || cancelled) return;
-        console.error("[ACPowerStateChart] load failed:", e);
+        console.error("[ACOnOff] load failed:", e);
         setRows([]);
         setStatus("error");
         setError(e.message || "Failed to load runtime data.");
@@ -590,4 +590,4 @@ const ACPowerStateChart = ({
   );
 };
 
-export default ACPowerStateChart;
+export default ACOnOff;

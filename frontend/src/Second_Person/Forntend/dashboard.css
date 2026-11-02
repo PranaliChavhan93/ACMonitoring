@@ -1767,13 +1767,14 @@
 }
 
 .chart-expand-btn {
-  padding: 7px 12px;
+  padding: 2px 4px;
   border: 1px solid #cbd5e1;
+  /* border: none; */
   border-radius: 6px;
   background: #ffffff;
   color: #334155;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -1937,3 +1938,6 @@
         gap: 8px;
     }
 }
+/* Zone energy, top-five branches and map dashboard layout */
+.top-energy-branches { min-width: 0; }
+.dashboard-grid--primary > .chart-box { min-width: 0; }

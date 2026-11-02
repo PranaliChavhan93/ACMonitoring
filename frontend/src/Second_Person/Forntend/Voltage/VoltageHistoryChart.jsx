@@ -4,7 +4,7 @@ import MetricHistoryChart from "../shared/MetricHistoryChart";
 // Voltage history, read from the backend database (telemetry_aggregate).
 const CONFIG = {
   metric: "voltage",
-  title: "⚡ Voltage History",
+  title: "🔋 Voltage History",
   subtitleDevice: "Voltage supplied to the selected AC",
   subtitleScope: "Average voltage per AC in the selected scope",
   seriesName: "Voltage",
