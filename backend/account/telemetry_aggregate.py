@@ -190,7 +190,8 @@ def ingest_payload(payload):
 def _record_from_row(row, device_name=None):
     age = (timezone.now() - row.last_timestamp).total_seconds() if row.last_timestamp else 10**9
     relay = int(row.latest_relay or 0)
-    status = "OFFLINE" if age > int(getattr(settings, "TELEMETRY_STALE_SECONDS", 120)) else ("ON" if relay else "OFF")
+    stale_seconds = int(getattr(settings, "TELEMETRY_OFFLINE_AFTER_SECONDS", getattr(settings, "TELEMETRY_STALE_SECONDS", 7)))
+    status = "OFFLINE" if age >= stale_seconds else "ONLINE"
     device_name = device_name or row.device_id
     
     return {
@@ -208,8 +209,9 @@ def _record_from_row(row, device_name=None):
         "temperature": row.latest_temperature or 0,
         "humidity": row.latest_humidity or 0, 
         "alarm_status": row.latest_alarm_status or 0,
-        "relay": relay, 
-        "status": status, 
+        "relay": relay,
+        "status": status,
+        "device_status": status,
         "timestamp": row.last_timestamp.isoformat(timespec="seconds") if row.last_timestamp else None,
         "source": "local_aggregate", 
         "sample_count": row.sample_count,
@@ -230,7 +232,7 @@ def get_latest_records():
     Historical aggregate rows are used as a compatibility fallback for older
     devices that predate the latest_telemetry table.
     """
-    stale_seconds = int(getattr(settings, "TELEMETRY_STALE_SECONDS", 120))
+    stale_seconds = int(getattr(settings, "TELEMETRY_OFFLINE_AFTER_SECONDS", getattr(settings, "TELEMETRY_STALE_SECONDS", 7)))
     latest_rows = list(LatestTelemetry.objects.select_related("device").all().order_by("device__ac_id"))
     records = []
     seen = set()
@@ -239,7 +241,7 @@ def get_latest_records():
         seen.add(device_id)
         age = (timezone.now() - row.device_timestamp).total_seconds()
         relay = int(row.relay or 0)
-        status = "OFFLINE" if age > stale_seconds else ("ON" if relay else "OFF")
+        status = "OFFLINE" if age >= stale_seconds else "ONLINE"
         records.append({
             "ac_id": device_id, "site_id": device_id,
             "device_name": row.device.device_name or device_id,
@@ -249,7 +251,8 @@ def get_latest_records():
             "frequency": row.frequency or 0, "power_factor": row.power_factor or 0,
             "ac_on_time": None, "ac_off_time": None,
             "temperature": row.temperature or 0, "humidity": row.humidity or 0,
-            "alarm_status": row.alarm_status or 0, "relay": relay, "status": status,
+            "alarm_status": row.alarm_status or 0, "relay": relay,
+            "status": status, "device_status": status,
             "timestamp": row.device_timestamp.isoformat(timespec="seconds"),
             "source": "local_latest", "sample_count": 1,
             "energy_delta": 0.0,

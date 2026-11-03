@@ -23,13 +23,18 @@ CACHE_SEC = float(os.environ.get("TPT_CACHE_SEC", "2"))
 # LOOKBACK_SEC = int(os.environ.get("TPT_LOOKBACK_SEC", "86400"))
 
 LOOKBACK_SEC = int( os.environ.get("TPT_LOOKBACK_SEC", str(7 * 24 * 60 * 60)) )
-OFFLINE_ERROR_AFTER = 7 * 24 * 60 * 60
-STALE_SEC = int(os.environ.get("TPT_STALE_SEC", "120"))
 TIMEOUT = float(os.environ.get("TPT_TIMEOUT", "8"))
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-STALE_SEC = 60
+# Use the shared expected interval + grace threshold from Django settings.
+STALE_SEC = int(
+    getattr(
+        settings,
+        "TELEMETRY_OFFLINE_AFTER_SECONDS",
+        getattr(settings, "TELEMETRY_STALE_SECONDS", 7),
+    )
+)
 
 # --- history back-fill -------------------------------------------------------
 # While the Django process is stopped nobody polls 3TP, so the minutes in
@@ -237,20 +242,17 @@ def _status(record_ts, relay):
 
 
 def to_record(device, ts_ms, p):
-    """Convert 3TP telemetry and force relay OFF when telemetry is stale."""
+    """Build a snapshot; connectivity and relay state are independent."""
     ts = datetime.fromtimestamp(ts_ms / 1000, IST)
     ac_id = device["ac_id"]
 
-    # The timestamp is the time of the latest reading reported by 3TP.
-    age_seconds = time.time() - ts.timestamp()
+    # Use the device-reported timestamp, not the server fetch time.
+    age_seconds = max(0, time.time() - ts.timestamp())
     is_stale = age_seconds >= STALE_SEC
 
-    # Preserve the actual relay value while telemetry is fresh.
-    actual_relay = int(_num(p.get("relay"), 0))
-
-    # Treat a device as OFF after 60 seconds without fresh telemetry.
-    relay = 0 if is_stale else actual_relay
-    status = "OFFLINE" if is_stale else ("ON" if relay == 1 else "OFF")
+    # Preserve the last reported relay state even when telemetry is stale.
+    relay = int(_num(p.get("relay"), 0))
+    status = "OFFLINE" if is_stale else "ONLINE"
 
     return {
         "ac_id": ac_id,
@@ -269,6 +271,7 @@ def to_record(device, ts_ms, p):
         "alarm_status": int(_num(p.get("alarm_status"), 0)),
         "relay": relay,
         "status": status,
+        "device_status": status,
         "timestamp": ts.isoformat(timespec="seconds"),
         "source": "3tp",
     }
@@ -326,14 +329,8 @@ def _get_saved_record(device):
 
         record["last_seen"] = record["timestamp"]
 
-        if age_seconds > OFFLINE_ERROR_AFTER:
-            record["status"] = "ERROR"
-            record["message"] = (
-                "Device has been offline for more than 7 days."
-            )
-        else:
-            record["status"] = "OFFLINE"
-
+        record["status"] = "OFFLINE"
+        record["device_status"] = "OFFLINE"
         record["offline_duration_seconds"] = int(age_seconds)
 
         return record
@@ -638,24 +635,22 @@ def get_records():
                 age_seconds = None
 
             if age_seconds is None:
-                r["status"] = "UNKNOWN"
-                r["message"] = "Last telemetry timestamp is unavailable."
-
-            elif age_seconds > OFFLINE_ERROR_AFTER:
-                r["status"] = "ERROR"
-                r["message"] = (
-                    "Device has been offline for more than 7 days."
-                )
-                r["last_seen"] = r.get("timestamp")
-                r["offline_duration_seconds"] = int(age_seconds)
-
-            elif age_seconds >= STALE_SEC:
-                # Preserve the last telemetry values.
-                # Do not overwrite voltage, current, energy, etc.
+                # No timestamp means a live connection cannot be confirmed.
                 r["status"] = "OFFLINE"
+                r["device_status"] = "OFFLINE"
+                r["message"] = "No telemetry timestamp is available."
                 r["last_seen"] = r.get("timestamp")
-                r["offline_duration_seconds"] = int(age_seconds)
+            else:
+                is_offline = age_seconds >= STALE_SEC
+                device_status = "OFFLINE" if is_offline else "ONLINE"
+                r["status"] = device_status
+                r["device_status"] = device_status
+                r["last_seen"] = r.get("timestamp")
+                if is_offline:
+                    r["offline_duration_seconds"] = int(age_seconds)
 
+            # Keep the last voltage/current/power/energy/relay values for display.
+            # Connectivity status must never overwrite the physical relay state.
             out.append(r)
 
         if not out:

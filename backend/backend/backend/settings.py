@@ -11,6 +11,18 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
 from pathlib import Path
+import os
+
+from dotenv import load_dotenv
+
+# from dotenv import load_dotenv
+
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from backend/.env
+load_dotenv(BASE_DIR / ".env")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,6 +41,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "192.168.1.9",
+    "192.168.1.11",
 ]
 
 # ALLOWED_HOSTS = ["*"]
@@ -46,9 +59,22 @@ INSTALLED_APPS = [
 
     'corsheaders',
     'rest_framework',
+    'rest_framework.authtoken',
 
     'account',
+    # "account.apps.AccountConfig",
 ]
+
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "account.authentication.ThreeTPAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+}
+
+AUTH_USER_MODEL = "account.User"
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -62,6 +88,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# DEFAULT_AUTHENTICATION_CLASSES 
 
 ROOT_URLCONF = 'backend.urls'
 
@@ -131,3 +159,85 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+# 3TP integration
+
+
+TPT_BASE_URL = os.getenv(
+    "TPT_BASE_URL",
+    "https://3tp.tapasyatech.in",
+).rstrip("/")
+
+TPT_USERNAME = os.getenv(
+    "TPT_USERNAME",
+    "",
+)
+
+TPT_PASSWORD = os.getenv(
+    "TPT_PASSWORD",
+    "",
+)
+
+TPT_TIMEOUT = float(
+    os.getenv(
+        "TPT_TIMEOUT",
+        "10",
+    )
+)
+
+TPT_SYNC_ENABLED = os.getenv(
+    "TPT_SYNC_ENABLED",
+    "true",
+).lower() in ("true", "1", "yes")
+
+TPT_ADMIN_AUTHORITY = os.getenv(
+    "TPT_ADMIN_AUTHORITY",
+    "TENANT_ADMIN",
+)
+
+TPT_OPERATOR_AUTHORITY = os.getenv(
+    "TPT_OPERATOR_AUTHORITY",
+    "CUSTOMER_USER",
+)
+
+TPT_SITE_ASSET_TYPE = os.getenv(
+    "TPT_SITE_ASSET_TYPE",
+    "SITE",
+)
+
+TPT_DEVICE_TYPE = os.getenv(
+    "TPT_DEVICE_TYPE",
+    "AC",
+)
+
+
+# Path of the 3TP login endpoint (no trailing slash for ThingsBoard-style servers)
+TPT_LOGIN_PATH = os.getenv(
+    "TPT_LOGIN_PATH",
+    "/api/auth/login",
+)
+
+
+# Telemetry aggregate storage. Keep "polling" until the push endpoint is tested.
+TELEMETRY_STORAGE_MODE = os.environ.get("TELEMETRY_STORAGE_MODE", "polling")
+TELEMETRY_INGEST_TOKEN = os.environ.get("TELEMETRY_INGEST_TOKEN", "")
+TELEMETRY_INGEST_MAX_BATCH = int(os.environ.get("TELEMETRY_INGEST_MAX_BATCH", "500"))
+# ONLINE timeout = expected device publish interval + grace period.
+# The project simulator currently publishes every 2 seconds.
+TELEMETRY_EXPECTED_INTERVAL_SECONDS = int(
+    os.environ.get("TELEMETRY_EXPECTED_INTERVAL_SECONDS", "2")
+)
+TELEMETRY_GRACE_SECONDS = int(
+    os.environ.get("TELEMETRY_GRACE_SECONDS", "5")
+)
+# Keep support for an explicit legacy timeout override.
+TELEMETRY_STALE_SECONDS = int(
+    os.environ.get(
+        "TELEMETRY_STALE_SECONDS",
+        os.environ.get(
+            "TPT_STALE_SEC",
+            str(TELEMETRY_EXPECTED_INTERVAL_SECONDS + TELEMETRY_GRACE_SECONDS),
+        ),
+    )
+)
+TELEMETRY_OFFLINE_AFTER_SECONDS = TELEMETRY_STALE_SECONDS

@@ -392,17 +392,61 @@
   }
 }
 
+/* Device connectivity status shown beside the relay controller. */
+.trends-device-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.trends-device-status-label {
+  color: #6b7280;
+  font-size: 12px;
+  font-weight: 700;
+}
+.trends-device-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.trends-device-status-pill.online {
+  color: #166534;
+  background: #dcfce7;
+}
+.trends-device-status-pill.offline {
+  color: #991b1b;
+  background: #fee2e2;
+}
+.trends-device-status-pill.unknown {
+  color: #92400e;
+  background: #fef3c7;
+}
+.trends-device-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
 /* Relay ON/OFF control (toggle switch, sits above "Last Updated") */
 .trends-toolbar-right {
   margin-left: auto;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .trends-toolbar-right .trends-last-updated {
   margin-left: 0;
+  flex-basis: 100%;
+  justify-content: flex-end;
 }
 .trends-relay {
   display: flex;
@@ -419,8 +463,8 @@
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: #4b5563;
+  margin-right: 10px;
 }
 .trends-relay-switch {
   position: relative;
@@ -460,9 +504,9 @@
 }
 .trends-relay-hint {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: #6b7280;
-  min-width: 52px;
+  min-width: 30px;
 }
 .trends-relay-msg {
   font-size: 12px;
@@ -480,6 +524,7 @@
     margin-left: 0;
     width: 100%;
     align-items: flex-start;
+    flex-direction: column;
   }
   .trends-relay {
     align-items: flex-start;
