@@ -711,7 +711,7 @@ import HumidityChart from "./HumidityChart/HumidityChart";
 import PowerConsumptionChart from "./PowerConsumptionChart/PowerConsumptionChart";
 import EnergyConsumptionChart from "./EnergyConsumptionChart/EnergyConsumptionChart";
 import ZoneEnergyChart from "./ZoneEnergyChart/ZoneEnergyChart";
-import TopEnergyBranches from "./TopEnergyBranches";
+import TopEnergyBranches from "./ZoneEnergyChart/TopEnergyBranches";
 import ACHealthChart from "./ACHealthChart/ACHealthChart";
 import CurrentFluctuationChart from "./CurrentFluctuationChart";
 import ACTable from "./ACTable/ACTable";
@@ -719,15 +719,15 @@ import ACDeviceTable from "./Tables/ACDeviceTable";
 import EnergyMap from "./EnergyMap/EnergyMap";
 import EnergyCostCard from "./KPI Cards/EnergyCostCard";
 
-import AIAssistantPanel from "./AIAssistantPanel";
-import FaultDetectionPanel from "./FaultDetectionPanel"
+import AIAssistantPanel from "./AIModules/AIAssistantPanel";
+import FaultDetectionPanel from "./AIModules/FaultDetectionPanel"
 
 import CurrentHistoryChart from "./Current/CurrentHistoryChart";
 import VoltageHistoryChart from "./Voltage/VoltageHistoryChart";
 import Inactive_Acs from "./KPI Cards/InactiveAcs";
 
 import "./dashboard.css";
-import "./dashboard-insight.css";
+import "./AIModules/dashboard-insight.css";
 
 const numberValue = (value) => {
     if (value === null || value === undefined || value === "") {

@@ -17332,23 +17332,18 @@ def assign_device_to_admin(request):
 
 # My current view
 
-
 # from .cloud_sync import provision_customer, provision_user
-
 from .cloud_sync import (
     provision_customer,
     provision_user,
 )
-
 
 from .access_scope import (
     site_customer,
 )
 from .hierarchy_tree_sync import sync_branch_to_tree
 
-
 # from backend.account import serializers
-
 class ReadOnlyOrAuthenticated(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:

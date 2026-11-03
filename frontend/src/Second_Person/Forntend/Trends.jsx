@@ -5,6 +5,7 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
+  LabelList,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -152,10 +153,19 @@ function metricUnit(metric) {
   return units[key] ?? "";
 }
 
-function formatMetricValue(value, unit) {
-  const formatted = Number(value).toLocaleString(undefined, {
-    maximumFractionDigits: 2,
-  });
+function formatMetricValue(value, unit, metric = "") {
+  if (value === null || value === undefined || value === "") {
+    return "--";
+  }
+
+  const normalized = metric.toLowerCase().replace(/[\s_-]/g, "");
+
+  const formatted =
+    normalized === "energydelta"
+      ? String(value)
+      : Number(value).toLocaleString(undefined, {
+          maximumFractionDigits: 2,
+        });
 
   return unit ? `${formatted} ${unit}` : formatted;
 }
@@ -198,31 +208,98 @@ function summarizeMetric(rows, key) {
   };
 }
 
-function TrendMetricChart({ metric, rows, resetKey, stat }) {
-  const { baseFrom, baseTo } = useMemo(() => {
-    const times = rows.map((row) => row.__chartTs).filter(Number.isFinite);
+function TrendMetricChart({
+  metric,
+  rows,
+  resetKey,
+  stat,
+  period,
+  aggregation,
+}) {
+    const { baseFrom, baseTo } = useMemo(() => {
+    const times = rows
+      .map((row) => row.__chartTs)
+      .filter(Number.isFinite);
+
     if (!times.length) {
       const now = Date.now();
-      return { baseFrom: now - 60 * 60 * 1000, baseTo: now };
+
+      return {
+        baseFrom: now - 60 * 60 * 1000,
+        baseTo: now,
+      };
     }
+
     const from = Math.min(...times);
-    return { baseFrom: from, baseTo: Math.max(Math.max(...times), from + 60 * 1000) };
+
+    return {
+      baseFrom: from,
+      baseTo: Math.max(Math.max(...times), from + 60 * 1000),
+    };
   }, [rows]);
 
   const zoomState = useTimeZoom({ baseFrom, baseTo, resetKey });
   const { view, zoomed } = zoomState;
-  const ticks = useMemo(() => makeZoomTicks(view.from, view.to), [view.from, view.to]);
+
+  const ticks = useMemo(
+    () => makeZoomTicks(view.from, view.to),
+    [view.from, view.to]
+  );
   const unit = metricUnit(metric);
+
+  const xAxisTitle = useMemo(() => {
+    if (aggregation === "minute") {
+      return period === "24h"
+        ? "Hours"
+        : period === "7d"
+          ? "Date"
+          : "Date";
+    }
+
+    if (aggregation === "hour") {
+      return "Time (Hourly)";
+    }
+
+    if (aggregation === "day") {
+      return "Date (Daily)";
+    }
+
+    return "Time";
+  }, [period, aggregation]);
 
   const [expanded, setExpanded] = useState(false);
   const downRef = useRef(null);
 
+  const renderLatestValueLabel = ({ x, y, value, index }) => {
+    if (index !== rows.length - 1 || value == null) return null;
+
+    return (
+      <text
+        x={x}
+        y={y - 12}
+        fill="#3182BD"
+        fontSize={11}
+        fontWeight={700}
+        textAnchor="middle"
+      >
+        {formatMetricValue(value, unit, metric)}
+      </text>
+    );
+  };
+
   useEffect(() => {
     if (!expanded) return undefined;
-    const onKey = (e) => { if (e.key === "Escape") setExpanded(false); };
+
+    const onKey = (e) => {
+      if (e.key === "Escape") setExpanded(false);
+    };
+
     window.addEventListener("keydown", onKey);
+
     return () => window.removeEventListener("keydown", onKey);
   }, [expanded]);
+
+  // Keep your remaining existing code from here.
 
   // A plain click on the graph (not a drag-to-zoom, not while zoomed) expands the card.
   const onAreaMouseDown = (e) => { downRef.current = { x: e.clientX, y: e.clientY }; };
@@ -277,27 +354,70 @@ function TrendMetricChart({ metric, rows, resetKey, stat }) {
                   tickFormatter={(t) => formatZoomTick(t, view.from, view.to)}
                   tick={{ fontSize: expanded ? 11 : 10 }}
                   minTickGap={expanded ? 5 : 18}
+                  label={
+                    expanded
+                      ? {
+                          value: xAxisTitle,
+                          position: "insideBottom",
+                          offset: -4,
+                          fontSize: 11,
+                        }
+                      : undefined
+                  }
                 />
+
                 <YAxis
-                  width={expanded ? 60 : 38}
+                  width={expanded ? 75 : 55}
                   tick={{ fontSize: expanded ? 11 : 10 }}
-                  label={expanded ? {
-                    value: unit ? `Value (${unit})` : "Value",
-                    angle: -90,
-                    position: "insideLeft",
-                    style: { textAnchor: "middle", fontSize: 11 },
-                  } : undefined}
+                  
+                  label={
+                    expanded
+                      ? {
+                          value: unit
+                            ? `${displayMetricName(metric)} (${unit})`
+                            : displayMetricName(metric),
+                          angle: -90,
+                          position: "insideLeft",
+                          style: {
+                            textAnchor: "middle",
+                            fontSize: 11,
+                          },
+                        }
+                      : undefined
+                  }
                 />
+
                 <Tooltip
-                  contentStyle={{ fontSize: 11, padding: "3px 7px", lineHeight: 1.3, borderRadius: 6 }}
-                  labelStyle={{ fontSize: 11, margin: 0 }}
-                  itemStyle={{ fontSize: 11, padding: 0 }}
+                  contentStyle={{
+                    fontSize: 12,
+                    padding: "7px 10px",
+                    borderRadius: 8,
+                  }}
+                  labelStyle={{ fontSize: 11, marginBottom: 4 }}
                   labelFormatter={(t) => formatZoomLabel(t, view.from, view.to)}
-                  formatter={(value) => [formatMetricValue(value, unit), displayMetricName(metric)]}
+                  formatter={(value) => [
+                    formatMetricValue(value, unit, metric),
+                    displayMetricName(metric),
+                  ]}
                 />
+
                 {expanded && <Legend />}
+
                 <ZoomSelection sel={zoomState.sel} />
-                <Line type="monotone" dataKey={metric} name={displayMetricName(metric)} stroke="#3182BD" strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+
+                <Line
+                  type="monotone"
+                  dataKey={metric}
+                  name={`${displayMetricName(metric)}${unit ? ` (${unit})` : ""}`}
+                  stroke="#3182BD"
+                  strokeWidth={2}
+                  dot={false}
+                  activeDot={{ r: 5 }}
+                  connectNulls
+                  isAnimationActive={false}
+                >
+                  {/* <LabelList content={renderLatestValueLabel} /> */}
+                </Line>
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -690,9 +810,20 @@ export default function Trends({
                 backgroundColor: isLive ? "#22c55e" : "#9ca3af",
               }}
             />
-            {isLive ? (
-              <span style={{ fontWeight: 600, color: "#22c55e" }}>LIVE</span>
+            {/* {isLive ? (
+              // <span style={{ fontWeight: 600, color: "#22c55e" }}>LIVE</span>
+              <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+                Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+              </strong>
+              <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+                Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+              </strong>
             ) : (
+              <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+                Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+              </strong>
+            )} */}
+            { isLive && (
               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
               </strong>
@@ -731,6 +862,8 @@ export default function Trends({
               metric={metric}
               rows={chartRows}
               stat={stats.find((item) => item.key === metric)}
+              period={period}
+              aggregation={aggregation}
               resetKey={`${selectedDeviceId}|${period}|${aggregation}`}
             />
           ))}

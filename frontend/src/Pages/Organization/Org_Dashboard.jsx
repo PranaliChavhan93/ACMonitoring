@@ -13,7 +13,7 @@
 // // // import { useAuth } from "../Layout/AuthContext";
 // // // import { useNavigate } from "react-router-dom";
 
-// // // const API_BASE = "http://192.168.1.7:8000/api";
+// // // const API_BASE = "http://192.168.1.9:8000/api";
 // // // const API_URL = `${API_BASE}/ac-data/`;
 // // // const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 
@@ -661,7 +661,7 @@
 // // import { useAuth } from "../Layout/AuthContext";
 // // import { useNavigate } from "react-router-dom";
 
-// // const API_BASE = "http://192.168.1.7:8000/api";
+// // const API_BASE = "http://192.168.1.9:8000/api";
 // // const API_URL = `${API_BASE}/ac-data/`;
 // // const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 
@@ -1338,7 +1338,7 @@
 // import { useNavigate } from "react-router-dom";
 // import Trends from "../../Second_Person/Forntend/Trends";
 
-// const API_BASE = "http://192.168.1.7:8000/api";
+// const API_BASE = "http://192.168.1.9:8000/api";
 // const API_URL = `${API_BASE}/ac-data/`;
 // const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 
@@ -2100,7 +2100,7 @@ import Trends from "../../Second_Person/Forntend/Trends";
 import { useAuth } from "../Layout/AuthContext";
 import { useNavigate } from "react-router-dom";
 
-const API_BASE = "http://192.168.1.7:8000/api";
+const API_BASE = "http://192.168.1.9:8000/api";
 const API_URL = `${API_BASE}/ac-data/`;
 const DASHBOARD_URL = `${API_BASE}/dashboard/preferences/`;
 

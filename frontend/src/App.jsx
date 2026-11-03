@@ -19,7 +19,7 @@ import ACCreation from "./Pages/Organization/ACCreation";
 import Trends from "./Second_Person/Forntend/Trends";
 import HierarchySiteCreation from "./Pages/Organization/HierarchySiteCreation";
 
-import AIAnalysisPage from "./Second_Person/Forntend/AIAnalysisPage";
+import AIAnalysisPage from "./Second_Person/Forntend/AIModules/AIAnalysisPage";
 import SuperAdminLogin from "./Pages/Layout/SuperAdminLogin";
 import ProfilePage from "./Pages/Profile/ProfilePage";
 import Analytics from "./Pages/Analytics";

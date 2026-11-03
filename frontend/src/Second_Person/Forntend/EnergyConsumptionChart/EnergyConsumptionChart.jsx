@@ -373,7 +373,7 @@ function EnergyConsumptionChart({ deviceId = "", scope = {} }) {
 
   return (
     <div
-      className={`chart-box current-history-card${isExpanded ? " current-history-expanded" : ""}`}
+      className={`chart-box current-history-card${isExpanded ? " ac-dashboard-chart-expanded" : ""}`}
     >
       <div className="chart-header">
         <div>

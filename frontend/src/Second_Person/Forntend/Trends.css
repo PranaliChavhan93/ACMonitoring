@@ -609,3 +609,204 @@
     width: 100%;
     margin-bottom: 20px;
 }
+
+
+/* =========================================================
+   TRENDS EXPANDED KPI — FIX THE COMPLETE HEIGHT CHAIN
+   Popup -> graph section -> zoom wrapper -> chart -> Recharts
+   ========================================================= */
+
+/* The expanded card is the popup viewport. */
+.trends-page .trends-kpi-expanded {
+  position: fixed !important;
+  inset: auto !important;
+  left: calc(var(--sidebar-w, 260px) + (100vw - var(--sidebar-w, 260px)) / 2) !important;
+  top: calc(var(--header-h, 68px) + (100vh - var(--header-h, 68px)) / 2) !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+
+  width: min(1200px, calc(100vw - var(--sidebar-w, 260px) - 48px)) !important;
+  height: min(760px, calc(100vh - var(--header-h, 68px) - 48px)) !important;
+  max-width: none !important;
+  max-height: none !important;
+
+  z-index: 850 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+}
+
+/* Hide the KPI number/value column when expanded. */
+.trends-page .trends-kpi-expanded > .trends-kpi-values {
+  display: none !important;
+}
+
+/* Toolbar remains at the top; graph area consumes all remaining height. */
+.trends-page .trends-kpi-expanded > .trends-kpi-graph {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  flex-direction: column !important;
+  justify-content: flex-start !important;
+  align-items: stretch !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* This is the zoom interaction wrapper around .trends-kpi-chart. */
+.trends-page .trends-kpi-expanded .trends-kpi-graph > div:not(.trends-kpi-tools) {
+  display: flex !important;
+  flex: 1 1 0 !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Chart div must have a definite height for ResponsiveContainer. */
+.trends-page .trends-kpi-expanded .trends-kpi-chart {
+  display: block !important;
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+/* Recharts must inherit the available width and height. */
+.trends-page .trends-kpi-expanded .recharts-responsive-container {
+  flex: 1 1 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.trends-page .trends-kpi-expanded .trends-kpi-tools {
+  flex: 0 0 auto !important;
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.trends-page .trends-kpi-expanded .trends-kpi-tools .chart-zoom-toolbar {
+  transform: none !important;
+  margin: 0 !important;
+}
+
+/* Shared Current & Temperature chart rendered inside Trends. */
+.trends-page .ac-dashboard-chart-expanded {
+  position: fixed !important;
+  inset: auto !important;
+  left: calc(var(--sidebar-w, 260px) + (100vw - var(--sidebar-w, 260px)) / 2) !important;
+  top: calc(var(--header-h, 68px) + (100vh - var(--header-h, 68px)) / 2) !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(1200px, calc(100vw - var(--sidebar-w, 260px) - 48px)) !important;
+  height: min(760px, calc(100vh - var(--header-h, 68px) - 48px)) !important;
+  z-index: 850 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: auto !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+}
+
+
+/* =========================================
+   TRENDS GRAPH POPUP — BLURRED BACKGROUND
+   ========================================= */
+
+/* Blur only the page behind an expanded graph */
+body:has(.trends-page .trends-kpi-expanded)::before,
+body:has(.trends-page .ac-dashboard-chart-expanded)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 849;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+/* Keep popup above the blurred background */
+.trends-page .trends-kpi-expanded,
+.trends-page .ac-dashboard-chart-expanded {
+  z-index: 850 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  box-sizing: border-box !important;
+}
+
+/* Remove popup scrollbars */
+.trends-page .trends-kpi-expanded,
+.trends-page .ac-dashboard-chart-expanded {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.trends-page .trends-kpi-expanded::-webkit-scrollbar,
+.trends-page .ac-dashboard-chart-expanded::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Keep the graph inside the popup */
+.trends-page .trends-kpi-expanded .trends-kpi-graph,
+.trends-page .ac-dashboard-chart-expanded {
+  min-height: 0 !important;
+}
+
+/* Prevent inner chart containers from creating scrollbars */
+.trends-page .trends-kpi-expanded .chart-zoom-area,
+.trends-page .trends-kpi-expanded .trends-kpi-chart {
+  overflow: hidden !important;
+  min-height: 0 !important;
+}
+
+/* Do not blur or dim the popup itself */
+.trends-page .trends-kpi-expanded,
+.trends-page .ac-dashboard-chart-expanded {
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+
+/* Collapsed sidebar. */
+.layout.collapsed .trends-page .trends-kpi-expanded,
+.layout.collapsed .trends-page .ac-dashboard-chart-expanded {
+  left: calc(var(--sidebar-w-collapsed, 78px) + (100vw - var(--sidebar-w-collapsed, 78px)) / 2) !important;
+  width: min(1200px, calc(100vw - var(--sidebar-w-collapsed, 78px) - 48px)) !important;
+}
+
+/* Small screens. */
+@media (max-width: 900px) {
+  .trends-page .trends-kpi-expanded,
+  .trends-page .ac-dashboard-chart-expanded,
+  .layout.collapsed .trends-page .trends-kpi-expanded,
+  .layout.collapsed .trends-page .ac-dashboard-chart-expanded {
+    left: 50vw !important;
+    top: 50vh !important;
+    width: calc(100vw - 24px) !important;
+    height: calc(100vh - 24px) !important;
+  }
+}

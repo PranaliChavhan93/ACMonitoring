@@ -63,7 +63,6 @@
 .chart-zoom-content {
   min-width: 100%;
   box-sizing: border-box;
-  /* Do not set a zoom transform here: growing width only keeps Y geometry fixed. */
 }
 
 .chart-zoom-content > * {

@@ -1782,7 +1782,7 @@
   background: #f1f5f9;
 }
 
-.current-history-expanded {
+/* .current-history-expanded {
   position: fixed;
   inset: 16px;
   z-index: 9999;
@@ -1790,7 +1790,7 @@
   padding: 20px;
   background: #ffffff;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
+} */
 
 /* Current & Temperature chart: occupy 2 dashboard columns */
 .current-temp-chart {
@@ -1941,3 +1941,135 @@
 /* Zone energy, top-five branches and map dashboard layout */
 .top-energy-branches { min-width: 0; }
 .dashboard-grid--primary > .chart-box { min-width: 0; }
+
+/* ------------------------- */
+
+/* =========================================================
+   ACDashboard expanded graph popup
+   Shared by Current/Temperature, Energy, and metric history
+   charts. Trends.jsx keeps its separate Trends styling.
+   ========================================================= */
+
+.ac-dashboard .ac-dashboard-chart-expanded {
+  position: fixed !important;
+  inset: auto !important;
+
+  /* Center the popup in the usable area to the right of the sidebar
+     and below the top navbar. */
+  left: calc(var(--sidebar-w, 260px) + (100vw - var(--sidebar-w, 260px)) / 2) !important;
+  top: calc(var(--header-h, 68px) + (100vh - var(--header-h, 68px)) / 2) !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: translate(-50%, -50%) !important;
+
+  width: min(1200px, calc(100vw - var(--sidebar-w, 260px) - 48px)) !important;
+  height: min(720px, calc(100vh - var(--header-h, 68px) - 48px)) !important;
+  max-width: none !important;
+  max-height: none !important;
+
+  z-index: 850 !important;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+  padding: 20px;
+  box-sizing: border-box;
+
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.22);
+}
+
+/* Match the same usable-area centering when the sidebar is collapsed. */
+.layout.collapsed .ac-dashboard .ac-dashboard-chart-expanded {
+  left: calc(var(--sidebar-w-collapsed, 78px) + (100vw - var(--sidebar-w-collapsed, 78px)) / 2) !important;
+  width: min(1200px, calc(100vw - var(--sidebar-w-collapsed, 78px) - 48px)) !important;
+}
+
+/* Keep popup inside the viewport on smaller screens. */
+@media (max-width: 900px) {
+  .ac-dashboard .ac-dashboard-chart-expanded,
+  .layout.collapsed .ac-dashboard .ac-dashboard-chart-expanded {
+    left: 50vw !important;
+    top: 50vh !important;
+    width: calc(100vw - 24px) !important;
+    height: calc(100vh - 24px) !important;
+  }
+}
+
+
+/* ============================================
+   DASHBOARD GRAPH POPUPS — BLURRED BACKGROUND
+   ============================================ */
+
+/* Blur only the dashboard background */
+body:has(.ac-dashboard .ac-dashboard-chart-expanded)::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 849;
+  background: rgba(15, 23, 42, 0.22);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+/* Expanded Current, Temperature and metric charts */
+.ac-dashboard .ac-dashboard-chart-expanded {
+  z-index: 850 !important;
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+  box-sizing: border-box !important;
+}
+
+.ac-dashboard .ac-dashboard-chart-expanded::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Keep chart content within popup */
+.ac-dashboard .ac-dashboard-chart-expanded .chart-zoom-area,
+.ac-dashboard .ac-dashboard-chart-expanded .recharts-responsive-container {
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Energy chart: blur only the background */
+.energy-chart-overlay {
+  background: rgba(15, 23, 42, 0.22) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+
+/* Energy modal must remain sharp and scroll-free */
+.energy-chart-modal {
+  overflow: hidden !important;
+  filter: none !important;
+  opacity: 1 !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.energy-chart-modal::-webkit-scrollbar {
+  display: none !important;
+}
+
+/* Prevent inner energy chart from scrolling */
+.energy-chart-modal__body {
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* Small screens */
+@media (max-width: 700px) {
+  .ac-dashboard .ac-dashboard-chart-expanded,
+  .energy-chart-modal {
+    overflow: hidden !important;
+  }
+}
