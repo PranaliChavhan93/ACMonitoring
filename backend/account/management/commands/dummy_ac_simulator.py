@@ -10,6 +10,11 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 
 
+# $env:TEST_AC_01_USERNAME="TEST-AC-01"
+# $env:TEST_AC_01_PASSWORD="TEST-AC-01"
+# $env:TEST_AC_02_USERNAME="TEST-AC-02"
+# $env:TEST_AC_02_PASSWORD="TEST-AC-02"
+
 # ==========================================================
 # MQTT BROKER CONFIGURATION
 # ==========================================================

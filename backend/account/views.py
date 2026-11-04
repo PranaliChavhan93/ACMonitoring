@@ -164,14 +164,63 @@ def _resolve_location(model, value, **extra_filters):
 # =====================================================================
 
 
+def _remove_device_entries_from_tree(tree, identifiers):
+    """Remove this AC from every branch.devices collection in a tree."""
+    wanted = {str(value).strip() for value in identifiers if value not in (None, "")}
+    changed = False
+
+    def walk(nodes):
+        nonlocal changed
+        for node in nodes or []:
+            if not isinstance(node, dict):
+                continue
+
+            devices = node.get("devices")
+            if isinstance(devices, list):
+                kept = []
+                for item in devices:
+                    if not isinstance(item, dict):
+                        kept.append(item)
+                        continue
+                    values = {
+                        str(item.get(key, "")).strip()
+                        for key in (
+                            "ac_id", "id", "device_id", "tpt_device_id",
+                            "thingsboard_device_id", "local_device_id", "site_id",
+                        )
+                    }
+                    if wanted.intersection(values):
+                        changed = True
+                    else:
+                        kept.append(item)
+                node["devices"] = kept
+
+            for key in (
+                "states", "districts", "talukas", "cities", "zones",
+                "circles", "regions", "divisions", "branches", "floors", "sites",
+            ):
+                children = node.get(key)
+                if isinstance(children, list):
+                    walk(children)
+
+    walk(tree)
+    return changed
+
+
 def remove_device_from_location_trees(ac_id, tpt_device_id="", site_id=""):
-    """Clean stale placements from BOTH hierarchy JSON files before moving an AC."""
+    """Clean stale device/site placements from BOTH hierarchy JSON files."""
     identifiers = [ac_id, tpt_device_id, site_id]
     for location_file in (GEOGRAPHICAL_LOCATION_FILE, ZONAL_LOCATION_FILE):
         if not os.path.exists(location_file):
             continue
         tree = load_location_tree(location_file)
-        if remove_site_from_tree(tree, identifiers):
+        changed = _remove_device_entries_from_tree(tree, identifiers)
+        # Legacy site entries used the AC ID as site_id. Remove each identifier
+        # individually; remove_site_from_tree expects one scalar, not a list.
+        for identifier in identifiers:
+            if identifier not in (None, ""):
+                changed = remove_site_from_tree(tree, identifier) or changed
+        if changed:
             save_location_tree(tree, location_file)
 
 
@@ -192,63 +241,198 @@ def remove_device_from_location_trees(ac_id, tpt_device_id="", site_id=""):
 # LOCATIONS  (tree)
 
 
-def _attach_devices_to_tree(tree, user):
-    """
-    Add the current user's locally assigned AC devices to their branch nodes.
-    The filter dropdown uses branch.devices; the location JSON does not maintain
-    this relationship, so derive it from the database on each request.
-    """
-    branch_nodes = {}
+def _branch_hierarchy_type(branch):
+    """Resolve which hierarchy a DB branch belongs to."""
+    configured = str(
+        getattr(getattr(branch, "customer", None), "hierarchy_type", "") or ""
+    ).strip().upper()
+    if configured in ("GEOGRAPHICAL", "ZONAL"):
+        return configured
+    if getattr(branch, "division_id", None):
+        return "ZONAL"
+    if getattr(branch, "city_id", None) or getattr(branch, "taluka_id", None):
+        return "GEOGRAPHICAL"
+    return ""
 
-    def walk(nodes):
-        for node in nodes or []:
-            if not isinstance(node, dict):
-                continue
-            if node.get("branch_id"):
-                branch_nodes.setdefault(str(node.get("branch_id")), node)
-            for key in (
-                "states", "districts", "talukas", "cities", "zones",
-                "circles", "regions", "divisions", "branches", "floors", "sites",
+
+def _branch_expected_tree_path(branch, hierarchy):
+    """Build the full DB ancestry used to match a branch JSON node."""
+    expected = {
+        "branch_name": str(getattr(branch, "name", "") or "").strip().casefold()
+    }
+    if hierarchy == "GEOGRAPHICAL":
+        parent = getattr(branch, "taluka", None)
+        if parent is None and getattr(branch, "city_id", None):
+            city = getattr(branch, "city", None)
+            parent = getattr(city, "taluka", None) if city else None
+        if parent is None:
+            return {}
+        district = parent.district
+        state = district.state
+        expected.update({
+            "state_name": str(state.name or "").strip().casefold(),
+            "district_name": str(district.name or "").strip().casefold(),
+            "taluka_name": str(parent.name or "").strip().casefold(),
+            "city_name": (
+                str(branch.city.name or "").strip().casefold()
+                if getattr(branch, "city_id", None) and getattr(branch, "city", None)
+                else ""
+            ),
+        })
+    elif hierarchy == "ZONAL":
+        division = getattr(branch, "division", None)
+        if not getattr(branch, "division_id", None) or division is None:
+            return {}
+        region = division.region
+        circle = region.circle
+        zone = circle.zone
+        expected.update({
+            "zone_name": str(zone.name or "").strip().casefold(),
+            "circle_name": str(circle.name or "").strip().casefold(),
+            "region_name": str(region.name or "").strip().casefold(),
+            "division_name": str(division.name or "").strip().casefold(),
+        })
+    return expected
+
+
+def _find_branch_node_for_db_branch(tree, branch, hierarchy=None):
+    """Find the exact tree branch by ancestry, tolerating legacy branch IDs.
+
+    JSON branch_id values have historically been a code, a DB UUID, or a
+    generated tree identifier. Full ancestry is therefore the primary match;
+    IDs and customer ownership disambiguate otherwise identical paths.
+    """
+    hierarchy = (hierarchy or _branch_hierarchy_type(branch)).upper()
+    if hierarchy not in ("GEOGRAPHICAL", "ZONAL"):
+        return None, {}
+
+    expected = _branch_expected_tree_path(branch, hierarchy)
+    if not expected:
+        return None, {}
+
+    candidates = []
+    for node, context in iter_branches(tree, hierarchy):
+        if str(context.get("branch_name", "")).strip().casefold() != expected["branch_name"]:
+            continue
+
+        if hierarchy == "GEOGRAPHICAL":
+            keys = ("state_name", "district_name", "taluka_name")
+            if any(
+                str(context.get(key, "")).strip().casefold() != expected[key]
+                for key in keys
             ):
-                children = node.get(key)
-                if isinstance(children, list):
-                    walk(children)
+                continue
+            # New hierarchy files place branches directly under Taluka and do
+            # not repeat city_name. Compare city when the tree node has it.
+            tree_city = str(context.get("city_name", "")).strip().casefold()
+            if tree_city and expected.get("city_name") and tree_city != expected["city_name"]:
+                continue
+        else:
+            keys = ("zone_name", "circle_name", "region_name", "division_name")
+            if any(
+                str(context.get(key, "")).strip().casefold() != expected[key]
+                for key in keys
+            ):
+                continue
+        candidates.append((node, context))
 
-    walk(tree)
+    if not candidates:
+        return None, {}
 
-    for node in branch_nodes.values():
-        node["devices"] = []
+    # Prefer a node whose tree ID matches the DB UUID or branch code.
+    accepted_ids = {
+        str(getattr(branch, "pk", "")),
+        str(getattr(branch, "code", "")),
+    }
+    exact = [
+        pair for pair in candidates
+        if accepted_ids.intersection({
+            str(pair[1].get("branch_id", "")),
+            str(pair[0].get("branch_id", "")),
+            str(pair[0].get("branch_code", "")),
+            str(pair[0].get("code", "")),
+            str(pair[0].get("db_branch_id", "")),
+        })
+    ]
+    if len(exact) == 1:
+        return exact[0]
+    if exact:
+        candidates = exact
+
+    # Ownership metadata is an additional safe discriminator where present.
+    customer_id = str(getattr(branch, "customer_id", "") or "")
+    owned = [
+        pair for pair in candidates
+        if str(pair[0].get("customer_id", "") or "") == customer_id
+    ]
+    if len(owned) == 1:
+        return owned[0]
+    if len(candidates) == 1:
+        return candidates[0]
+
+    # Ambiguous duplicate paths are deliberately not cross-linked.
+    return None, {}
+
+
+def _attach_devices_to_tree(tree, user):
+    """Derive branch.devices from scoped DB assignments for every tree response."""
+    branch_nodes = []
+    seen_nodes = set()
+    for hierarchy in ("GEOGRAPHICAL", "ZONAL"):
+        for node, context in iter_branches(tree, hierarchy):
+            marker = id(node)
+            if marker in seen_nodes:
+                continue
+            seen_nodes.add(marker)
+            node["devices"] = []
+            branch_nodes.append((hierarchy, node, context))
 
     devices = accessible_devices(user).select_related(
-        "branch", "site", "site__branch"
+        "branch", "branch__customer",
+        "branch__city__taluka__district__state",
+        "branch__taluka__district__state",
+        "branch__division__region__circle__zone",
+        "site", "site__branch", "site__branch__customer",
+        "site__branch__city__taluka__district__state",
+        "site__branch__taluka__district__state",
+        "site__branch__division__region__circle__zone",
     ).order_by("ac_id")
 
     for device in devices:
         branch = device.branch if device.branch_id else (
-            device.site.branch if device.site_id and device.site.branch_id else None
+            device.site.branch
+            if device.site_id and device.site and device.site.branch_id
+            else None
         )
-        if not branch:
+        if branch is None:
             continue
 
-        node = branch_nodes.get(str(branch.code))
-        if node is None:
-            # Compatibility for older tree files whose branch_id is a UUID.
-            node = branch_nodes.get(str(branch.pk))
+        hierarchy = _branch_hierarchy_type(branch)
+        node, context = _find_branch_node_for_db_branch(tree, branch, hierarchy)
         if node is None:
             continue
 
         node.setdefault("devices", []).append({
-            # The filter selection and Trends page both identify telemetry by AC ID.
-            "id": device.ac_id,
+            # Keep the 3TP identifier in `id` for existing filter consumers,
+            # and always expose ac_id as the stable application identifier.
+            "id": device.tpt_device_id or device.ac_id,
             "ac_id": device.ac_id,
             "device_name": device.device_name or device.ac_id,
+            "name": device.device_name or device.ac_id,
+            "label": device.device_name or device.ac_id,
             "local_device_id": str(device.pk),
             "tpt_device_id": device.tpt_device_id or "",
+            "thingsboard_device_id": device.tpt_device_id or "",
+            "device_id": device.tpt_device_id or "",
             "status": device.status,
             "site_id": str(device.site_id or ""),
-            "site_name": device.site.name if device.site_id else "",
-            "branch_id": str(branch.code),
+            "site_name": device.site.name if device.site_id and device.site else "",
+            "branch_id": str(context.get("branch_id", "")),
+            "db_branch_id": str(branch.pk),
+            "branch_code": branch.code or "",
             "branch_name": branch.name,
+            "customer_id": str(branch.customer_id or ""),
+            "customer_name": branch.customer.company if branch.customer_id else "",
         })
 
     return tree
@@ -7136,17 +7320,45 @@ def create_device(request):
                 status=400
             )
 
-        # Optional branch placement makes a newly created AC immediately
-        # available in the customer's hierarchy/filter tree.
+        # A new AC must be assigned to a branch at creation time so it is
+        # immediately visible in the hierarchy filters.
         branch_ref = str(body.get("branch_id") or "").strip()
+        if not branch_ref:
+            return JsonResponse(
+                {"error": "branch_id is required. Select a branch before creating the device."},
+                status=400,
+            )
+
+        branch_qs = Branch.objects.select_related(
+            "customer", "city__taluka__district__state",
+            "taluka__district__state", "division__region__circle__zone",
+        )
         target_branch = None
-        if branch_ref:
-            try:
-                target_branch = Branch.objects.select_related("customer").filter(pk=uuid.UUID(branch_ref)).first()
-            except (ValueError, TypeError):
-                target_branch = Branch.objects.select_related("customer").filter(code__iexact=branch_ref).first()
-            if target_branch is None:
-                return JsonResponse({"error": "Selected branch was not found."}, status=400)
+        try:
+            target_branch = branch_qs.filter(pk=uuid.UUID(branch_ref)).first()
+        except (ValueError, TypeError, AttributeError):
+            target_branch = branch_qs.filter(code__iexact=branch_ref).first()
+        if target_branch is None:
+            return JsonResponse({"error": "Selected branch was not found."}, status=400)
+        if not target_branch.customer_id:
+            return JsonResponse(
+                {"error": "The selected branch is not assigned to a customer."},
+                status=400,
+            )
+
+        # Enforce the caller's scope when Django authentication is available.
+        caller = getattr(request, "user", None)
+        if caller is not None and getattr(caller, "is_authenticated", False):
+            if caller.role not in (Role.ORG_SUPER_ADMIN, Role.CUSTOMER, Role.BR_ADMIN):
+                return JsonResponse({"error": "You are not allowed to create devices for a branch."}, status=403)
+            if caller.role == Role.CUSTOMER and target_branch.customer_id != caller.customer_id:
+                return JsonResponse({"error": "Selected branch is outside your customer scope."}, status=403)
+            if caller.role == Role.BR_ADMIN:
+                if target_branch.customer_id != caller.customer_id or not accessible_branches(caller).filter(pk=target_branch.pk).exists():
+                    return JsonResponse({"error": "Selected branch is outside your assigned branch scope."}, status=403)
+            if caller.role == Role.ORG_SUPER_ADMIN:
+                if not caller.organization_id or target_branch.customer.organization_id != caller.organization_id:
+                    return JsonResponse({"error": "Selected branch is outside your organization."}, status=403)
 
         # ---------------- CREATE DEVICE IN 3TP ----------------
 
@@ -7191,17 +7403,24 @@ def create_device(request):
 
         # ---------------- SAVE LOCAL ----------------
 
-        device = ACDevice.objects.create(
-            ac_id=ac_id,
-            device_name=device_name or ac_id,
-            tpt_device_id=device_id,
-            branch=target_branch,
-            assigned_admin=(
-                target_branch.assigned_admin
-                or User.objects.filter(customer_id=target_branch.customer_id, role=Role.CUSTOMER, is_active=True).order_by("date_joined").first()
-                if target_branch else None
-            ),
-        )
+        default_admin = getattr(target_branch, "assigned_admin", None)
+        if default_admin is None:
+            default_admin = User.objects.filter(
+                customer_id=target_branch.customer_id,
+                role__in=(Role.BR_ADMIN, Role.CUSTOMER),
+                is_active=True,
+            ).order_by("date_joined").first()
+
+        device_create_fields = {
+            "ac_id": ac_id,
+            "device_name": device_name or ac_id,
+            "tpt_device_id": device_id,
+            "branch": target_branch,
+            "assigned_admin": default_admin,
+        }
+        if caller is not None and getattr(caller, "is_authenticated", False):
+            device_create_fields["assigned_by"] = caller
+        device = ACDevice.objects.create(**device_create_fields)
 
         if target_branch:
             CustomerDeviceMapping.objects.update_or_create(
@@ -7213,9 +7432,15 @@ def create_device(request):
                 traceback.print_exc()
 
         return JsonResponse({
-            "message": "Device created successfully",
-            "device_id": str(device.id),
-            "tpt_device_id": device_id
+            "status": "success",
+            "message": "Device created and assigned to the selected branch successfully.",
+            "id": str(device.pk),
+            "device_id": str(device.pk),
+            "local_device_id": str(device.pk),
+            "ac_id": device.ac_id,
+            "branch_id": str(target_branch.pk),
+            "branch_code": target_branch.code or "",
+            "tpt_device_id": device_id,
         }, status=201)
 
     except Exception as e:
@@ -8117,13 +8342,8 @@ def control_device_relay(request):
         )
 
 def _place_direct_branch_device_in_tree(device, branch):
-    """Persist a directly assigned AC under its real branch in the hierarchy tree.
-
-    FilterDashboard consumes `branch.devices`; older site-based records may be
-    stored under `branch.sites`. Keep those legacy records intact while moving
-    this device to the canonical `devices` collection.
-    """
-    hierarchy = str(getattr(branch.customer, "hierarchy_type", "") or "").upper()
+    """Persist a directly assigned AC under its matching hierarchy branch."""
+    hierarchy = _branch_hierarchy_type(branch)
     if hierarchy not in ("GEOGRAPHICAL", "ZONAL"):
         return {}
 
@@ -8132,7 +8352,6 @@ def _place_direct_branch_device_in_tree(device, branch):
         else ZONAL_LOCATION_FILE
     )
 
-    # Remove any previous branch/floor placement in either hierarchy first.
     remove_device_from_location_trees(
         device.ac_id,
         tpt_device_id=device.tpt_device_id or "",
@@ -8140,51 +8359,7 @@ def _place_direct_branch_device_in_tree(device, branch):
     )
 
     tree = load_location_tree(location_file)
-    expected = {"branch_name": str(branch.name or "").strip().casefold()}
-
-    if hierarchy == "GEOGRAPHICAL":
-        parent = branch.taluka or (branch.city.taluka if branch.city_id and branch.city else None)
-        if not parent:
-            return {}
-        expected.update({
-            "state_name": str(parent.district.state.name or "").strip().casefold(),
-            "district_name": str(parent.district.name or "").strip().casefold(),
-            "taluka_name": str(parent.name or "").strip().casefold(),
-            "city_name": str(branch.city.name or "").strip().casefold() if branch.city_id else "",
-        })
-    else:
-        if not branch.division_id or not branch.division:
-            return {}
-        division = branch.division
-        region = division.region
-        circle = region.circle
-        zone = circle.zone
-        expected.update({
-            "zone_name": str(zone.name or "").strip().casefold(),
-            "circle_name": str(circle.name or "").strip().casefold(),
-            "region_name": str(region.name or "").strip().casefold(),
-            "division_name": str(division.name or "").strip().casefold(),
-        })
-
-    target = None
-    target_context = {}
-    for node, context in iter_branches(tree, hierarchy):
-        if str(context.get("branch_name", "")).strip().casefold() != expected["branch_name"]:
-            continue
-        # Match the complete ancestry so duplicate branch names cannot cross-link.
-        if hierarchy == "GEOGRAPHICAL":
-            keys = ("state_name", "district_name", "taluka_name")
-            if any(str(context.get(k, "")).strip().casefold() != expected[k] for k in keys):
-                continue
-            if expected["city_name"] and str(context.get("city_name", "")).strip().casefold() != expected["city_name"]:
-                continue
-        else:
-            keys = ("zone_name", "circle_name", "region_name", "division_name")
-            if any(str(context.get(k, "")).strip().casefold() != expected[k] for k in keys):
-                continue
-        target, target_context = node, context
-        break
-
+    target, target_context = _find_branch_node_for_db_branch(tree, branch, hierarchy)
     if target is None:
         return {}
 
@@ -8200,6 +8375,7 @@ def _place_direct_branch_device_in_tree(device, branch):
         "local_device_id": str(device.pk),
         "branch_id": str(target_context.get("branch_id", "")),
         "db_branch_id": str(branch.pk),
+        "branch_code": branch.code or "",
         "customer_id": str(branch.customer_id),
         "customer_name": branch.customer.company,
         "status": device.status,
@@ -8208,6 +8384,11 @@ def _place_direct_branch_device_in_tree(device, branch):
     if not isinstance(devices, list):
         devices = []
         target["devices"] = devices
+    devices[:] = [
+        item for item in devices
+        if not isinstance(item, dict)
+        or str(item.get("ac_id", "")) != str(device.ac_id)
+    ]
     devices.append(entry)
     save_location_tree(tree, location_file)
     return target_context
@@ -8761,7 +8942,252 @@ def ac_faults_from_3tp(request):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def profile(request):
-    return Response("Profile Page")
+    """
+    Return the authenticated user's account summary and permitted AC hierarchy.
+    The response intentionally contains only local metadata; telemetry secrets
+    and MQTT credentials are never exposed to the browser.
+    """
+    user = request.user
+    branches = list(
+        accessible_branches(user)
+        .select_related(
+            "customer", "city", "city__taluka", "city__taluka__district",
+            "city__taluka__district__state", "taluka", "taluka__district",
+            "taluka__district__state", "division", "division__region",
+            "division__region__circle", "division__region__circle__zone",
+        )
+        .order_by("name")
+    )
+    branch_ids = [branch.pk for branch in branches]
+
+    devices = list(
+        accessible_devices(user)
+        .select_related(
+            "branch", "branch__customer", "site", "site__branch",
+            "site__floor", "site__branch__customer",
+        )
+        .order_by("ac_id")
+    )
+
+    devices_by_branch = defaultdict(list)
+    for device in devices:
+        branch = device.branch if device.branch_id else (
+            device.site.branch if device.site_id and device.site.branch_id else None
+        )
+        if branch and branch.pk in branch_ids:
+            site = device.site if device.site_id else None
+            floor = (site.floor if site and site.floor_id else None)
+            devices_by_branch[branch.pk].append({
+                "id": str(device.pk),
+                "device_id": str(device.pk),
+                "ac_id": device.ac_id,
+                "device_name": device.device_name or device.ac_id,
+                "name": device.device_name or device.ac_id,
+                "code": device.ac_id,
+                "status": device.status,
+                "health_status": "unknown",
+                "capacity": device.capacity_ton,
+                "capacity_ton": device.capacity_ton,
+                "installation_date": device.installation_date,
+                "maintenance_date": device.last_maintenance_date,
+                "last_maintenance_date": device.last_maintenance_date,
+                "model": "",
+                "tpt_device_id": device.tpt_device_id or "",
+                "mqtt": {
+                    "protocol": "MQTT",
+                    "broker_host": getattr(settings, "MQTT_HOST", "3tp.tapasyatech.in"),
+                    "broker_port": getattr(settings, "MQTT_PORT", 1883),
+                    "topic": getattr(settings, "MQTT_TOPIC", "v1/devices/me/telemetry"),
+                    "client_id": device.ac_id,
+                    "device_id": device.tpt_device_id or "",
+                    "sync_status": device.tpt_sync_status,
+                    "sync_error": device.tpt_sync_error or "",
+                },
+                "site_name": site.name if site else "",
+                "floor_name": floor.name if floor else "",
+                "branch_name": branch.name,
+                "branch_code": branch.code,
+                "children": [],
+            })
+
+    customers_map = {}
+    for branch in branches:
+        customer = branch.customer
+        if not customer:
+            continue
+        customer_key = str(customer.pk)
+        if customer_key not in customers_map:
+            customers_map[customer_key] = {
+                "id": customer.pk,
+                "customer_id": customer.pk,
+                "name": customer.company,
+                "company": customer.company,
+                "code": customer.code,
+                "email": customer.company_email,
+                "phone": customer.phone,
+                "hierarchy_type": customer.hierarchy_type,
+                "branches": [],
+            }
+
+        if branch.city_id:
+            city = branch.city
+            taluka = city.taluka if city else None
+            district = taluka.district if taluka else None
+            state = district.state if district else None
+            location = {
+                "city": city.name if city else "",
+                "taluka": taluka.name if taluka else "",
+                "district": district.name if district else "",
+                "state": state.name if state else "",
+            }
+        elif branch.taluka_id:
+            taluka = branch.taluka
+            district = taluka.district if taluka else None
+            state = district.state if district else None
+            location = {
+                "city": "", "taluka": taluka.name if taluka else "",
+                "district": district.name if district else "",
+                "state": state.name if state else "",
+            }
+        else:
+            division = branch.division
+            region = division.region if division else None
+            circle = region.circle if region else None
+            zone = circle.zone if circle else None
+            location = {
+                "zone": zone.name if zone else "",
+                "circle": circle.name if circle else "",
+                "region": region.name if region else "",
+                "division": division.name if division else "",
+            }
+
+        floor_map = {}
+        for device_data in devices_by_branch.get(branch.pk, []):
+            floor_name = device_data.pop("floor_name", "") or "Unassigned floor"
+            floor_key = floor_name.lower()
+            if floor_key not in floor_map:
+                floor_map[floor_key] = {
+                    "id": f"{branch.pk}:{floor_key}",
+                    "name": floor_name,
+                    "floors": [],
+                    "acs": [],
+                }
+            floor_map[floor_key]["acs"].append(device_data)
+
+        # Include real floors even when they currently have no assigned AC.
+        floor_qs = Floor.objects.filter(branch=branch).order_by("name")
+        for floor in floor_qs:
+            floor_map.setdefault(floor.name.lower(), {
+                "id": str(floor.pk), "name": floor.name, "acs": [], "floors": [],
+            })
+
+        customers_map[customer_key]["branches"].append({
+            "id": str(branch.pk),
+            "name": branch.name,
+            "code": branch.code,
+            "is_active": branch.is_active,
+            **location,
+            "floors": list(floor_map.values()),
+        })
+
+    customer_rows = list(customers_map.values())
+    # Customer and branch admins should still receive their own customer node
+    # when no branch is currently assigned.
+    if user.customer_id and not customer_rows:
+        customer = user.customer
+        customer_rows = [{
+            "id": customer.pk, "customer_id": customer.pk,
+            "name": customer.company, "company": customer.company,
+            "code": customer.code, "email": customer.company_email,
+            "phone": customer.phone, "hierarchy_type": customer.hierarchy_type,
+            "branches": [],
+        }]
+
+    serialized_user = UserSerializer(user).data
+    customer = user.customer if user.customer_id else None
+    org = user.organization if user.organization_id else None
+    serialized_user.update({
+        "status": "active" if user.is_active else "inactive",
+        "member_since": user.date_joined,
+        "organization_name": org.name if org else "",
+        "customer_name": customer.company if customer else "",
+        "customer_code": customer.code if customer else "",
+        "customer_email": customer.company_email if customer else "",
+        "customer_phone": customer.phone if customer else "",
+        "head_office_city_name": (
+            customer.head_office_city.name
+            if customer and customer.head_office_city_id else customer.city if customer else ""
+        ),
+        "head_office_branch": user.branch.name if user.branch_id else "",
+    })
+
+    return Response({
+        "status": "success",
+        "user": serialized_user,
+        "customers": customer_rows,
+        "summary": {
+            "customers": len(customer_rows),
+            "branches": len(branches),
+            "floors": sum(len(c["branches"][i]["floors"]) for c in customer_rows for i in range(len(c["branches"]))),
+            "acs": len(devices),
+        },
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def ac_device_info(request):
+    """Return the local metadata card for one AC identified by its AC code."""
+    ac_id = (request.query_params.get("ac_id") or "").strip()
+    if not ac_id:
+        return Response({"detail": "ac_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+    device = accessible_devices(request.user).filter(ac_id__iexact=ac_id).select_related(
+        "branch", "branch__customer", "site", "site__branch",
+        "site__floor", "site__branch__customer",
+    ).first()
+    if not device:
+        return Response({"detail": "AC device was not found in your assigned scope."},
+                        status=status.HTTP_404_NOT_FOUND)
+
+    branch = device.branch if device.branch_id else (
+        device.site.branch if device.site_id and device.site.branch_id else None
+    )
+    site = device.site if device.site_id else None
+    floor = site.floor if site and site.floor_id else None
+    customer = branch.customer if branch and branch.customer_id else device_customer(device)
+
+    return Response({
+        "id": str(device.pk),
+        "ac_id": device.ac_id,
+        "name": device.device_name or device.ac_id,
+        "device_name": device.device_name or device.ac_id,
+        "code": device.ac_id,
+        "capacity_ton": device.capacity_ton,
+        "capacity": device.capacity_ton,
+        "status": device.status,
+        "relay_status": device.status,
+        "installation_date": device.installation_date,
+        "maintenance_date": device.last_maintenance_date,
+        "last_maintenance_date": device.last_maintenance_date,
+        "branch": branch.name if branch else "",
+        "branch_code": branch.code if branch else "",
+        "floor": floor.name if floor else "",
+        "site": site.name if site else "",
+        "customer": customer.company if customer else "",
+        "mqtt": {
+            "protocol": "MQTT",
+            "broker_host": getattr(settings, "MQTT_HOST", "3tp.tapasyatech.in"),
+            "broker_port": getattr(settings, "MQTT_PORT", 1883),
+            "topic": getattr(settings, "MQTT_TOPIC", "v1/devices/me/telemetry"),
+            "client_id": device.ac_id,
+            "device_id": device.tpt_device_id or "",
+            "sync_status": device.tpt_sync_status,
+            "sync_error": device.tpt_sync_error or "",
+        },
+        "created_at": device.created_at,
+        "updated_at": device.updated_at,
+    })
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])

@@ -1,4 +1,1931 @@
 
+// // // // import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// // // // import { useLocation, useNavigate } from "react-router-dom";
+// // // // import {
+// // // //   ResponsiveContainer,
+// // // //   LineChart,
+// // // //   Line,
+// // // //   LabelList,
+// // // //   CartesianGrid,
+// // // //   XAxis,
+// // // //   YAxis,
+// // // //   Tooltip,
+// // // //   Legend,
+// // // // } from "recharts";
+// // // // import { 
+// // // //   ArrowLeft,
+// // // //   BrainCircuit,
+// // // //   RefreshCw,
+// // // //   ChartNoAxesCombined,
+// // // //   AlertCircle,
+// // // //   Power,
+// // // //   X
+// // // // } from "lucide-react";
+// // // // import "./dashboard.css";
+// // // // import "./Trends.css";
+// // // // import ACOnOff from "./ACOnOffBar/ACOnOff";
+// // // // // import DeviceTelemetryPage from "./Tables/DeviceTelemetryTable";
+// // // // import CurrentTemperatureChart from "./Current/CurrentTemp";
+// // // // import {
+// // // //   ZoomToolbar,
+// // // //   ZoomSelection,
+// // // //   useTimeZoom,
+// // // //   makeZoomTicks,
+// // // //   formatZoomTick,
+// // // //   formatZoomLabel,
+// // // // } from "./shared/chartZoom";
+// // // // import DeviceTelemetryTable from "./Tables/DeviceTelemetryTAble";
+
+// // // // const API_BASE = (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
+// // // // const GENAI_BASE = (import.meta.env.VITE_GENAI_API_BASE_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
+// // // // const FILTER_STORAGE_KEY = "acMonitoringTrendsFilters";
+// // // // const FILTER_KEYS = [
+// // // //   "hierarchy", "country", "state", "district", "taluka", "city",
+// // // //   "zone", "circle", "region", "division", "branch", "floor",
+// // // //   "device", "device_id", "selectedDeviceId", "ac_id",
+// // // // ];
+// // // // const TIME_FIELDS = ["timestamp", "bucket_start", "ts", "time", "datetime", "date", "created_at", "last_updated", "last_timestamp", "device_timestamp", "telemetry_timestamp"];
+// // // // const PREFERRED_METRICS = ["energy_delta", "current", "temperature", "latest_energy_counter"];
+
+// // // // function getToken() {
+// // // //   for (const key of ["token", "authToken", "access_token", "accessToken", "jwt"]) {
+// // // //     const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+// // // //     if (value) return value;
+// // // //   }
+// // // //   return "";
+// // // // }
+
+// // // // function getAuthHeaders() {
+// // // //   const token = getToken();
+// // // //   return {
+// // // //     Accept: "application/json",
+// // // //     ...(token ? { Authorization: token.startsWith("Token ") || token.startsWith("Bearer ") ? token : `Token ${token}` } : {}),
+// // // //   };
+// // // // }
+
+// // // // function readSavedFilters() {
+// // // //   try {
+// // // //     const value = localStorage.getItem(FILTER_STORAGE_KEY);
+// // // //     return value ? JSON.parse(value) : null;
+// // // //   } catch {
+// // // //     return null;
+// // // //   }
+// // // // }
+
+// // // // function normalizeRows(payload) {
+// // // //   if (Array.isArray(payload)) 
+// // // //     return payload.filter((row) => row && typeof row === "object");
+// // // //   if (Array.isArray(payload?.data)) 
+// // // //     return payload.data.filter((row) => row && typeof row === "object");
+// // // //   if (Array.isArray(payload?.results)) 
+// // // //     return payload.results.filter((row) => row && typeof row === "object");
+// // // //   if (Array.isArray(payload?.records)) 
+// // // //     return payload.records.filter((row) => row && typeof row === "object");
+// // // //   return [];
+// // // // }
+
+// // // // function parseTimestamp(raw) {
+// // // //   if (raw === null || raw === undefined || raw === "") return null;
+// // // //   let parsed;
+// // // //   if (typeof raw === "number" || /^\d+$/.test(String(raw))) {
+// // // //     let n = Number(raw);
+// // // //     if (String(raw).length <= 10) n *= 1000;
+// // // //     else if (String(raw).length >= 16) n /= 1000;
+// // // //     parsed = new Date(n).getTime();
+// // // //   } else {
+// // // //     parsed = new Date(raw).getTime();
+// // // //   }
+// // // //   return Number.isFinite(parsed) ? parsed : null;
+// // // // }
+
+// // // // function timestampOf(row) {
+// // // //   // Normalized timestamp is the bucket position used by historical charts.
+// // // //   return parseTimestamp(row?.timestamp ?? row?.bucket_start ?? row?.ts ?? row?.time ?? row?.datetime ?? row?.date);
+// // // // }
+
+// // // // function lastTelemetryTimestampOf(row) {
+// // // //   return parseTimestamp(
+// // // //     row?.last_timestamp ?? row?.device_timestamp ?? row?.telemetry_timestamp ??
+// // // //     row?.timestamp ?? row?.bucket_start
+// // // //   );
+// // // // }
+
+// // // // function isNumericMetric(key, rows) {
+// // // //   if (TIME_FIELDS.includes(key.toLowerCase())) return false;
+// // // //   if (/^(id|ac_id|device_id|customer_id|branch_id|floor_id|site_id|uuid|status|relay|alarm_status|latest_relay|sample_count|interval_seconds)$/i.test(key)) return false;
+// // // //   if (/_sample_count$/i.test(key) || /_wh$/i.test(key)) return false;
+// // // //   if (/^(avg|min|max)_(voltage|current|power|temperature|humidity)$/i.test(key)) return false;
+// // // //   const values = rows.map((row) => row[key]).filter((value) => value !== null && value !== undefined && value !== "");
+// // // //   if (!values.length) return false;
+// // // //   return values.filter((value) => Number.isFinite(Number(value))).length / values.length >= 0.7;
+// // // // }
+
+// // // // function metricLabel(value) {
+// // // //   const normalized = String(value).toLowerCase().replace(/[\s_-]/g, "");
+// // // //   if (normalized === "latestenergycounter") return "Energy Consumption";
+// // // //   return String(value).replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+// // // // }
+
+// // // // function displayMetricName(value) {
+// // // //   return metricLabel(value);
+// // // // }
+
+// // // // function metricUnit(metric) {
+// // // //   const key = metric.toLowerCase().replace(/[\s_-]/g, "");
+
+// // // //   const units = {
+// // // //     voltage: "V",
+// // // //     current: "A",
+// // // //     power: "W",
+// // // //     activepower: "W",
+// // // //     temperature: "°C",
+// // // //     indoortemperature: "°C",
+// // // //     humidity: "%",
+// // // //     indoorhumidity: "%",
+// // // //     frequency: "Hz",
+// // // //     powerfactor: "",
+// // // //     energy: "kWh",
+// // // //     energyconsumption: "kWh",
+// // // //     energydelta: "kWh",
+// // // //     latestenergycounter: "kWh",
+// // // //   };
+
+// // // //   return units[key] ?? "";
+// // // // }
+
+// // // // function formatMetricValue(value, unit, metric = "") {
+// // // //   if (value === null || value === undefined || value === "") {
+// // // //     return "--";
+// // // //   }
+
+// // // //   const normalized = metric.toLowerCase().replace(/[\s_-]/g, "");
+
+// // // //   const formatted =
+// // // //     normalized === "energydelta"
+// // // //       ? String(value)
+// // // //       : Number(value).toLocaleString(undefined, {
+// // // //           maximumFractionDigits: 2,
+// // // //         });
+
+// // // //   return unit ? `${formatted} ${unit}` : formatted;
+// // // // }
+
+// // // // function formatMetricParts(value, unit) {
+// // // //   const formatted = Number(value).toLocaleString(undefined, {
+// // // //     maximumFractionDigits: 2,
+// // // //   });
+
+// // // //   return { formatted, unit };
+// // // // }
+
+// // // // function shortTime(value) {
+// // // //   const date = new Date(value);
+// // // //   return Number.isNaN(date.getTime()) ? String(value ?? "") : date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+// // // // }
+
+// // // // function summarizeMetric(rows, key) {
+// // // //   const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
+// // // //   if (!values.length) return null;
+
+// // // //   const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, "");
+// // // //   const sum = values.reduce((total, value) => total + value, 0);
+// // // //   const latest = values[values.length - 1];
+
+// // // //   // Period KPIs: cumulative energy remains a counter, energy_delta is
+// // // //   // accumulated over the selected period, and instantaneous metrics are averaged.
+// // // //   let displayValue = sum / values.length;
+// // // //   if (normalizedKey === "energydelta") displayValue = sum;
+// // // //   if (normalizedKey === "latestenergycounter") displayValue = latest;
+
+// // // //   return {
+// // // //     count: values.length,
+// // // //     latest,
+// // // //     min: Math.min(...values),
+// // // //     max: Math.max(...values),
+// // // //     average: sum / values.length,
+// // // //     total: sum,
+// // // //     displayValue,
+// // // //   };
+// // // // }
+
+// // // // function TrendMetricChart({
+// // // //   metric,
+// // // //   rows,
+// // // //   resetKey,
+// // // //   stat,
+// // // //   period,
+// // // //   aggregation,
+// // // // }) {
+// // // //     const { baseFrom, baseTo } = useMemo(() => {
+// // // //     const times = rows
+// // // //       .map((row) => row.__chartTs)
+// // // //       .filter(Number.isFinite);
+
+// // // //     if (!times.length) {
+// // // //       const now = Date.now();
+
+// // // //       return {
+// // // //         baseFrom: now - 60 * 60 * 1000,
+// // // //         baseTo: now,
+// // // //       };
+// // // //     }
+
+// // // //     const from = Math.min(...times);
+
+// // // //     return {
+// // // //       baseFrom: from,
+// // // //       baseTo: Math.max(Math.max(...times), from + 60 * 1000),
+// // // //     };
+// // // //   }, [rows]);
+
+// // // //   const zoomState = useTimeZoom({ baseFrom, baseTo, resetKey });
+// // // //   const { view, zoomed } = zoomState;
+
+// // // //   const ticks = useMemo(
+// // // //     () => makeZoomTicks(view.from, view.to),
+// // // //     [view.from, view.to]
+// // // //   );
+// // // //   const unit = metricUnit(metric);
+
+// // // //   const xAxisTitle = useMemo(() => {
+// // // //     if (aggregation === "minute") {
+// // // //       return period === "24h"
+// // // //         ? "Hours"
+// // // //         : period === "7d"
+// // // //           ? "Date"
+// // // //           : "Date";
+// // // //     }
+
+// // // //     if (aggregation === "hour") {
+// // // //       return "Time (Hourly)";
+// // // //     }
+
+// // // //     if (aggregation === "day") {
+// // // //       return "Date (Daily)";
+// // // //     }
+
+// // // //     return "Time";
+// // // //   }, [period, aggregation]);
+
+// // // //   const [expanded, setExpanded] = useState(false);
+// // // //   const downRef = useRef(null);
+
+// // // //   const renderLatestValueLabel = ({ x, y, value, index }) => {
+// // // //     if (index !== rows.length - 1 || value == null) return null;
+
+// // // //     return (
+// // // //       <text
+// // // //         x={x}
+// // // //         y={y - 12}
+// // // //         fill="#3182BD"
+// // // //         fontSize={11}
+// // // //         fontWeight={700}
+// // // //         textAnchor="middle"
+// // // //       >
+// // // //         {formatMetricValue(value, unit, metric)}
+// // // //       </text>
+// // // //     );
+// // // //   };
+
+// // // //   useEffect(() => {
+// // // //     if (!expanded) return undefined;
+
+// // // //     const onKey = (e) => {
+// // // //       if (e.key === "Escape") setExpanded(false);
+// // // //     };
+
+// // // //     window.addEventListener("keydown", onKey);
+
+// // // //     return () => window.removeEventListener("keydown", onKey);
+// // // //   }, [expanded]);
+
+// // // //   // Keep your remaining existing code from here.
+
+// // // //   // A plain click on the graph (not a drag-to-zoom, not while zoomed) expands the card.
+// // // //   const onAreaMouseDown = (e) => { downRef.current = { x: e.clientX, y: e.clientY }; };
+// // // //   const onAreaClick = (e) => {
+// // // //     const d = downRef.current;
+// // // //     downRef.current = null;
+// // // //     if (expanded || zoomed || !d) return;
+// // // //     if (Math.abs(e.clientX - d.x) > 4 || Math.abs(e.clientY - d.y) > 4) return;
+// // // //     setExpanded(true);
+// // // //   };
+
+// // // //   // KPI card: values on the left, the zoomable graph on the right.  Click the graph
+// // // //   // to open it large, same as the Current & Temperature chart.
+// // // //   return (
+// // // //     <article className={`trends-stat-card trends-kpi-card${expanded ? " current-history-expanded trends-kpi-expanded" : ""}`}>
+// // // //       <div className="trends-kpi-values">
+// // // //         <span>{displayMetricName(metric)}</span>
+// // // //         <strong>
+// // // //           {stat ? formatMetricParts(stat.displayValue, unit).formatted : "--"}
+// // // //           {unit && <span className="trends-stat-unit">{unit}</span>}
+// // // //         </strong>
+// // // //       </div>
+
+// // // //       <div className="trends-kpi-graph">
+// // // //         {/* Zoom bar + close button only exist while the card is expanded. */}
+// // // //         {expanded && (
+// // // //           <div className="trends-kpi-tools">
+// // // //             <ZoomToolbar z={zoomState} />
+// // // //             <button
+// // // //               type="button"
+// // // //               className="chart-expand-btn"
+// // // //               onClick={() => setExpanded(false)}
+// // // //               title="Restore Window"
+// // // //               aria-label="Restore Window"
+// // // //             >
+// // // //               <X size={18} />
+// // // //             </button>
+// // // //           </div>
+// // // //         )}
+// // // //         <div {...zoomState.areaProps} onMouseDown={onAreaMouseDown} onClick={onAreaClick} style={expanded ? undefined : { cursor: "zoom-in" }}>
+// // // //           <div className="trends-chart trends-kpi-chart">
+// // // //             <ResponsiveContainer width="100%" height="100%">
+// // // //               <LineChart data={rows} margin={{ top: 8, right: 14, left: 4, bottom: 8 }} {...zoomState.chartProps}>
+// // // //                 <CartesianGrid strokeDasharray="3 3" />
+// // // //                 <XAxis
+// // // //                   dataKey="__chartTs"
+// // // //                   type="number"
+// // // //                   scale="time"
+// // // //                   domain={[view.from, view.to]}
+// // // //                   allowDataOverflow
+// // // //                   ticks={ticks}
+// // // //                   tickFormatter={(t) => formatZoomTick(t, view.from, view.to)}
+// // // //                   tick={{ fontSize: expanded ? 11 : 10 }}
+// // // //                   minTickGap={expanded ? 5 : 18}
+// // // //                   label={
+// // // //                     expanded
+// // // //                       ? {
+// // // //                           value: xAxisTitle,
+// // // //                           position: "insideBottom",
+// // // //                           offset: -4,
+// // // //                           fontSize: 11,
+// // // //                         }
+// // // //                       : undefined
+// // // //                   }
+// // // //                 />
+
+// // // //                 <YAxis
+// // // //                   width={expanded ? 75 : 55}
+// // // //                   tick={{ fontSize: expanded ? 11 : 10 }}
+                  
+// // // //                   label={
+// // // //                     expanded
+// // // //                       ? {
+// // // //                           value: unit
+// // // //                             ? `${displayMetricName(metric)} (${unit})`
+// // // //                             : displayMetricName(metric),
+// // // //                           angle: -90,
+// // // //                           position: "insideLeft",
+// // // //                           style: {
+// // // //                             textAnchor: "middle",
+// // // //                             fontSize: 11,
+// // // //                           },
+// // // //                         }
+// // // //                       : undefined
+// // // //                   }
+// // // //                 />
+
+// // // //                 <Tooltip
+// // // //                   contentStyle={{
+// // // //                     fontSize: 12,
+// // // //                     padding: "7px 10px",
+// // // //                     borderRadius: 8,
+// // // //                   }}
+// // // //                   labelStyle={{ fontSize: 11, marginBottom: 4 }}
+// // // //                   labelFormatter={(t) => formatZoomLabel(t, view.from, view.to)}
+// // // //                   formatter={(value) => [
+// // // //                     formatMetricValue(value, unit, metric),
+// // // //                     displayMetricName(metric),
+// // // //                   ]}
+// // // //                 />
+
+// // // //                 {expanded && <Legend />}
+
+// // // //                 <ZoomSelection sel={zoomState.sel} />
+
+// // // //                 <Line
+// // // //                   type="monotone"
+// // // //                   dataKey={metric}
+// // // //                   name={`${displayMetricName(metric)}${unit ? ` (${unit})` : ""}`}
+// // // //                   stroke="#3182BD"
+// // // //                   strokeWidth={2}
+// // // //                   dot={false}
+// // // //                   activeDot={{ r: 5 }}
+// // // //                   connectNulls
+// // // //                   isAnimationActive={false}
+// // // //                 >
+// // // //                   {/* <LabelList content={renderLatestValueLabel} /> */}
+// // // //                 </Line>
+// // // //               </LineChart>
+// // // //             </ResponsiveContainer>
+// // // //           </div>
+// // // //         </div>
+// // // //       </div>
+// // // //     </article>
+// // // //   );
+// // // // }
+
+// // // // function RelayControl({ deviceId, telemetryRelay, disabled }) {
+// // // //   const [override, setOverride] = useState(null); // { deviceId, value }
+// // // //   const [sending, setSending] = useState(false);
+// // // //   const [message, setMessage] = useState(null); // { type: "ok" | "error", text }
+
+// // // //   useEffect(() => { setOverride(null); setMessage(null); }, [deviceId]);
+// // // //   useEffect(() => { setOverride(null); }, [telemetryRelay]); // fresh telemetry wins
+
+// // // //   const current = override && override.deviceId === deviceId ? override.value : telemetryRelay;
+// // // //   const known = current === 0 || current === 1;
+
+// // // //   const send = async (value) => {
+// // // //     if (!deviceId || sending) return;
+// // // //     const label = value === 1 ? "ON" : "OFF";
+// // // //     setSending(true);
+// // // //     setMessage(null);
+// // // //     try {
+// // // //       const response = await fetch(`${API_BASE}/devices/relay/`, {
+// // // //         method: "POST",
+// // // //         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+// // // //         body: JSON.stringify({ device_id: deviceId, method: "Relay", params: value }),
+// // // //       });
+// // // //       const result = await response.json().catch(() => ({}));
+// // // //       if (!response.ok || result?.status === "error") {
+// // // //         throw new Error([result?.message || `Relay command failed (HTTP ${response.status}).`, result?.details].filter(Boolean).join(" - "));
+// // // //       }
+// // // //       setOverride({ deviceId, value });
+// // // //       setMessage({ type: "ok", text: result?.message || `Relay ${label} command sent.` });
+// // // //     } catch (err) {
+// // // //       setMessage({ type: "error", text: err?.message || "Could not send the relay command." });
+// // // //     } finally {
+// // // //       setSending(false);
+// // // //     }
+// // // //   };
+
+// // // //   const off = disabled || sending || !deviceId;
+// // // //   const isOn = current === 1;
+// // // //   return (
+// // // //     <div className="trends-relay">
+// // // //       <div className="trends-relay-wrap">
+// // // //         <span className="trends-relay-label">Relay Control</span>
+// // // //         <button
+// // // //           type="button"
+// // // //           role="switch"
+// // // //           aria-checked={isOn}
+// // // //           aria-label={`Relay ${isOn ? "ON" : "OFF"}`}
+// // // //           className={`trends-relay-switch ${isOn ? "on" : ""} ${sending ? "busy" : ""}`}
+// // // //           onClick={() => send(isOn ? 0 : 1)}
+// // // //           disabled={off}
+// // // //           title={!deviceId ? "Select an AC device first" : known ? `Relay is ${isOn ? "ON" : "OFF"} - click to turn ${isOn ? "OFF" : "ON"}` : "Relay state unknown"}
+// // // //         >
+// // // //           <span className="trends-relay-knob" />
+// // // //         </button>
+// // // //         <span className="trends-relay-hint">{sending ? "Sending…" : !deviceId ? "Select an AC" : known ? (isOn ? "ON" : "OFF") : "Unknown"}</span>
+// // // //       </div>
+// // // //       {message && <small className={`trends-relay-msg ${message.type}`}>{message.text}</small>}
+// // // //     </div>
+// // // //   );
+// // // // }
+
+// // // // // export default function Trends() {
+// // // // export default function Trends({
+// // // //   embedded = false,
+// // // //   dashboardFilters = null,
+// // // // }) {
+// // // //   const location = useLocation();
+// // // //   const navigate = useNavigate();
+// // // //   // const [filters, setFilters] = useState(() => location.state?.filters || readSavedFilters());
+// // // //   const [filters, setFilters] = useState(
+// // // //     () => dashboardFilters || location.state?.filters || readSavedFilters()
+// // // //   );
+// // // //   const [rows, setRows] = useState([]);
+// // // //   const [selectedDeviceId, setSelectedDeviceId] = useState("");
+// // // //   const [loading, setLoading] = useState(false);
+// // // //   const [error, setError] = useState("");
+// // // //   const [period, setPeriod] = useState("24h");
+// // // //   const [aggregation, setAggregation] = useState("minute");
+// // // //   const [selectedMetrics, setSelectedMetrics] = useState([]);
+// // // //   const [analysis, setAnalysis] = useState("");
+// // // //   const [analyzing, setAnalyzing] = useState(false);
+// // // //   const [analysisError, setAnalysisError] = useState("");
+
+// // // //   // useEffect(() => {
+// // // //   //   const nextFilters = location.state?.filters || readSavedFilters();
+// // // //   //   if (nextFilters) setFilters(nextFilters);
+// // // //   // }, [location.state]);
+
+// // // //   useEffect(() => {
+// // // //     const nextFilters =
+// // // //         dashboardFilters ||
+// // // //         location.state?.filters ||
+// // // //         readSavedFilters();
+
+// // // //     if (nextFilters) {
+// // // //         setFilters(nextFilters);
+
+// // // //         const deviceId = String(
+// // // //             nextFilters.selectedDeviceId ||
+// // // //             nextFilters.device_id ||
+// // // //             nextFilters.device ||
+// // // //             nextFilters.ac_id ||
+// // // //             ""
+// // // //         ).trim();
+
+// // // //         setSelectedDeviceId(deviceId);
+// // // //     }
+// // // //   }, [dashboardFilters, location.state]);
+
+// // // //   const branchSelected = Boolean(String(filters?.branch || "").trim());
+
+// // // //   const fetchRows = useCallback(async () => {
+// // // //     if (!branchSelected) return;
+// // // //     setLoading(true);
+// // // //     setError("");
+// // // //     try {
+// // // //       const now = Date.now();
+// // // //       const windowMs = period === "24h" ? 24 * 60 * 60 * 1000 : period === "7d" ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+// // // //       const params = new URLSearchParams();
+// // // //       FILTER_KEYS.forEach((key) => {
+// // // //         const value = filters?.[key];
+// // // //         if (key === "device" || key === "device_id" || key === "selectedDeviceId" || key === "ac_id") return;
+// // // //         if (value !== undefined && value !== null && String(value).trim()) params.set(key, String(value));
+// // // //       });
+// // // //       params.set("from", new Date(now - windowMs).toISOString());
+// // // //       params.set("to", new Date(now).toISOString());
+// // // //       // The local backend stores one-minute buckets; it cannot return raw samples.
+// // // //       // Hour/day are rollups of those stored minute buckets.
+// // // //       params.set("interval_seconds", aggregation === "hour" ? "3600" : aggregation === "day" ? "86400" : "60");
+// // // //       params.set("t", String(now));
+      
+// // // //       const response = await fetch(`${API_BASE}/telemetry-aggregates/?${params.toString()}`, {
+// // // //         method: "GET",
+// // // //         headers: getAuthHeaders(),
+// // // //         cache: "no-store",
+// // // //       });
+// // // //       if (!response.ok) throw new Error(response.status === 401 ? "Your session is not authorized. Please sign in again." : `Telemetry history API returned HTTP ${response.status}.`);
+      
+// // // //       const payload = await response.json();
+
+// // // //       const historyRows = normalizeRows(payload).map((row) => {
+// // // //         // Chart points use bucket_start; freshness uses last_timestamp (the
+// // // //         // actual device reading time). Backend energy fields are already kWh.
+// // // //         const bucketTimestamp = row.bucket_start ?? row.timestamp ?? row.ts ?? row.time;
+// // // //         return {
+// // // //           ...row,
+// // // //           timestamp: bucketTimestamp,
+// // // //           voltage: row.avg_voltage ?? row.voltage,
+// // // //           current: row.avg_current ?? row.current,
+// // // //           power: row.avg_power ?? row.power,
+// // // //           temperature: row.avg_temperature ?? row.temperature,
+// // // //           humidity: row.avg_humidity ?? row.humidity,
+// // // //           energy: row.energy,
+// // // //           energy_delta: row.energy_delta,
+// // // //         };
+// // // //       }).filter((row) => timestampOf(row) !== null);
+
+// // // //       setRows(historyRows);
+
+// // // //       const deviceIds = [...new Set(historyRows.map((row) => String(row.device_id || row.ac_id || "")).filter(Boolean))].sort();
+// // // //       setSelectedDeviceId((previous) => deviceIds.includes(previous) ? previous : (deviceIds.length === 1 ? deviceIds[0] : ""));
+      
+// // // //       if (!historyRows.length) {
+// // // //         setError("No historical telemetry was returned for this branch and time range. Check the stored telemetry and selected hierarchy.");
+// // // //       }
+// // // //     } catch (fetchError) {
+// // // //       setRows([]);
+// // // //       setError(fetchError?.message || "Unable to load historical telemetry for this branch.");
+// // // //     } finally {
+// // // //       setLoading(false);
+// // // //     }
+// // // //   }, [branchSelected, filters, period, aggregation]);
+
+// // // //   useEffect(() => {
+// // // //     fetchRows();
+// // // //   }, [fetchRows]);
+
+// // // //   const deviceOptions = useMemo(() => [...new Set(rows.map((row) => String(row.device_id || row.ac_id || "")).filter(Boolean))].sort(), [rows]);
+
+// // // //   const selectedRows = useMemo(() => selectedDeviceId
+// // // //     ? rows.filter((row) => String(row.device_id || row.ac_id || "") === selectedDeviceId)
+// // // //     : [], [rows, selectedDeviceId]);
+
+// // // //   // ✅ MOVED THESE HOOKS HERE (Top level of component, AFTER selectedRows is defined)
+// // // //   const latestDeviceTelemetryTime = useMemo(() => {
+// // // //     if (!selectedRows.length) return null;
+// // // //     const timestamps = selectedRows
+// // // //       .map((row) => lastTelemetryTimestampOf(row))
+// // // //       .filter((timestamp) => timestamp !== null);
+// // // //     if (!timestamps.length) return null;
+// // // //     return Math.max(...timestamps);
+// // // //   }, [selectedRows]);
+
+// // // //   const telemetryRelay = useMemo(() => {
+// // // //     const sorted = selectedRows
+// // // //       .map((row) => ({ row, ts: timestampOf(row) ?? 0 }))
+// // // //       .sort((x, y) => x.ts - y.ts);
+// // // //     for (let i = sorted.length - 1; i >= 0; i -= 1) {
+// // // //       const raw = sorted[i].row.latest_relay ?? sorted[i].row.relay;
+// // // //       if (raw !== null && raw !== undefined && raw !== "") return Number(raw) ? 1 : 0;
+// // // //     }
+// // // //     return null;
+// // // //   }, [selectedRows]);
+
+// // // //   const isLive = useMemo(() => {
+// // // //     if (!latestDeviceTelemetryTime) return false;
+// // // //     return Math.abs(Date.now() - latestDeviceTelemetryTime) < 60000;
+// // // //   }, [latestDeviceTelemetryTime]);
+
+// // // //   const lastTelemetryText = latestDeviceTelemetryTime
+// // // //     ? new Date(latestDeviceTelemetryTime).toLocaleTimeString([], {
+// // // //         hour: "2-digit",
+// // // //         minute: "2-digit",
+// // // //         second: "2-digit",
+// // // //         hour12: false,
+// // // //       })
+// // // //     : "--";
+// // // //   // --------------------------------------------------------------------------
+
+// // // //   const allMetrics = useMemo(() => {
+// // // //     if (!selectedRows.length) return [];
+// // // //     const keys = [...new Set(selectedRows.flatMap((row) => Object.keys(row)))];
+// // // //     const numericKeys = keys.filter((key) => isNumericMetric(key, selectedRows));
+
+// // // //     return numericKeys.sort((a, b) => {
+// // // //       const normA = a.toLowerCase().replace(/[\s_-]/g, "");
+// // // //       const normB = b.toLowerCase().replace(/[\s_-]/g, "");
+      
+// // // //       const indexA = PREFERRED_METRICS.findIndex(k => k.toLowerCase().replace(/[\s_-]/g, "") === normA);
+// // // //       const indexB = PREFERRED_METRICS.findIndex(k => k.toLowerCase().replace(/[\s_-]/g, "") === normB);
+
+// // // //       if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+// // // //       if (indexA !== -1) return -1;
+// // // //       if (indexB !== -1) return 1;
+// // // //       return a.localeCompare(b);
+// // // //     });
+// // // //   }, [selectedRows]);
+
+// // // //   const timeFilteredRows = useMemo(() => {
+// // // //     const now = Date.now();
+// // // //     const windowMs = period === "24h"
+// // // //       ? 24 * 60 * 60 * 1000
+// // // //       : period === "7d"
+// // // //         ? 7 * 24 * 60 * 60 * 1000
+// // // //         : 30 * 24 * 60 * 60 * 1000;
+// // // //     const from = now - windowMs;
+
+// // // //     const dated = selectedRows
+// // // //       .map((row) => ({ ...row, __ts: timestampOf(row) }))
+// // // //       .filter((row) => row.__ts !== null && row.__ts >= from && row.__ts <= now);
+
+// // // //     return dated.map((row) => ({
+// // // //       ...row,
+// // // //       __chartTime: shortTime(row.__ts),
+// // // //       __chartTs: row.__ts,
+// // // //     }));
+// // // //   }, [selectedRows, period]);
+
+// // // //   useEffect(() => {
+// // // //     const available = allMetrics;
+// // // //     setSelectedMetrics((previous) => {
+// // // //       const valid = previous.filter((key) => available.includes(key));
+// // // //       if (valid.length) return valid;
+
+// // // //       const defaultSelection = available.filter((key) => {
+// // // //         const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, "");
+// // // //         return PREFERRED_METRICS.some(
+// // // //           (preferred) => preferred.toLowerCase().replace(/[\s_-]/g, "") === normalizedKey
+// // // //         );
+// // // //       });
+
+// // // //       return defaultSelection.length > 0 ? defaultSelection : available.slice(0, 4);
+// // // //     });
+// // // //   }, [selectedDeviceId, allMetrics.join("|")]);
+
+// // // //   const chartRows = useMemo(() => {
+// // // //     const sorted = [...timeFilteredRows].sort((a, b) => (timestampOf(a) ?? 0) - (timestampOf(b) ?? 0));
+// // // //     return sorted.map((row) => ({
+// // // //       ...row,
+// // // //       __chartTime: row.__chartTime || shortTime(timestampOf(row) ?? row.timestamp ?? row.ts ?? row.time ?? ""),
+// // // //     }));
+// // // //   }, [timeFilteredRows]);
+
+// // // //   const stats = useMemo(() => selectedMetrics.map((metric) => ({
+// // // //     key: metric,
+// // // //     ...summarizeMetric(chartRows, metric),
+// // // //   })).filter((item) => item.count), [chartRows, selectedMetrics]);
+
+// // // //   const runAnalysis = async () => {
+// // // //     if (!selectedDeviceId || !chartRows.length || !selectedMetrics.length) return;
+// // // //     setAnalyzing(true);
+// // // //     setAnalysisError("");
+// // // //     setAnalysis("");
+// // // //     try {
+// // // //       const summary = Object.fromEntries(stats.map((item) => [item.key, item]));
+// // // //       const response = await fetch(`${GENAI_BASE}/api/analyze`, {
+// // // //         method: "POST",
+// // // //         headers: { "Content-Type": "application/json", Accept: "application/json" },
+// // // //         body: JSON.stringify({
+// // // //           metrics: selectedMetrics,
+// // // //           aggregation,
+// // // //           rows: chartRows.slice(-500).map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !key.startsWith("__")))),
+// // // //           device_id: selectedDeviceId,
+// // // //           ac_id: selectedDeviceId,
+// // // //           summary: { ...summary, device_id: selectedDeviceId, branch: filters.branch, hierarchy: filters.hierarchy, period },
+// // // //         }),
+// // // //       });
+// // // //       if (!response.ok) throw new Error(`GenAI service returned HTTP ${response.status}. Check that the FastAPI service is running on port 8001.`);
+// // // //       const result = await response.json();
+// // // //       setAnalysis(result.analysis || result.explanation || result.summary || JSON.stringify(result, null, 2));
+// // // //     } catch (analysisFetchError) {
+// // // //       setAnalysisError(analysisFetchError?.message || "Could not generate AI insights.");
+// // // //     } finally {
+// // // //       setAnalyzing(false);
+// // // //     }
+// // // //   };
+
+// // // //   if (!branchSelected) {
+// // // //     return (
+// // // //       // <main className="trends-page">
+// // // //       <main className={`trends-page ${embedded ? "trends-embedded" : ""}`}>
+// // // //         <section className="trends-empty">
+// // // //           <AlertCircle size={42} />
+// // // //           <h1>Choose a branch first</h1>
+// // // //           <p>Trends are available only after selecting a branch in the dashboard hierarchy.</p>
+// // // //           <button className="trends-primary" onClick={() => navigate("/org/dashboard")}>Back to Dashboard</button>
+// // // //         </section>
+// // // //       </main>
+// // // //     );
+// // // //   }
+
+// // // //   return (
+// // // //     <main className="trends-page">
+// // // //       <header className="trends-header">
+// // // //         <div>
+// // // //           {/* <button className="trends-back" onClick={() => navigate(-1)}><ArrowLeft size={16} /> Back</button> */}
+// // // //           <p className="trends-eyebrow"><ChartNoAxesCombined size={16} /> GENAI TREND EXPLORER</p>
+// // // //           {/* <h1>AC Device Trends</h1> */}
+// // // //           {/* <p className="trends-subtitle">
+// // // //             {filters.hierarchy || "Hierarchy"} · {filters.state || filters.zone || "All areas"} · {filters.branch}
+// // // //             {selectedDeviceId ? ` · AC ${selectedDeviceId}` : " · Select an AC to view its individual history"}
+// // // //           </p> */}
+// // // //         </div>
+// // // //         <button className="trends-secondary" onClick={fetchRows} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh data"}</button>
+// // // //       </header>
+
+// // // //       <section className="trends-toolbar">
+// // // //         <div className="trends-control">
+// // // //           <label>Time range</label>
+// // // //           <div className="trends-segmented">
+// // // //             {[["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"]].map(([value, label]) => (
+// // // //               <button key={value} className={period === value ? "active" : ""} onClick={() => setPeriod(value)}>{label}</button>
+// // // //             ))}
+// // // //           </div>
+// // // //         </div>
+// // // //         {/* <div className="trends-control">
+// // // //           <label htmlFor="trends-device-select">AC device</label>
+// // // //           <select id="trends-device-select" value={selectedDeviceId} onChange={(event) => { setSelectedDeviceId(event.target.value); setAnalysis(""); setAnalysisError(""); }} disabled={loading || !deviceOptions.length}>
+// // // //             <option value="">Select an AC device</option>
+// // // //             {deviceOptions.map((deviceId) => <option key={deviceId} value={deviceId}>{deviceId}</option>)}
+// // // //           </select>
+// // // //         </div> */}
+        
+// // // //         <div className="trends-control">
+// // // //           <label>Aggregation</label>
+// // // //           <select value={aggregation} onChange={(event) => setAggregation(event.target.value)}>
+// // // //             <option value="minute">1-minute stored readings / average</option>
+// // // //             <option value="hour">Hourly average</option>
+// // // //             <option value="day">Daily average</option>
+// // // //           </select>
+// // // //         </div>
+
+// // // //         <div className="trends-toolbar-right">
+// // // //           <RelayControl deviceId={selectedDeviceId} telemetryRelay={telemetryRelay} disabled={loading} />
+// // // //           <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+// // // //             <span
+// // // //               className="trends-live-dot"
+// // // //               style={{
+// // // //                 width: "8px",
+// // // //                 height: "8px",
+// // // //                 borderRadius: "50%",
+// // // //                 backgroundColor: isLive ? "#22c55e" : "#9ca3af",
+// // // //               }}
+// // // //             />
+// // // //             {/* {isLive ? (
+// // // //               // <span style={{ fontWeight: 600, color: "#22c55e" }}>LIVE</span>
+// // // //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+// // // //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+// // // //               </strong>
+// // // //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+// // // //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+// // // //               </strong>
+// // // //             ) : (
+// // // //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+// // // //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+// // // //               </strong>
+// // // //             )} */}
+// // // //             { isLive && (
+// // // //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+// // // //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+// // // //               </strong>
+// // // //             )}
+// // // //           </div>
+// // // //         </div>
+// // // //       </section>
+
+
+// // // //       {error && <div className="trends-notice">
+// // // //         <AlertCircle size={18} /><span>{error}</span></div>
+// // // //       }
+
+// // // //       <section className="trends-panel">
+// // // //         <div className="trends-panel-heading">
+// // // //           <div><h2>Available numeric metrics</h2><p>Choose which telemetry fields to plot. Data and AI analysis are restricted to the selected AC device.</p></div>
+// // // //           <span className="trends-count">{selectedMetrics.length} selected</span>
+// // // //         </div>
+// // // //         {allMetrics.length ? (
+// // // //           <div className="trends-metric-list">
+// // // //             {allMetrics.map((metric) => (
+// // // //               <label key={metric} className="trends-metric-option">
+// // // //                 <input type="checkbox" checked={selectedMetrics.includes(metric)} onChange={(event) => setSelectedMetrics((previous) => event.target.checked ? [...previous, metric] : previous.filter((key) => key !== metric))} />
+// // // //                 <span>{metricLabel(metric)}</span>
+// // // //               </label>
+// // // //             ))}
+// // // //           </div>
+// // // //         ) : <p className="trends-muted">{loading ? "Detecting metrics…" : !selectedDeviceId ? "Select an AC device to load its metrics." : "No numeric metrics were detected for this AC in the selected time range."}</p>}
+// // // //       </section>
+
+// // // //       {selectedMetrics.length > 0 && (
+// // // //         <section className="trends-stats-grid trends-kpi-grid">
+// // // //           {selectedMetrics.map((metric) => (
+// // // //             <TrendMetricChart
+// // // //               key={metric}
+// // // //               metric={metric}
+// // // //               rows={chartRows}
+// // // //               stat={stats.find((item) => item.key === metric)}
+// // // //               period={period}
+// // // //               aggregation={aggregation}
+// // // //               resetKey={`${selectedDeviceId}|${period}|${aggregation}`}
+// // // //             />
+// // // //           ))}
+// // // //         </section>
+// // // //       )}
+
+// // // //       <section className="trends-chart-grid trends-device-charts">
+// // // //         <ACOnOff
+// // // //           deviceId={selectedDeviceId || filters?.ac_id || ""}
+// // // //           scope={filters}
+// // // //         />
+// // // //         {/* <DeviceTelemetryTable
+// // // //           data={selectedRows}
+// // // //           deviceId={selectedDeviceId || filters?.ac_id || ""}
+// // // //         /> */}
+// // // //         <CurrentTemperatureChart
+// // // //           deviceId={selectedDeviceId || filters?.ac_id || ""}
+// // // //           scope={filters}
+// // // //         />
+// // // //       </section>
+
+
+// // // //       <section className="trends-panel trends-ai-panel">
+// // // //         <div className="trends-panel-heading">
+// // // //           <div><h2><BrainCircuit size={20} /> GenAI explanation</h2><p>Ask the GenAI service to analyze historical readings for the selected AC device only.</p></div>
+// // // //           <button className="trends-primary" onClick={runAnalysis} disabled={analyzing || !selectedDeviceId || !chartRows.length || !selectedMetrics.length}><BrainCircuit size={16} /> {analyzing ? "Analyzing…" : "Explain trends"}</button>
+// // // //         </div>
+// // // //         {analysisError && <div className="trends-notice"><AlertCircle size={18} /><span>{analysisError}</span></div>}
+// // // //         {analysis ? <div className="trends-analysis-text">{analysis}</div> : <p className="trends-muted">Select an AC device, choose metrics, and click “Explain trends” to analyze only that device's history.</p>}
+// // // //       </section>
+// // // //     </main>
+// // // //   );
+// // // // }
+
+
+
+// // // import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+// // // import { useLocation, useNavigate } from "react-router-dom";
+// // // import {
+// // //   ResponsiveContainer,
+// // //   LineChart,
+// // //   Line,
+// // //   LabelList,
+// // //   CartesianGrid,
+// // //   XAxis,
+// // //   YAxis,
+// // //   Tooltip,
+// // //   Legend,
+// // // } from "recharts";
+// // // import { 
+// // //   ArrowLeft,
+// // //   BrainCircuit,
+// // //   RefreshCw,
+// // //   ChartNoAxesCombined,
+// // //   AlertCircle,
+// // //   Power,
+// // //   X
+// // // } from "lucide-react";
+// // // import "./dashboard.css";
+// // // import "./Trends.css";
+// // // import ACOnOff from "./ACOnOffBar/ACOnOff";
+// // // // import DeviceTelemetryPage from "./Tables/DeviceTelemetryTable";
+// // // import CurrentTemperatureChart from "./Current/CurrentTemp";
+// // // import {
+// // //   ZoomToolbar,
+// // //   ZoomSelection,
+// // //   useTimeZoom,
+// // //   makeZoomTicks,
+// // //   formatZoomTick,
+// // //   formatZoomLabel,
+// // // } from "./shared/chartZoom";
+// // // import DeviceTelemetryTable from "./Tables/DeviceTelemetryTAble";
+
+// // // const API_BASE = (import.meta.env.VITE_API_BASE || import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/$/, "");
+// // // const GENAI_BASE = (import.meta.env.VITE_GENAI_API_BASE_URL || "http://127.0.0.1:8001").replace(/\/$/, "");
+// // // const FILTER_STORAGE_KEY = "acMonitoringTrendsFilters";
+// // // const FILTER_KEYS = [
+// // //   "hierarchy", "country", "state", "district", "taluka", "city",
+// // //   "zone", "circle", "region", "division", "branch", "floor",
+// // //   "device", "device_id", "selectedDeviceId", "ac_id",
+// // // ];
+// // // const TIME_FIELDS = ["timestamp", "bucket_start", "ts", "time", "datetime", "date", "created_at", "last_updated", "last_timestamp", "device_timestamp", "telemetry_timestamp"];
+// // // const PREFERRED_METRICS = ["energy_delta", "current", "temperature", "latest_energy_counter"];
+// // // // Device is considered offline when no telemetry arrives for the configured
+// // // // publishing interval plus the 5-second grace period.
+// // // const TELEMETRY_EXPECTED_INTERVAL_SECONDS = Math.max(
+// // //   1,
+// // //   Number(import.meta.env.VITE_TELEMETRY_EXPECTED_INTERVAL_SECONDS || 2)
+// // // );
+// // // const TELEMETRY_GRACE_SECONDS = Math.max(
+// // //   0,
+// // //   Number(import.meta.env.VITE_TELEMETRY_GRACE_SECONDS || 5)
+// // // );
+// // // const DEVICE_OFFLINE_AFTER_MS =
+// // //   (TELEMETRY_EXPECTED_INTERVAL_SECONDS + TELEMETRY_GRACE_SECONDS) * 1000;
+// // // const DEVICE_STATUS_POLL_MS = 5000;
+
+// // // function getToken() {
+// // //   for (const key of ["token", "authToken", "access_token", "accessToken", "jwt"]) {
+// // //     const value = localStorage.getItem(key) || sessionStorage.getItem(key);
+// // //     if (value) return value;
+// // //   }
+// // //   return "";
+// // // }
+
+// // // function getAuthHeaders() {
+// // //   const token = getToken();
+// // //   return {
+// // //     Accept: "application/json",
+// // //     ...(token ? { Authorization: token.startsWith("Token ") || token.startsWith("Bearer ") ? token : `Token ${token}` } : {}),
+// // //   };
+// // // }
+
+// // // function readSavedFilters() {
+// // //   try {
+// // //     const value = localStorage.getItem(FILTER_STORAGE_KEY);
+// // //     return value ? JSON.parse(value) : null;
+// // //   } catch {
+// // //     return null;
+// // //   }
+// // // }
+
+// // // function normalizeRows(payload) {
+// // //   if (Array.isArray(payload)) 
+// // //     return payload.filter((row) => row && typeof row === "object");
+// // //   if (Array.isArray(payload?.data)) 
+// // //     return payload.data.filter((row) => row && typeof row === "object");
+// // //   if (Array.isArray(payload?.results)) 
+// // //     return payload.results.filter((row) => row && typeof row === "object");
+// // //   if (Array.isArray(payload?.records)) 
+// // //     return payload.records.filter((row) => row && typeof row === "object");
+// // //   return [];
+// // // }
+
+// // // function parseTimestamp(raw) {
+// // //   if (raw === null || raw === undefined || raw === "") return null;
+// // //   let parsed;
+// // //   if (typeof raw === "number" || /^\d+$/.test(String(raw))) {
+// // //     let n = Number(raw);
+// // //     if (String(raw).length <= 10) n *= 1000;
+// // //     else if (String(raw).length >= 16) n /= 1000;
+// // //     parsed = new Date(n).getTime();
+// // //   } else {
+// // //     parsed = new Date(raw).getTime();
+// // //   }
+// // //   return Number.isFinite(parsed) ? parsed : null;
+// // // }
+
+// // // function timestampOf(row) {
+// // //   // Normalized timestamp is the bucket position used by historical charts.
+// // //   return parseTimestamp(row?.timestamp ?? row?.bucket_start ?? row?.ts ?? row?.time ?? row?.datetime ?? row?.date);
+// // // }
+
+// // // function lastTelemetryTimestampOf(row) {
+// // //   return parseTimestamp(
+// // //     row?.last_timestamp ?? row?.device_timestamp ?? row?.telemetry_timestamp ??
+// // //     row?.timestamp ?? row?.bucket_start
+// // //   );
+// // // }
+
+// // // // The AC table uses the latest-device snapshot API, while chart history uses
+// // // // minute/hour aggregates. Use the same latest snapshot for the Trends status
+// // // // badge so an old aggregate bucket cannot incorrectly mark a live device OFFLINE.
+// // // function isOnlineFromLatestRecord(record, now = Date.now()) {
+// // //   if (!record) return null;
+
+// // //   const rawStatus = String(
+// // //     record.device_status ?? record.connectivity_status ?? record.status ?? ""
+// // //   ).trim().toUpperCase();
+
+// // //   // In the existing backend response, ON/OFF represents relay state while the
+// // //   // telemetry snapshot is fresh. Both therefore mean the device is ONLINE.
+// // //   if (["ONLINE", "ON", "OFF", "ACTIVE", "RUNNING", "1", "TRUE"].includes(rawStatus)) {
+// // //     return true;
+// // //   }
+// // //   if (["OFFLINE", "ERROR", "DISCONNECTED"].includes(rawStatus)) {
+// // //     return false;
+// // //   }
+
+// // //   const lastSeen = lastTelemetryTimestampOf(record) ?? parseTimestamp(record?.last_seen);
+// // //   if (lastSeen === null) return null;
+// // //   return now >= lastSeen - 60000 && now - lastSeen <= DEVICE_OFFLINE_AFTER_MS;
+// // // }
+
+// // // function isNumericMetric(key, rows) {
+// // //   if (TIME_FIELDS.includes(key.toLowerCase())) return false;
+// // //   if (/^(id|ac_id|device_id|customer_id|branch_id|floor_id|site_id|uuid|status|relay|alarm_status|latest_relay|sample_count|interval_seconds)$/i.test(key)) return false;
+// // //   if (/_sample_count$/i.test(key) || /_wh$/i.test(key)) return false;
+// // //   if (/^(avg|min|max)_(voltage|current|power|temperature|humidity)$/i.test(key)) return false;
+// // //   const values = rows.map((row) => row[key]).filter((value) => value !== null && value !== undefined && value !== "");
+// // //   if (!values.length) return false;
+// // //   return values.filter((value) => Number.isFinite(Number(value))).length / values.length >= 0.7;
+// // // }
+
+// // // function metricLabel(value) {
+// // //   const normalized = String(value).toLowerCase().replace(/[\s_-]/g, "");
+// // //   if (normalized === "latestenergycounter") return "Energy Consumption";
+// // //   return String(value).replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+// // // }
+
+// // // function displayMetricName(value) {
+// // //   return metricLabel(value);
+// // // }
+
+// // // function metricUnit(metric) {
+// // //   const key = metric.toLowerCase().replace(/[\s_-]/g, "");
+
+// // //   const units = {
+// // //     voltage: "V",
+// // //     current: "A",
+// // //     power: "W",
+// // //     activepower: "W",
+// // //     temperature: "°C",
+// // //     indoortemperature: "°C",
+// // //     humidity: "%",
+// // //     indoorhumidity: "%",
+// // //     frequency: "Hz",
+// // //     powerfactor: "",
+// // //     energy: "kWh",
+// // //     energyconsumption: "kWh",
+// // //     energydelta: "kWh",
+// // //     latestenergycounter: "kWh",
+// // //   };
+
+// // //   return units[key] ?? "";
+// // // }
+
+// // // function formatMetricValue(value, unit, metric = "") {
+// // //   if (value === null || value === undefined || value === "") {
+// // //     return "--";
+// // //   }
+
+// // //   const normalized = metric.toLowerCase().replace(/[\s_-]/g, "");
+
+// // //   const formatted =
+// // //     normalized === "energydelta"
+// // //       ? String(value)
+// // //       : Number(value).toLocaleString(undefined, {
+// // //           maximumFractionDigits: 2,
+// // //         });
+
+// // //   return unit ? `${formatted} ${unit}` : formatted;
+// // // }
+
+// // // function formatMetricParts(value, unit) {
+// // //   const formatted = Number(value).toLocaleString(undefined, {
+// // //     maximumFractionDigits: 2,
+// // //   });
+
+// // //   return { formatted, unit };
+// // // }
+
+// // // function shortTime(value) {
+// // //   const date = new Date(value);
+// // //   return Number.isNaN(date.getTime()) ? String(value ?? "") : date.toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+// // // }
+
+// // // function summarizeMetric(rows, key) {
+// // //   const values = rows.map((row) => Number(row[key])).filter(Number.isFinite);
+// // //   if (!values.length) return null;
+
+// // //   const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, "");
+// // //   const sum = values.reduce((total, value) => total + value, 0);
+// // //   const latest = values[values.length - 1];
+
+// // //   // Period KPIs: cumulative energy remains a counter, energy_delta is
+// // //   // accumulated over the selected period, and instantaneous metrics are averaged.
+// // //   let displayValue = sum / values.length;
+// // //   if (normalizedKey === "energydelta") displayValue = sum;
+// // //   if (normalizedKey === "latestenergycounter") displayValue = latest;
+
+// // //   return {
+// // //     count: values.length,
+// // //     latest,
+// // //     min: Math.min(...values),
+// // //     max: Math.max(...values),
+// // //     average: sum / values.length,
+// // //     total: sum,
+// // //     displayValue,
+// // //   };
+// // // }
+
+// // // function TrendMetricChart({
+// // //   metric,
+// // //   rows,
+// // //   resetKey,
+// // //   stat,
+// // //   period,
+// // //   aggregation,
+// // // }) {
+// // //     const { baseFrom, baseTo } = useMemo(() => {
+// // //     const times = rows
+// // //       .map((row) => row.__chartTs)
+// // //       .filter(Number.isFinite);
+
+// // //     if (!times.length) {
+// // //       const now = Date.now();
+
+// // //       return {
+// // //         baseFrom: now - 60 * 60 * 1000,
+// // //         baseTo: now,
+// // //       };
+// // //     }
+
+// // //     const from = Math.min(...times);
+
+// // //     return {
+// // //       baseFrom: from,
+// // //       baseTo: Math.max(Math.max(...times), from + 60 * 1000),
+// // //     };
+// // //   }, [rows]);
+
+// // //   const zoomState = useTimeZoom({ baseFrom, baseTo, resetKey });
+// // //   const { view, zoomed } = zoomState;
+
+// // //   const ticks = useMemo(
+// // //     () => makeZoomTicks(view.from, view.to),
+// // //     [view.from, view.to]
+// // //   );
+// // //   const unit = metricUnit(metric);
+
+// // //   const xAxisTitle = useMemo(() => {
+// // //     if (aggregation === "minute") {
+// // //       return period === "24h"
+// // //         ? "Hours"
+// // //         : period === "7d"
+// // //           ? "Date"
+// // //           : "Date";
+// // //     }
+
+// // //     if (aggregation === "hour") {
+// // //       return "Time (Hourly)";
+// // //     }
+
+// // //     if (aggregation === "day") {
+// // //       return "Date (Daily)";
+// // //     }
+
+// // //     return "Time";
+// // //   }, [period, aggregation]);
+
+// // //   const [expanded, setExpanded] = useState(false);
+// // //   const downRef = useRef(null);
+
+// // //   const renderLatestValueLabel = ({ x, y, value, index }) => {
+// // //     if (index !== rows.length - 1 || value == null) return null;
+
+// // //     return (
+// // //       <text
+// // //         x={x}
+// // //         y={y - 12}
+// // //         fill="#3182BD"
+// // //         fontSize={11}
+// // //         fontWeight={700}
+// // //         textAnchor="middle"
+// // //       >
+// // //         {formatMetricValue(value, unit, metric)}
+// // //       </text>
+// // //     );
+// // //   };
+
+// // //   useEffect(() => {
+// // //     if (!expanded) return undefined;
+
+// // //     const onKey = (e) => {
+// // //       if (e.key === "Escape") setExpanded(false);
+// // //     };
+
+// // //     window.addEventListener("keydown", onKey);
+
+// // //     return () => window.removeEventListener("keydown", onKey);
+// // //   }, [expanded]);
+
+// // //   // Keep your remaining existing code from here.
+
+// // //   // A plain click on the graph (not a drag-to-zoom, not while zoomed) expands the card.
+// // //   const onAreaMouseDown = (e) => { downRef.current = { x: e.clientX, y: e.clientY }; };
+// // //   const onAreaClick = (e) => {
+// // //     const d = downRef.current;
+// // //     downRef.current = null;
+// // //     if (expanded || zoomed || !d) return;
+// // //     if (Math.abs(e.clientX - d.x) > 4 || Math.abs(e.clientY - d.y) > 4) return;
+// // //     setExpanded(true);
+// // //   };
+
+// // //   // KPI card: values on the left, the zoomable graph on the right.  Click the graph
+// // //   // to open it large, same as the Current & Temperature chart.
+// // //   return (
+// // //     <article className={`trends-stat-card trends-kpi-card${expanded ? " current-history-expanded trends-kpi-expanded" : ""}`}>
+// // //       <div className="trends-kpi-values">
+// // //         <span>{displayMetricName(metric)}</span>
+// // //         <strong>
+// // //           {stat ? formatMetricParts(stat.displayValue, unit).formatted : "--"}
+// // //           {unit && <span className="trends-stat-unit">{unit}</span>}
+// // //         </strong>
+// // //       </div>
+
+// // //       <div className="trends-kpi-graph">
+// // //         {/* Zoom bar + close button only exist while the card is expanded. */}
+// // //         {expanded && (
+// // //           <div className="trends-kpi-tools">
+// // //             <ZoomToolbar z={zoomState} />
+// // //             <button
+// // //               type="button"
+// // //               className="chart-expand-btn"
+// // //               onClick={() => setExpanded(false)}
+// // //               title="Restore Window"
+// // //               aria-label="Restore Window"
+// // //             >
+// // //               <X size={18} />
+// // //             </button>
+// // //           </div>
+// // //         )}
+// // //         <div {...zoomState.areaProps} onMouseDown={onAreaMouseDown} onClick={onAreaClick} style={expanded ? undefined : { cursor: "zoom-in" }}>
+// // //           <div className="trends-chart trends-kpi-chart">
+// // //             <ResponsiveContainer width="100%" height="100%">
+// // //               <LineChart data={rows} margin={{ top: 8, right: 14, left: 4, bottom: 8 }} {...zoomState.chartProps}>
+// // //                 <CartesianGrid strokeDasharray="3 3" />
+// // //                 <XAxis
+// // //                   dataKey="__chartTs"
+// // //                   type="number"
+// // //                   scale="time"
+// // //                   domain={[view.from, view.to]}
+// // //                   allowDataOverflow
+// // //                   ticks={ticks}
+// // //                   tickFormatter={(t) => formatZoomTick(t, view.from, view.to)}
+// // //                   tick={{ fontSize: expanded ? 11 : 10 }}
+// // //                   minTickGap={expanded ? 5 : 18}
+// // //                   label={
+// // //                     expanded
+// // //                       ? {
+// // //                           value: xAxisTitle,
+// // //                           position: "insideBottom",
+// // //                           offset: -4,
+// // //                           fontSize: 11,
+// // //                         }
+// // //                       : undefined
+// // //                   }
+// // //                 />
+
+// // //                 <YAxis
+// // //                   width={expanded ? 75 : 55}
+// // //                   tick={{ fontSize: expanded ? 11 : 10 }}
+                  
+// // //                   label={
+// // //                     expanded
+// // //                       ? {
+// // //                           value: unit
+// // //                             ? `${displayMetricName(metric)} (${unit})`
+// // //                             : displayMetricName(metric),
+// // //                           angle: -90,
+// // //                           position: "insideLeft",
+// // //                           style: {
+// // //                             textAnchor: "middle",
+// // //                             fontSize: 11,
+// // //                           },
+// // //                         }
+// // //                       : undefined
+// // //                   }
+// // //                 />
+
+// // //                 <Tooltip
+// // //                   contentStyle={{
+// // //                     fontSize: 12,
+// // //                     padding: "7px 10px",
+// // //                     borderRadius: 8,
+// // //                   }}
+// // //                   labelStyle={{ fontSize: 11, marginBottom: 4 }}
+// // //                   labelFormatter={(t) => formatZoomLabel(t, view.from, view.to)}
+// // //                   formatter={(value) => [
+// // //                     formatMetricValue(value, unit, metric),
+// // //                     displayMetricName(metric),
+// // //                   ]}
+// // //                 />
+
+// // //                 {expanded && <Legend />}
+
+// // //                 <ZoomSelection sel={zoomState.sel} />
+
+// // //                 <Line
+// // //                   type="monotone"
+// // //                   dataKey={metric}
+// // //                   name={`${displayMetricName(metric)}${unit ? ` (${unit})` : ""}`}
+// // //                   stroke="#3182BD"
+// // //                   strokeWidth={2}
+// // //                   dot={false}
+// // //                   activeDot={{ r: 5 }}
+// // //                   connectNulls
+// // //                   isAnimationActive={false}
+// // //                 >
+// // //                   {/* <LabelList content={renderLatestValueLabel} /> */}
+// // //                 </Line>
+// // //               </LineChart>
+// // //             </ResponsiveContainer>
+// // //           </div>
+// // //         </div>
+// // //       </div>
+// // //     </article>
+// // //   );
+// // // }
+
+// // // function RelayControl({ deviceId, telemetryRelay, deviceOnline, disabled }) {
+// // //   const [override, setOverride] = useState(null); // { deviceId, value }
+// // //   const [sending, setSending] = useState(false);
+// // //   const [message, setMessage] = useState(null); // { type: "ok" | "error", text }
+
+// // //   useEffect(() => { setOverride(null); setMessage(null); }, [deviceId]);
+// // //   useEffect(() => { setOverride(null); }, [telemetryRelay]); // fresh telemetry wins
+
+// // //   const current = override && override.deviceId === deviceId ? override.value : telemetryRelay;
+// // //   const known = current === 0 || current === 1;
+
+// // //   const send = async (value) => {
+// // //     if (!deviceId || sending) return;
+// // //     const label = value === 1 ? "ON" : "OFF";
+// // //     setSending(true);
+// // //     setMessage(null);
+// // //     try {
+// // //       const response = await fetch(`${API_BASE}/devices/relay/`, {
+// // //         method: "POST",
+// // //         headers: { ...getAuthHeaders(), "Content-Type": "application/json" },
+// // //         body: JSON.stringify({ device_id: deviceId, method: "Relay", params: value }),
+// // //       });
+// // //       const result = await response.json().catch(() => ({}));
+// // //       if (!response.ok || result?.status === "error") {
+// // //         throw new Error([result?.message || `Relay command failed (HTTP ${response.status}).`, result?.details].filter(Boolean).join(" - "));
+// // //       }
+// // //       setOverride({ deviceId, value });
+// // //       setMessage({ type: "ok", text: result?.message || `Relay ${label} command sent.` });
+// // //     } catch (err) {
+// // //       setMessage({ type: "error", text: err?.message || "Could not send the relay command." });
+// // //     } finally {
+// // //       setSending(false);
+// // //     }
+// // //   };
+
+// // //   const off = disabled || sending || !deviceId || !deviceOnline;
+// // //   const isOn = current === 1;
+// // //   return (
+// // //     <div className="trends-relay">
+// // //       <div className="trends-relay-wrap">
+// // //         {/* <span className="trends-relay-label">Relay Control</span> */}
+// // //         <button
+// // //           type="button"
+// // //           role="switch"
+// // //           aria-checked={isOn}
+// // //           aria-label={`Relay ${isOn ? "ON" : "OFF"}`}
+// // //           className={`trends-relay-switch ${isOn ? "on" : ""} ${sending ? "busy" : ""}`}
+// // //           onClick={() => send(isOn ? 0 : 1)}
+// // //           disabled={off}
+// // //           title={!deviceId ? "Select an AC device first" : known ? `Relay is ${isOn ? "ON" : "OFF"} - click to turn ${isOn ? "OFF" : "ON"}` : "Relay state unknown"}
+// // //         >
+// // //           <span className="trends-relay-knob" />
+// // //         </button>
+// // //         {/* <span className="trends-relay-hint">{!deviceOnline ? "Unavailable" : sending ? "Sending…" : !deviceId ? "Select an AC" : known ? (isOn ? "ON" : "OFF") : "Unknown"}</span> */}
+// // //       </div>
+// // //       {message && <small className={`trends-relay-msg ${message.type}`}>{message.text}</small>}
+// // //     </div>
+// // //   );
+// // // }
+
+// // // // export default function Trends() {
+// // // export default function Trends({
+// // //   embedded = false,
+// // //   dashboardFilters = null,
+// // // }) {
+// // //   const location = useLocation();
+// // //   const navigate = useNavigate();
+// // //   // const [filters, setFilters] = useState(() => location.state?.filters || readSavedFilters());
+// // //   const [filters, setFilters] = useState(
+// // //     () => dashboardFilters || location.state?.filters || readSavedFilters()
+// // //   );
+// // //   const [rows, setRows] = useState([]);
+// // //   const [selectedDeviceId, setSelectedDeviceId] = useState("");
+// // //   const [loading, setLoading] = useState(false);
+// // //   const [error, setError] = useState("");
+// // //   const [period, setPeriod] = useState("24h");
+// // //   const [aggregation, setAggregation] = useState("minute");
+// // //   const [selectedMetrics, setSelectedMetrics] = useState([]);
+// // //   const [analysis, setAnalysis] = useState("");
+// // //   const [analyzing, setAnalyzing] = useState(false);
+// // //   const [analysisError, setAnalysisError] = useState("");
+// // //   const [statusClock, setStatusClock] = useState(Date.now());
+// // //   const [latestStatusRows, setLatestStatusRows] = useState([]);
+
+// // //   // useEffect(() => {
+// // //   //   const nextFilters = location.state?.filters || readSavedFilters();
+// // //   //   if (nextFilters) setFilters(nextFilters);
+// // //   // }, [location.state]);
+
+// // //   useEffect(() => {
+// // //     const nextFilters =
+// // //         dashboardFilters ||
+// // //         location.state?.filters ||
+// // //         readSavedFilters();
+
+// // //     if (nextFilters) {
+// // //         setFilters(nextFilters);
+
+// // //         const deviceId = String(
+// // //             nextFilters.selectedDeviceId ||
+// // //             nextFilters.device_id ||
+// // //             nextFilters.device ||
+// // //             nextFilters.ac_id ||
+// // //             ""
+// // //         ).trim();
+
+// // //         setSelectedDeviceId(deviceId);
+// // //     }
+// // //   }, [dashboardFilters, location.state]);
+
+// // //   const branchSelected = Boolean(String(filters?.branch || "").trim());
+
+// // //   const fetchRows = useCallback(async ({ silent = false } = {}) => {
+// // //     if (!branchSelected) return;
+// // //     if (!silent) {
+// // //       setLoading(true);
+// // //       setError("");
+// // //     }
+// // //     try {
+// // //       const now = Date.now();
+// // //       const windowMs = period === "24h" ? 24 * 60 * 60 * 1000 : period === "7d" ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+// // //       const params = new URLSearchParams();
+// // //       FILTER_KEYS.forEach((key) => {
+// // //         const value = filters?.[key];
+// // //         if (key === "device" || key === "device_id" || key === "selectedDeviceId" || key === "ac_id") return;
+// // //         if (value !== undefined && value !== null && String(value).trim()) params.set(key, String(value));
+// // //       });
+// // //       params.set("from", new Date(now - windowMs).toISOString());
+// // //       params.set("to", new Date(now).toISOString());
+// // //       // The local backend stores one-minute buckets; it cannot return raw samples.
+// // //       // Hour/day are rollups of those stored minute buckets.
+// // //       params.set("interval_seconds", aggregation === "hour" ? "3600" : aggregation === "day" ? "86400" : "60");
+// // //       params.set("t", String(now));
+      
+// // //       const response = await fetch(`${API_BASE}/telemetry-aggregates/?${params.toString()}`, {
+// // //         method: "GET",
+// // //         headers: getAuthHeaders(),
+// // //         cache: "no-store",
+// // //       });
+// // //       if (!response.ok) throw new Error(response.status === 401 ? "Your session is not authorized. Please sign in again." : `Telemetry history API returned HTTP ${response.status}.`);
+      
+// // //       const payload = await response.json();
+
+// // //       const historyRows = normalizeRows(payload).map((row) => {
+// // //         // Chart points use bucket_start; freshness uses last_timestamp (the
+// // //         // actual device reading time). Backend energy fields are already kWh.
+// // //         const bucketTimestamp = row.bucket_start ?? row.timestamp ?? row.ts ?? row.time;
+// // //         return {
+// // //           ...row,
+// // //           timestamp: bucketTimestamp,
+// // //           voltage: row.avg_voltage ?? row.voltage,
+// // //           current: row.avg_current ?? row.current,
+// // //           power: row.avg_power ?? row.power,
+// // //           temperature: row.avg_temperature ?? row.temperature,
+// // //           humidity: row.avg_humidity ?? row.humidity,
+// // //           energy: row.energy,
+// // //           energy_delta: row.energy_delta,
+// // //         };
+// // //       }).filter((row) => timestampOf(row) !== null);
+
+// // //       setRows(historyRows);
+
+// // //       const deviceIds = [...new Set(historyRows.map((row) => String(row.device_id || row.ac_id || "")).filter(Boolean))].sort();
+// // //       setSelectedDeviceId((previous) => deviceIds.includes(previous) ? previous : (deviceIds.length === 1 ? deviceIds[0] : ""));
+      
+// // //       if (!historyRows.length && !silent) {
+// // //         setError("No historical telemetry was returned for this branch and time range. Check the stored telemetry and selected hierarchy.");
+// // //       }
+// // //     } catch (fetchError) {
+// // //       // A background status refresh must not erase the chart or its last-known
+// // //       // telemetry when the API has a temporary failure.
+// // //       if (!silent) {
+// // //         setRows([]);
+// // //         setError(fetchError?.message || "Unable to load historical telemetry for this branch.");
+// // //       }
+// // //     } finally {
+// // //       if (!silent) setLoading(false);
+// // //     }
+// // //   }, [branchSelected, filters, period, aggregation]);
+
+// // //   useEffect(() => {
+// // //     fetchRows();
+// // //   }, [fetchRows]);
+
+// // //   // Fetch the same latest-device snapshot used by the AC table. Historical
+// // //   // aggregate rows are optimized for charts and may have an older bucket time.
+// // //   const fetchLatestStatusRows = useCallback(async () => {
+// // //     if (!branchSelected) {
+// // //       setLatestStatusRows([]);
+// // //       return;
+// // //     }
+
+// // //     try {
+// // //       const params = new URLSearchParams();
+// // //       FILTER_KEYS.forEach((key) => {
+// // //         if (["device", "device_id", "selectedDeviceId", "ac_id"].includes(key)) return;
+// // //         const value = filters?.[key];
+// // //         if (value !== undefined && value !== null && String(value).trim()) {
+// // //           params.set(key, String(value));
+// // //         }
+// // //       });
+// // //       params.set("_status_t", String(Date.now()));
+
+// // //       const response = await fetch(`${API_BASE}/ac-data/?${params.toString()}`, {
+// // //         method: "GET",
+// // //         headers: getAuthHeaders(),
+// // //         cache: "no-store",
+// // //       });
+// // //       if (!response.ok) return;
+// // //       const payload = await response.json();
+// // //       setLatestStatusRows(normalizeRows(payload));
+// // //     } catch (statusFetchError) {
+// // //       // Keep the last successful status snapshot if a poll temporarily fails.
+// // //     }
+// // //   }, [branchSelected, filters]);
+
+// // //   useEffect(() => {
+// // //     fetchLatestStatusRows();
+// // //     if (!branchSelected) return undefined;
+// // //     const statusPollId = window.setInterval(fetchLatestStatusRows, DEVICE_STATUS_POLL_MS);
+// // //     return () => window.clearInterval(statusPollId);
+// // //   }, [fetchLatestStatusRows, branchSelected]);
+
+// // //   // Refresh telemetry quietly so the status can return to ONLINE as soon as
+// // //   // new readings arrive, without showing the page loading state every 5 sec.
+// // //   useEffect(() => {
+// // //     if (!branchSelected) return undefined;
+// // //     const pollId = window.setInterval(() => fetchRows({ silent: true }), DEVICE_STATUS_POLL_MS);
+// // //     return () => window.clearInterval(pollId);
+// // //   }, [branchSelected, fetchRows]);
+
+// // //   // Re-evaluate the age of the latest device timestamp every second. This
+// // //   // changes the badge to OFFLINE exactly when the timeout is crossed.
+// // //   useEffect(() => {
+// // //     const clockId = window.setInterval(() => setStatusClock(Date.now()), 1000);
+// // //     return () => window.clearInterval(clockId);
+// // //   }, []);
+
+// // //   const deviceOptions = useMemo(() => [...new Set(rows.map((row) => String(row.device_id || row.ac_id || "")).filter(Boolean))].sort(), [rows]);
+
+// // //   const selectedRows = useMemo(() => selectedDeviceId
+// // //     ? rows.filter((row) => String(row.device_id || row.ac_id || "") === selectedDeviceId)
+// // //     : [], [rows, selectedDeviceId]);
+
+// // //   // ✅ MOVED THESE HOOKS HERE (Top level of component, AFTER selectedRows is defined)
+// // //   const latestDeviceTelemetryTime = useMemo(() => {
+// // //     if (!selectedRows.length) return null;
+// // //     const timestamps = selectedRows
+// // //       .map((row) => lastTelemetryTimestampOf(row))
+// // //       .filter((timestamp) => timestamp !== null);
+// // //     if (!timestamps.length) return null;
+// // //     return Math.max(...timestamps);
+// // //   }, [selectedRows]);
+
+// // //   const latestSelectedStatusRecord = useMemo(() => {
+// // //     if (!selectedDeviceId) return null;
+// // //     return latestStatusRows.find((record) => {
+// // //       const recordId = String(
+// // //         record?.ac_id ?? record?.device_id ?? record?.device_name ?? record?.id ?? ""
+// // //       ).trim();
+// // //       return recordId === String(selectedDeviceId).trim();
+// // //     }) || null;
+// // //   }, [latestStatusRows, selectedDeviceId]);
+
+// // //   const latestApiOnline = isOnlineFromLatestRecord(latestSelectedStatusRecord, statusClock);
+// // //   // Prefer the latest snapshot API (same source as the AC table). Fall back to
+// // //   // the chart history timestamp only if the selected device is absent there.
+// // //   const historyTimestampOnline = Boolean(
+// // //     latestDeviceTelemetryTime &&
+// // //     statusClock - latestDeviceTelemetryTime <= DEVICE_OFFLINE_AFTER_MS &&
+// // //     statusClock >= latestDeviceTelemetryTime - 60000
+// // //   );
+// // //   const deviceOnline = latestApiOnline !== null
+// // //     ? latestApiOnline
+// // //     : Boolean(selectedDeviceId && historyTimestampOnline);
+// // //   const deviceStatus = !selectedDeviceId
+// // //     ? "UNKNOWN"
+// // //     : deviceOnline
+// // //       ? "ONLINE"
+// // //       : "OFFLINE";
+
+// // //   const telemetryRelay = useMemo(() => {
+// // //     const sorted = selectedRows
+// // //       .map((row) => ({ row, ts: timestampOf(row) ?? 0 }))
+// // //       .sort((x, y) => x.ts - y.ts);
+// // //     for (let i = sorted.length - 1; i >= 0; i -= 1) {
+// // //       const raw = sorted[i].row.latest_relay ?? sorted[i].row.relay;
+// // //       if (raw !== null && raw !== undefined && raw !== "") return Number(raw) ? 1 : 0;
+// // //     }
+// // //     return null;
+// // //   }, [selectedRows]);
+
+// // //   const isLive = useMemo(() => {
+// // //     if (!latestDeviceTelemetryTime) return false;
+// // //     return Math.abs(Date.now() - latestDeviceTelemetryTime) < 60000;
+// // //   }, [latestDeviceTelemetryTime]);
+
+// // //   const lastTelemetryText = latestDeviceTelemetryTime
+// // //     ? new Date(latestDeviceTelemetryTime).toLocaleTimeString([], {
+// // //         hour: "2-digit",
+// // //         minute: "2-digit",
+// // //         second: "2-digit",
+// // //         hour12: false,
+// // //       })
+// // //     : "--";
+// // //   // --------------------------------------------------------------------------
+
+// // //   const allMetrics = useMemo(() => {
+// // //     if (!selectedRows.length) return [];
+// // //     const keys = [...new Set(selectedRows.flatMap((row) => Object.keys(row)))];
+// // //     const numericKeys = keys.filter((key) => isNumericMetric(key, selectedRows));
+
+// // //     return numericKeys.sort((a, b) => {
+// // //       const normA = a.toLowerCase().replace(/[\s_-]/g, "");
+// // //       const normB = b.toLowerCase().replace(/[\s_-]/g, "");
+      
+// // //       const indexA = PREFERRED_METRICS.findIndex(k => k.toLowerCase().replace(/[\s_-]/g, "") === normA);
+// // //       const indexB = PREFERRED_METRICS.findIndex(k => k.toLowerCase().replace(/[\s_-]/g, "") === normB);
+
+// // //       if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+// // //       if (indexA !== -1) return -1;
+// // //       if (indexB !== -1) return 1;
+// // //       return a.localeCompare(b);
+// // //     });
+// // //   }, [selectedRows]);
+
+// // //   const timeFilteredRows = useMemo(() => {
+// // //     const now = Date.now();
+// // //     const windowMs = period === "24h"
+// // //       ? 24 * 60 * 60 * 1000
+// // //       : period === "7d"
+// // //         ? 7 * 24 * 60 * 60 * 1000
+// // //         : 30 * 24 * 60 * 60 * 1000;
+// // //     const from = now - windowMs;
+
+// // //     const dated = selectedRows
+// // //       .map((row) => ({ ...row, __ts: timestampOf(row) }))
+// // //       .filter((row) => row.__ts !== null && row.__ts >= from && row.__ts <= now);
+
+// // //     return dated.map((row) => ({
+// // //       ...row,
+// // //       __chartTime: shortTime(row.__ts),
+// // //       __chartTs: row.__ts,
+// // //     }));
+// // //   }, [selectedRows, period]);
+
+// // //   useEffect(() => {
+// // //     const available = allMetrics;
+// // //     setSelectedMetrics((previous) => {
+// // //       const valid = previous.filter((key) => available.includes(key));
+// // //       if (valid.length) return valid;
+
+// // //       const defaultSelection = available.filter((key) => {
+// // //         const normalizedKey = key.toLowerCase().replace(/[\s_-]/g, "");
+// // //         return PREFERRED_METRICS.some(
+// // //           (preferred) => preferred.toLowerCase().replace(/[\s_-]/g, "") === normalizedKey
+// // //         );
+// // //       });
+
+// // //       return defaultSelection.length > 0 ? defaultSelection : available.slice(0, 4);
+// // //     });
+// // //   }, [selectedDeviceId, allMetrics.join("|")]);
+
+// // //   const chartRows = useMemo(() => {
+// // //     const sorted = [...timeFilteredRows].sort((a, b) => (timestampOf(a) ?? 0) - (timestampOf(b) ?? 0));
+// // //     return sorted.map((row) => ({
+// // //       ...row,
+// // //       __chartTime: row.__chartTime || shortTime(timestampOf(row) ?? row.timestamp ?? row.ts ?? row.time ?? ""),
+// // //     }));
+// // //   }, [timeFilteredRows]);
+
+// // //   const stats = useMemo(() => selectedMetrics.map((metric) => ({
+// // //     key: metric,
+// // //     ...summarizeMetric(chartRows, metric),
+// // //   })).filter((item) => item.count), [chartRows, selectedMetrics]);
+
+// // //   const runAnalysis = async () => {
+// // //     if (!selectedDeviceId || !chartRows.length || !selectedMetrics.length) return;
+// // //     setAnalyzing(true);
+// // //     setAnalysisError("");
+// // //     setAnalysis("");
+// // //     try {
+// // //       const summary = Object.fromEntries(stats.map((item) => [item.key, item]));
+// // //       const response = await fetch(`${GENAI_BASE}/api/analyze`, {
+// // //         method: "POST",
+// // //         headers: { "Content-Type": "application/json", Accept: "application/json" },
+// // //         body: JSON.stringify({
+// // //           metrics: selectedMetrics,
+// // //           aggregation,
+// // //           rows: chartRows.slice(-500).map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => !key.startsWith("__")))),
+// // //           device_id: selectedDeviceId,
+// // //           ac_id: selectedDeviceId,
+// // //           summary: { ...summary, device_id: selectedDeviceId, branch: filters.branch, hierarchy: filters.hierarchy, period },
+// // //         }),
+// // //       });
+// // //       if (!response.ok) throw new Error(`GenAI service returned HTTP ${response.status}. Check that the FastAPI service is running on port 8001.`);
+// // //       const result = await response.json();
+// // //       setAnalysis(result.analysis || result.explanation || result.summary || JSON.stringify(result, null, 2));
+// // //     } catch (analysisFetchError) {
+// // //       setAnalysisError(analysisFetchError?.message || "Could not generate AI insights.");
+// // //     } finally {
+// // //       setAnalyzing(false);
+// // //     }
+// // //   };
+
+// // //   if (!branchSelected) {
+// // //     return (
+// // //       // <main className="trends-page">
+// // //       <main className={`trends-page ${embedded ? "trends-embedded" : ""}`}>
+// // //         <section className="trends-empty">
+// // //           <AlertCircle size={42} />
+// // //           <h1>Choose a branch first</h1>
+// // //           <p>Trends are available only after selecting a branch in the dashboard hierarchy.</p>
+// // //           <button className="trends-primary" onClick={() => navigate("/org/dashboard")}>Back to Dashboard</button>
+// // //         </section>
+// // //       </main>
+// // //     );
+// // //   }
+
+// // //   return (
+// // //     <main className="trends-page">
+// // //       <header className="trends-header">
+// // //         <div>
+// // //           {/* <button className="trends-back" onClick={() => navigate(-1)}><ArrowLeft size={16} /> Back</button> */}
+// // //           <p className="trends-eyebrow"><ChartNoAxesCombined size={16} /> GENAI TREND EXPLORER</p>
+// // //           {/* <h1>AC Device Trends</h1> */}
+// // //           {/* <p className="trends-subtitle">
+// // //             {filters.hierarchy || "Hierarchy"} · {filters.state || filters.zone || "All areas"} · {filters.branch}
+// // //             {selectedDeviceId ? ` · AC ${selectedDeviceId}` : " · Select an AC to view its individual history"}
+// // //           </p> */}
+// // //         </div>
+// // //         <button className="trends-secondary" onClick={() => fetchRows()} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh data"}</button>
+// // //       </header>
+
+// // //       <section className="trends-toolbar">
+// // //         <div className="trends-control">
+// // //           <label>Time range</label>
+// // //           <div className="trends-segmented">
+// // //             {[["24h", "24 hours"], ["7d", "7 days"], ["30d", "30 days"]].map(([value, label]) => (
+// // //               <button key={value} className={period === value ? "active" : ""} onClick={() => setPeriod(value)}>{label}</button>
+// // //             ))}
+// // //           </div>
+// // //         </div>
+// // //         {/* <div className="trends-control">
+// // //           <label htmlFor="trends-device-select">AC device</label>
+// // //           <select id="trends-device-select" value={selectedDeviceId} onChange={(event) => { setSelectedDeviceId(event.target.value); setAnalysis(""); setAnalysisError(""); }} disabled={loading || !deviceOptions.length}>
+// // //             <option value="">Select an AC device</option>
+// // //             {deviceOptions.map((deviceId) => <option key={deviceId} value={deviceId}>{deviceId}</option>)}
+// // //           </select>
+// // //         </div> */}
+        
+// // //         <div className="trends-control">
+// // //           <label>Aggregation</label>
+// // //           <select value={aggregation} onChange={(event) => setAggregation(event.target.value)}>
+// // //             <option value="minute">1-minute stored readings / average</option>
+// // //             <option value="hour">Hourly average</option>
+// // //             <option value="day">Daily average</option>
+// // //           </select>
+// // //         </div>
+
+// // //         <div className="trends-toolbar-right">
+// // //           <div className="trends-device-status" aria-live="polite">
+// // //             {/* <span className="trends-device-status-label">Device</span> */}
+// // //             <span className={`trends-device-status-pill ${deviceStatus.toLowerCase()}`}>
+// // //               <span className="trends-device-status-dot" />
+// // //               {deviceStatus === "UNKNOWN" ? "Select AC" : deviceStatus}
+// // //             </span>
+// // //           </div>
+// // //           <RelayControl
+// // //             deviceId={selectedDeviceId}
+// // //             telemetryRelay={telemetryRelay}
+// // //             deviceOnline={deviceOnline}
+// // //             disabled={loading}
+// // //           />
+// // //           <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+// // //             <span
+// // //               className="trends-live-dot"
+// // //               style={{
+// // //                 width: "8px",
+// // //                 height: "8px",
+// // //                 borderRadius: "50%",
+// // //                 backgroundColor: isLive ? "#22c55e" : "#9ca3af",
+// // //               }}
+// // //             />
+// // //             { isLive && (
+// // //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
+// // //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
+// // //               </strong>
+// // //             )}
+// // //           </div>
+// // //         </div>
+// // //       </section>
+
+
+// // //       {error && <div className="trends-notice">
+// // //         <AlertCircle size={18} /><span>{error}</span></div>
+// // //       }
+
+// // //       <section className="trends-panel">
+// // //         <div className="trends-panel-heading">
+// // //           <div><h2>Available numeric metrics</h2><p>Choose which telemetry fields to plot. Data and AI analysis are restricted to the selected AC device.</p></div>
+// // //           <span className="trends-count">{selectedMetrics.length} selected</span>
+// // //         </div>
+// // //         {allMetrics.length ? (
+// // //           <div className="trends-metric-list">
+// // //             {allMetrics.map((metric) => (
+// // //               <label key={metric} className="trends-metric-option">
+// // //                 <input type="checkbox" checked={selectedMetrics.includes(metric)} onChange={(event) => setSelectedMetrics((previous) => event.target.checked ? [...previous, metric] : previous.filter((key) => key !== metric))} />
+// // //                 <span>{metricLabel(metric)}</span>
+// // //               </label>
+// // //             ))}
+// // //           </div>
+// // //         ) : <p className="trends-muted">{loading ? "Detecting metrics…" : !selectedDeviceId ? "Select an AC device to load its metrics." : "No numeric metrics were detected for this AC in the selected time range."}</p>}
+// // //       </section>
+
+// // //       {selectedMetrics.length > 0 && (
+// // //         <section className="trends-stats-grid trends-kpi-grid">
+// // //           {selectedMetrics.map((metric) => (
+// // //             <TrendMetricChart
+// // //               key={metric}
+// // //               metric={metric}
+// // //               rows={chartRows}
+// // //               stat={stats.find((item) => item.key === metric)}
+// // //               period={period}
+// // //               aggregation={aggregation}
+// // //               resetKey={`${selectedDeviceId}|${period}|${aggregation}`}
+// // //             />
+// // //           ))}
+// // //         </section>
+// // //       )}
+
+// // //       <section className="trends-chart-grid trends-device-charts">
+// // //         <ACOnOff
+// // //           deviceId={selectedDeviceId || filters?.ac_id || ""}
+// // //           scope={filters}
+// // //         />
+// // //         {/* <DeviceTelemetryTable
+// // //           data={selectedRows}
+// // //           deviceId={selectedDeviceId || filters?.ac_id || ""}
+// // //         /> */}
+// // //         <CurrentTemperatureChart
+// // //           deviceId={selectedDeviceId || filters?.ac_id || ""}
+// // //           scope={filters}
+// // //         />
+// // //       </section>
+
+
+// // //       <section className="trends-panel trends-ai-panel">
+// // //         <div className="trends-panel-heading">
+// // //           <div><h2><BrainCircuit size={20} /> GenAI explanation</h2><p>Ask the GenAI service to analyze historical readings for the selected AC device only.</p></div>
+// // //           <button className="trends-primary" onClick={runAnalysis} disabled={analyzing || !selectedDeviceId || !chartRows.length || !selectedMetrics.length}><BrainCircuit size={16} /> {analyzing ? "Analyzing…" : "Explain trends"}</button>
+// // //         </div>
+// // //         {analysisError && <div className="trends-notice"><AlertCircle size={18} /><span>{analysisError}</span></div>}
+// // //         {analysis ? <div className="trends-analysis-text">{analysis}</div> : <p className="trends-muted">Select an AC device, choose metrics, and click “Explain trends” to analyze only that device's history.</p>}
+// // //       </section>
+// // //     </main>
+// // //   );
+// // // }
+
+
+
 // // import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // // import { useLocation, useNavigate } from "react-router-dom";
 // // import {
@@ -46,6 +1973,19 @@
 // // ];
 // // const TIME_FIELDS = ["timestamp", "bucket_start", "ts", "time", "datetime", "date", "created_at", "last_updated", "last_timestamp", "device_timestamp", "telemetry_timestamp"];
 // // const PREFERRED_METRICS = ["energy_delta", "current", "temperature", "latest_energy_counter"];
+// // // Device is considered offline when no telemetry arrives for the configured
+// // // publishing interval plus the 5-second grace period.
+// // const TELEMETRY_EXPECTED_INTERVAL_SECONDS = Math.max(
+// //   1,
+// //   Number(import.meta.env.VITE_TELEMETRY_EXPECTED_INTERVAL_SECONDS || 2)
+// // );
+// // const TELEMETRY_GRACE_SECONDS = Math.max(
+// //   0,
+// //   Number(import.meta.env.VITE_TELEMETRY_GRACE_SECONDS || 5)
+// // );
+// // const DEVICE_OFFLINE_AFTER_MS =
+// //   (TELEMETRY_EXPECTED_INTERVAL_SECONDS + TELEMETRY_GRACE_SECONDS) * 1000;
+// // const DEVICE_STATUS_POLL_MS = 5000;
 
 // // function getToken() {
 // //   for (const key of ["token", "authToken", "access_token", "accessToken", "jwt"]) {
@@ -108,6 +2048,30 @@
 // //     row?.last_timestamp ?? row?.device_timestamp ?? row?.telemetry_timestamp ??
 // //     row?.timestamp ?? row?.bucket_start
 // //   );
+// // }
+
+// // // The AC table uses the latest-device snapshot API, while chart history uses
+// // // minute/hour aggregates. Use the same latest snapshot for the Trends status
+// // // badge so an old aggregate bucket cannot incorrectly mark a live device OFFLINE.
+// // function isOnlineFromLatestRecord(record, now = Date.now()) {
+// //   if (!record) return null;
+
+// //   const rawStatus = String(
+// //     record.device_status ?? record.connectivity_status ?? record.status ?? ""
+// //   ).trim().toUpperCase();
+
+// //   // In the existing backend response, ON/OFF represents relay state while the
+// //   // telemetry snapshot is fresh. Both therefore mean the device is ONLINE.
+// //   if (["ONLINE", "ON", "OFF", "ACTIVE", "RUNNING", "1", "TRUE"].includes(rawStatus)) {
+// //     return true;
+// //   }
+// //   if (["OFFLINE", "ERROR", "DISCONNECTED"].includes(rawStatus)) {
+// //     return false;
+// //   }
+
+// //   const lastSeen = lastTelemetryTimestampOf(record) ?? parseTimestamp(record?.last_seen);
+// //   if (lastSeen === null) return null;
+// //   return now >= lastSeen - 60000 && now - lastSeen <= DEVICE_OFFLINE_AFTER_MS;
 // // }
 
 // // function isNumericMetric(key, rows) {
@@ -427,7 +2391,7 @@
 // //   );
 // // }
 
-// // function RelayControl({ deviceId, telemetryRelay, disabled }) {
+// // function RelayControl({ deviceId, telemetryRelay, deviceOnline, disabled }) {
 // //   const [override, setOverride] = useState(null); // { deviceId, value }
 // //   const [sending, setSending] = useState(false);
 // //   const [message, setMessage] = useState(null); // { type: "ok" | "error", text }
@@ -462,12 +2426,12 @@
 // //     }
 // //   };
 
-// //   const off = disabled || sending || !deviceId;
+// //   const off = disabled || sending || !deviceId || !deviceOnline;
 // //   const isOn = current === 1;
 // //   return (
 // //     <div className="trends-relay">
 // //       <div className="trends-relay-wrap">
-// //         <span className="trends-relay-label">Relay Control</span>
+// //         {/* <span className="trends-relay-label">Relay Control</span> */}
 // //         <button
 // //           type="button"
 // //           role="switch"
@@ -480,7 +2444,7 @@
 // //         >
 // //           <span className="trends-relay-knob" />
 // //         </button>
-// //         <span className="trends-relay-hint">{sending ? "Sending…" : !deviceId ? "Select an AC" : known ? (isOn ? "ON" : "OFF") : "Unknown"}</span>
+// //         <span className="trends-relay-hint">{!deviceOnline ? "Unavailable" : sending ? "Sending…" : !deviceId ? "Select an AC" : known ? (isOn ? "ON" : "OFF") : "Unknown"}</span>
 // //       </div>
 // //       {message && <small className={`trends-relay-msg ${message.type}`}>{message.text}</small>}
 // //     </div>
@@ -508,6 +2472,8 @@
 // //   const [analysis, setAnalysis] = useState("");
 // //   const [analyzing, setAnalyzing] = useState(false);
 // //   const [analysisError, setAnalysisError] = useState("");
+// //   const [statusClock, setStatusClock] = useState(Date.now());
+// //   const [latestStatusRows, setLatestStatusRows] = useState([]);
 
 // //   // useEffect(() => {
 // //   //   const nextFilters = location.state?.filters || readSavedFilters();
@@ -537,10 +2503,12 @@
 
 // //   const branchSelected = Boolean(String(filters?.branch || "").trim());
 
-// //   const fetchRows = useCallback(async () => {
+// //   const fetchRows = useCallback(async ({ silent = false } = {}) => {
 // //     if (!branchSelected) return;
-// //     setLoading(true);
-// //     setError("");
+// //     if (!silent) {
+// //       setLoading(true);
+// //       setError("");
+// //     }
 // //     try {
 // //       const now = Date.now();
 // //       const windowMs = period === "24h" ? 24 * 60 * 60 * 1000 : period === "7d" ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
@@ -588,20 +2556,78 @@
 // //       const deviceIds = [...new Set(historyRows.map((row) => String(row.device_id || row.ac_id || "")).filter(Boolean))].sort();
 // //       setSelectedDeviceId((previous) => deviceIds.includes(previous) ? previous : (deviceIds.length === 1 ? deviceIds[0] : ""));
       
-// //       if (!historyRows.length) {
+// //       if (!historyRows.length && !silent) {
 // //         setError("No historical telemetry was returned for this branch and time range. Check the stored telemetry and selected hierarchy.");
 // //       }
 // //     } catch (fetchError) {
-// //       setRows([]);
-// //       setError(fetchError?.message || "Unable to load historical telemetry for this branch.");
+// //       // A background status refresh must not erase the chart or its last-known
+// //       // telemetry when the API has a temporary failure.
+// //       if (!silent) {
+// //         setRows([]);
+// //         setError(fetchError?.message || "Unable to load historical telemetry for this branch.");
+// //       }
 // //     } finally {
-// //       setLoading(false);
+// //       if (!silent) setLoading(false);
 // //     }
 // //   }, [branchSelected, filters, period, aggregation]);
 
 // //   useEffect(() => {
 // //     fetchRows();
 // //   }, [fetchRows]);
+
+// //   // Fetch the same latest-device snapshot used by the AC table. Historical
+// //   // aggregate rows are optimized for charts and may have an older bucket time.
+// //   const fetchLatestStatusRows = useCallback(async () => {
+// //     if (!branchSelected) {
+// //       setLatestStatusRows([]);
+// //       return;
+// //     }
+
+// //     try {
+// //       const params = new URLSearchParams();
+// //       FILTER_KEYS.forEach((key) => {
+// //         if (["device", "device_id", "selectedDeviceId", "ac_id"].includes(key)) return;
+// //         const value = filters?.[key];
+// //         if (value !== undefined && value !== null && String(value).trim()) {
+// //           params.set(key, String(value));
+// //         }
+// //       });
+// //       params.set("_status_t", String(Date.now()));
+
+// //       const response = await fetch(`${API_BASE}/ac-data/?${params.toString()}`, {
+// //         method: "GET",
+// //         headers: getAuthHeaders(),
+// //         cache: "no-store",
+// //       });
+// //       if (!response.ok) return;
+// //       const payload = await response.json();
+// //       setLatestStatusRows(normalizeRows(payload));
+// //     } catch (statusFetchError) {
+// //       // Keep the last successful status snapshot if a poll temporarily fails.
+// //     }
+// //   }, [branchSelected, filters]);
+
+// //   useEffect(() => {
+// //     fetchLatestStatusRows();
+// //     if (!branchSelected) return undefined;
+// //     const statusPollId = window.setInterval(fetchLatestStatusRows, DEVICE_STATUS_POLL_MS);
+// //     return () => window.clearInterval(statusPollId);
+// //   }, [fetchLatestStatusRows, branchSelected]);
+
+// //   // Refresh telemetry quietly so the status can return to ONLINE as soon as
+// //   // new readings arrive, without showing the page loading state every 5 sec.
+// //   useEffect(() => {
+// //     if (!branchSelected) return undefined;
+// //     const pollId = window.setInterval(() => fetchRows({ silent: true }), DEVICE_STATUS_POLL_MS);
+// //     return () => window.clearInterval(pollId);
+// //   }, [branchSelected, fetchRows]);
+
+// //   // Re-evaluate the age of the latest device timestamp every second. This
+// //   // changes the badge to OFFLINE exactly when the timeout is crossed.
+// //   useEffect(() => {
+// //     const clockId = window.setInterval(() => setStatusClock(Date.now()), 1000);
+// //     return () => window.clearInterval(clockId);
+// //   }, []);
 
 // //   const deviceOptions = useMemo(() => [...new Set(rows.map((row) => String(row.device_id || row.ac_id || "")).filter(Boolean))].sort(), [rows]);
 
@@ -618,6 +2644,33 @@
 // //     if (!timestamps.length) return null;
 // //     return Math.max(...timestamps);
 // //   }, [selectedRows]);
+
+// //   const latestSelectedStatusRecord = useMemo(() => {
+// //     if (!selectedDeviceId) return null;
+// //     return latestStatusRows.find((record) => {
+// //       const recordId = String(
+// //         record?.ac_id ?? record?.device_id ?? record?.device_name ?? record?.id ?? ""
+// //       ).trim();
+// //       return recordId === String(selectedDeviceId).trim();
+// //     }) || null;
+// //   }, [latestStatusRows, selectedDeviceId]);
+
+// //   const latestApiOnline = isOnlineFromLatestRecord(latestSelectedStatusRecord, statusClock);
+// //   // Prefer the latest snapshot API (same source as the AC table). Fall back to
+// //   // the chart history timestamp only if the selected device is absent there.
+// //   const historyTimestampOnline = Boolean(
+// //     latestDeviceTelemetryTime &&
+// //     statusClock - latestDeviceTelemetryTime <= DEVICE_OFFLINE_AFTER_MS &&
+// //     statusClock >= latestDeviceTelemetryTime - 60000
+// //   );
+// //   const deviceOnline = latestApiOnline !== null
+// //     ? latestApiOnline
+// //     : Boolean(selectedDeviceId && historyTimestampOnline);
+// //   const deviceStatus = !selectedDeviceId
+// //     ? "UNKNOWN"
+// //     : deviceOnline
+// //       ? "ONLINE"
+// //       : "OFFLINE";
 
 // //   const telemetryRelay = useMemo(() => {
 // //     const sorted = selectedRows
@@ -769,7 +2822,7 @@
 // //             {selectedDeviceId ? ` · AC ${selectedDeviceId}` : " · Select an AC to view its individual history"}
 // //           </p> */}
 // //         </div>
-// //         <button className="trends-secondary" onClick={fetchRows} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh data"}</button>
+// //         <button className="trends-secondary" onClick={() => fetchRows()} disabled={loading}><RefreshCw size={16} /> {loading ? "Refreshing…" : "Refresh data"}</button>
 // //       </header>
 
 // //       <section className="trends-toolbar">
@@ -799,7 +2852,21 @@
 // //         </div>
 
 // //         <div className="trends-toolbar-right">
-// //           <RelayControl deviceId={selectedDeviceId} telemetryRelay={telemetryRelay} disabled={loading} />
+// //           <div className="trends-device-status" aria-live="polite">
+// //             {/* <span className="trends-device-status-label">Device</span> */}
+// //             <span className={`trends-device-status-pill ${deviceStatus.toLowerCase()}`}>
+// //               <span className="trends-device-status-dot" />
+// //               {deviceStatus === "UNKNOWN" ? "Select AC" : deviceStatus}
+// //             </span>
+// //           </div>
+// //           {deviceOnline && (
+// //             <RelayControl
+// //               deviceId={selectedDeviceId}
+// //               telemetryRelay={telemetryRelay}
+// //               deviceOnline={deviceOnline}
+// //               disabled={loading}
+// //             />
+// //           )}
 // //           <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
 // //             <span
 // //               className="trends-live-dot"
@@ -810,19 +2877,6 @@
 // //                 backgroundColor: isLive ? "#22c55e" : "#9ca3af",
 // //               }}
 // //             />
-// //             {/* {isLive ? (
-// //               // <span style={{ fontWeight: 600, color: "#22c55e" }}>LIVE</span>
-// //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
-// //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
-// //               </strong>
-// //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
-// //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
-// //               </strong>
-// //             ) : (
-// //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
-// //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
-// //               </strong>
-// //             )} */}
 // //             { isLive && (
 // //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
 // //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
@@ -1418,7 +3472,7 @@
 //         >
 //           <span className="trends-relay-knob" />
 //         </button>
-//         {/* <span className="trends-relay-hint">{!deviceOnline ? "Unavailable" : sending ? "Sending…" : !deviceId ? "Select an AC" : known ? (isOn ? "ON" : "OFF") : "Unknown"}</span> */}
+//         <span className="trends-relay-hint">{!deviceOnline ? "Unavailable" : sending ? "Sending…" : !deviceId ? "Select an AC" : known ? (isOn ? "ON" : "OFF") : "Unknown"}</span>
 //       </div>
 //       {message && <small className={`trends-relay-msg ${message.type}`}>{message.text}</small>}
 //     </div>
@@ -1833,12 +3887,14 @@
 //               {deviceStatus === "UNKNOWN" ? "Select AC" : deviceStatus}
 //             </span>
 //           </div>
-//           <RelayControl
-//             deviceId={selectedDeviceId}
-//             telemetryRelay={telemetryRelay}
-//             deviceOnline={deviceOnline}
-//             disabled={loading}
-//           />
+//           {deviceOnline && (
+//             <RelayControl
+//               deviceId={selectedDeviceId}
+//               telemetryRelay={telemetryRelay}
+//               deviceOnline={deviceOnline}
+//               disabled={loading}
+//             />
+//           )}
 //           <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
 //             <span
 //               className="trends-live-dot"
@@ -1849,11 +3905,11 @@
 //                 backgroundColor: isLive ? "#22c55e" : "#9ca3af",
 //               }}
 //             />
-//             { isLive && (
+//             {/* { isLive && ( */}
 //               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
 //                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
 //               </strong>
-//             )}
+//             {/* )} */}
 //           </div>
 //         </div>
 //       </section>
@@ -1926,6 +3982,7 @@
 
 
 
+
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -1975,17 +4032,15 @@ const TIME_FIELDS = ["timestamp", "bucket_start", "ts", "time", "datetime", "dat
 const PREFERRED_METRICS = ["energy_delta", "current", "temperature", "latest_energy_counter"];
 // Device is considered offline when no telemetry arrives for the configured
 // publishing interval plus the 5-second grace period.
-const TELEMETRY_EXPECTED_INTERVAL_SECONDS = Math.max(
-  1,
-  Number(import.meta.env.VITE_TELEMETRY_EXPECTED_INTERVAL_SECONDS || 2)
+// Keep the browser threshold aligned with Django's telemetry freshness rule.
+const DEVICE_OFFLINE_AFTER_MS = Math.max(
+  1000,
+  Number(import.meta.env.VITE_DEVICE_OFFLINE_AFTER_SECONDS || 15) * 1000
 );
-const TELEMETRY_GRACE_SECONDS = Math.max(
-  0,
-  Number(import.meta.env.VITE_TELEMETRY_GRACE_SECONDS || 5)
+const DEVICE_STATUS_POLL_MS = Math.max(
+  1000,
+  Number(import.meta.env.VITE_DEVICE_STATUS_POLL_MS || 2000)
 );
-const DEVICE_OFFLINE_AFTER_MS =
-  (TELEMETRY_EXPECTED_INTERVAL_SECONDS + TELEMETRY_GRACE_SECONDS) * 1000;
-const DEVICE_STATUS_POLL_MS = 5000;
 
 function getToken() {
   for (const key of ["token", "authToken", "access_token", "accessToken", "jwt"]) {
@@ -2877,11 +4932,11 @@ export default function Trends({
                 backgroundColor: isLive ? "#22c55e" : "#9ca3af",
               }}
             />
-            { isLive && (
+            {/* { isLive && ( */}
               <strong style={{ marginLeft: "6px", fontSize: "13px" }}>
                 Last Updated : {!selectedDeviceId ? "--" : lastTelemetryText}
               </strong>
-            )}
+            {/* )} */}
           </div>
         </div>
       </section>

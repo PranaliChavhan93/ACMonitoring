@@ -68,6 +68,7 @@ from .views import (
     telemetry_status, 
     LocationListView, 
     treands,
+    ac_device_info,
 )
 
 urlpatterns = [
@@ -76,6 +77,7 @@ urlpatterns = [
     path("auth/login/", login_view),
     path("auth/logout/", logout_view),
     path("profile/", profile),
+    path("profile/ac-device/", ac_device_info),
 
     path("ac-data/", ac_data),
     path("ac-data/latest/", latest_ac_data),

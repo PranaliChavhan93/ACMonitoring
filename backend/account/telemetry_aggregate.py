@@ -194,8 +194,14 @@ def _record_from_row(row, device_name=None):
     status = "OFFLINE" if age >= stale_seconds else "ONLINE"
     device_name = device_name or row.device_id
     
+    is_offline = age >= stale_seconds
+    long_offline_after = int(
+        getattr(settings, "TELEMETRY_LONG_OFFLINE_AFTER_SECONDS", 7 * 24 * 60 * 60)
+    )
+    long_offline = is_offline and age >= long_offline_after
+
     return {
-        "ac_id": row.device_id, 
+        "ac_id": row.device_id,
         "site_id": row.device_id, 
         "device_name": device_name,
         "voltage": row.latest_voltage or 0, 
@@ -212,6 +218,14 @@ def _record_from_row(row, device_name=None):
         "relay": relay,
         "status": status,
         "device_status": status,
+        "connectivity_status": status,
+        "last_seen": row.last_timestamp.isoformat(timespec="seconds") if row.last_timestamp else None,
+        "offline_duration_seconds": int(age) if is_offline else 0,
+        "long_offline": long_offline,
+        "offline_message": (
+            "Device has been offline for more than 7 days."
+            if long_offline else ("No recent telemetry received." if is_offline else "")
+        ),
         "timestamp": row.last_timestamp.isoformat(timespec="seconds") if row.last_timestamp else None,
         "source": "local_aggregate", 
         "sample_count": row.sample_count,
@@ -242,6 +256,11 @@ def get_latest_records():
         age = (timezone.now() - row.device_timestamp).total_seconds()
         relay = int(row.relay or 0)
         status = "OFFLINE" if age >= stale_seconds else "ONLINE"
+        long_offline_after = int(
+            getattr(settings, "TELEMETRY_LONG_OFFLINE_AFTER_SECONDS", 7 * 24 * 60 * 60)
+        )
+        long_offline = status == "OFFLINE" and age >= long_offline_after
+        timestamp_text = row.device_timestamp.isoformat(timespec="seconds")
         records.append({
             "ac_id": device_id, "site_id": device_id,
             "device_name": row.device.device_name or device_id,
@@ -253,7 +272,15 @@ def get_latest_records():
             "temperature": row.temperature or 0, "humidity": row.humidity or 0,
             "alarm_status": row.alarm_status or 0, "relay": relay,
             "status": status, "device_status": status,
-            "timestamp": row.device_timestamp.isoformat(timespec="seconds"),
+            "connectivity_status": status,
+            "last_seen": timestamp_text,
+            "offline_duration_seconds": int(age) if status == "OFFLINE" else 0,
+            "long_offline": long_offline,
+            "offline_message": (
+                "Device has been offline for more than 7 days."
+                if long_offline else ("No recent telemetry received." if status == "OFFLINE" else "")
+            ),
+            "timestamp": timestamp_text,
             "source": "local_latest", "sample_count": 1,
             "energy_delta": 0.0,
             "latest_energy_counter": row.energy_consumption,

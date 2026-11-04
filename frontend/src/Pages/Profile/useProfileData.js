@@ -1,6 +1,26 @@
 import { useState, useEffect } from "react";
 import { buildHierarchy } from "./buildHierarchy";
 
+const API_BASE = (
+    import.meta.env.VITE_API_BASE ||
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8000/api"
+).replace(/\/$/, "");
+
+function authHeaders() {
+    const token = ["token", "authToken", "access_token", "accessToken", "jwt"]
+        .map((key) => localStorage.getItem(key) || sessionStorage.getItem(key))
+        .find(Boolean);
+    return {
+        Accept: "application/json",
+        ...(token ? {
+            Authorization: token.startsWith("Bearer ") || token.startsWith("Token ")
+                ? token
+                : `Bearer ${token}`,
+        } : {}),
+    };
+}
+
 function useProfileData(currentUser) {
     const [user, setUser] = useState(currentUser || {});
     const [tree, setTree] = useState([]);
@@ -9,51 +29,45 @@ function useProfileData(currentUser) {
     const [source, setSource] = useState("api");
 
     useEffect(() => {
-        let isMounted = true;
+        const controller = new AbortController();
 
         const loadData = async () => {
             setLoading(true);
             setError(null);
-
             try {
-                const token = localStorage.getItem("token") || localStorage.getItem("authToken");
-                
-                // --- FETCH YOUR API DATA HERE ---
-                // Example: Fetch the flat ac-data rows
-                const response = await fetch("http://localhost:8000/api/ac-data/", {
-                    headers: token ? { Authorization: `Bearer ${token}` } : {}
+                const response = await fetch(`${API_BASE}/profile/`, {
+                    method: "GET",
+                    headers: authHeaders(),
+                    cache: "no-store",
+                    signal: controller.signal,
                 });
 
+                const payload = await response.json().catch(() => ({}));
                 if (!response.ok) {
-                    throw new Error(`Failed to load data: HTTP ${response.status}`);
+                    throw new Error(
+                        payload?.detail || payload?.message ||
+                        `Profile API returned HTTP ${response.status}.`
+                    );
                 }
 
-                const payload = await response.json();
-                
-                // Pass the data to the tree builder (accepts flat array or nested object)
-                const builtTree = buildHierarchy(payload);
+                const profileUser = payload?.user || currentUser || {};
+                const hierarchy = buildHierarchy(payload);
 
-                if (isMounted) {
-                    setTree(builtTree);
-                    setSource("api");
-                }
+                setUser(profileUser);
+                setTree(hierarchy);
+                setSource("api");
             } catch (err) {
-                if (isMounted) {
+                if (err.name !== "AbortError") {
                     console.error("[useProfileData] Error:", err);
-                    setError(err.message || "An error occurred while loading profile data.");
+                    setError(err.message || "Unable to load profile information.");
                 }
             } finally {
-                if (isMounted) {
-                    setLoading(false);
-                }
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
 
         loadData();
-
-        return () => {
-            isMounted = false;
-        };
+        return () => controller.abort();
     }, [currentUser]);
 
     return { user, tree, loading, error, source };

@@ -328,10 +328,15 @@ def _get_saved_record(device):
         )
 
         record["last_seen"] = record["timestamp"]
-
         record["status"] = "OFFLINE"
         record["device_status"] = "OFFLINE"
+        record["connectivity_status"] = "OFFLINE"
         record["offline_duration_seconds"] = int(age_seconds)
+        record["long_offline"] = age_seconds >= int(
+            getattr(settings, "TELEMETRY_LONG_OFFLINE_AFTER_SECONDS", 7 * 24 * 60 * 60)
+        )
+        if record["long_offline"]:
+            record["offline_message"] = "Device has been offline for more than 7 days."
 
         return record
 
@@ -638,16 +643,29 @@ def get_records():
                 # No timestamp means a live connection cannot be confirmed.
                 r["status"] = "OFFLINE"
                 r["device_status"] = "OFFLINE"
+                r["connectivity_status"] = "OFFLINE"
                 r["message"] = "No telemetry timestamp is available."
                 r["last_seen"] = r.get("timestamp")
+                r["offline_duration_seconds"] = None
+                r["long_offline"] = False
             else:
                 is_offline = age_seconds >= STALE_SEC
                 device_status = "OFFLINE" if is_offline else "ONLINE"
+                long_offline_after = int(
+                    getattr(settings, "TELEMETRY_LONG_OFFLINE_AFTER_SECONDS", 7 * 24 * 60 * 60)
+                )
+                is_long_offline = is_offline and age_seconds >= long_offline_after
+
                 r["status"] = device_status
                 r["device_status"] = device_status
+                r["connectivity_status"] = device_status
                 r["last_seen"] = r.get("timestamp")
-                if is_offline:
-                    r["offline_duration_seconds"] = int(age_seconds)
+                r["offline_duration_seconds"] = int(age_seconds) if is_offline else 0
+                r["long_offline"] = is_long_offline
+                if is_long_offline:
+                    r["offline_message"] = "Device has been offline for more than 7 days."
+                elif is_offline:
+                    r["offline_message"] = "No recent telemetry received."
 
             # Keep the last voltage/current/power/energy/relay values for display.
             # Connectivity status must never overwrite the physical relay state.

@@ -41,7 +41,6 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "localhost",
     "192.168.1.9",
-    "192.168.1.11",
 ]
 
 # ALLOWED_HOSTS = ["*"]
@@ -222,4 +221,19 @@ TPT_LOGIN_PATH = os.getenv(
 TELEMETRY_STORAGE_MODE = os.environ.get("TELEMETRY_STORAGE_MODE", "polling")
 TELEMETRY_INGEST_TOKEN = os.environ.get("TELEMETRY_INGEST_TOKEN", "")
 TELEMETRY_INGEST_MAX_BATCH = int(os.environ.get("TELEMETRY_INGEST_MAX_BATCH", "500"))
-TELEMETRY_STALE_SECONDS = int(os.environ.get("TELEMETRY_STALE_SECONDS", "120"))
+# Device connectivity is based on the age of the DEVICE telemetry timestamp,
+# not the time at which Django last polled 3TP.
+# Default: 15 seconds (three missed 5-second telemetry intervals).
+TELEMETRY_OFFLINE_AFTER_SECONDS = int(
+    os.environ.get(
+        "TELEMETRY_OFFLINE_AFTER_SECONDS",
+        os.environ.get("TELEMETRY_STALE_SECONDS", os.environ.get("TPT_STALE_SEC", "10")),
+    )
+)
+# Keep the legacy setting name for modules that still read it.
+TELEMETRY_STALE_SECONDS = TELEMETRY_OFFLINE_AFTER_SECONDS
+
+# A separate flag is raised after seven days offline; last readings are retained.
+TELEMETRY_LONG_OFFLINE_AFTER_SECONDS = int(
+    os.environ.get("TELEMETRY_LONG_OFFLINE_AFTER_SECONDS", str(7 * 24 * 60 * 60))
+)

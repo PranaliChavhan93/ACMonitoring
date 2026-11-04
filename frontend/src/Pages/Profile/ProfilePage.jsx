@@ -20,11 +20,14 @@ function IdentityCard({ user }) {
     const rows = [
         ["Email", user.email],
         ["Phone", user.phone],
+        ["Organization", user.organization_name],
+        ["Customer", user.customer_name],
         ["Hierarchy", user.customer_hierarchy_type === "ZONAL" ? "Zonal" : user.customer_hierarchy_type === "GEOGRAPHICAL" ? "Geographical" : user.customer_hierarchy_type],
-        ["Region", user.zone_name || user.state_name],
+        ["Region", user.zone_name || user.state_name || user.head_office_state],
+        ["District", user.district_name || user.head_office_district],
         ["Head office", user.head_office_city_name || user.head_office_branch],
-        ["Member since", user.member_since],
-        ["Last login", user.last_login],
+        ["Member since", user.member_since ? new Date(user.member_since).toLocaleDateString() : user.date_joined ? new Date(user.date_joined).toLocaleDateString() : ""],
+        ["Last login", user.last_login ? new Date(user.last_login).toLocaleString() : ""],
     ].filter(([, v]) => v);
 
     return (
@@ -146,8 +149,21 @@ function Detail({ entry, select, onOpenDashboard }) {
                         <Field label="Indoor temp" value={node.temperature} unit=" °C" />
                         <Field label="Indoor humidity" value={node.humidity} unit=" %" />
                         <Field label="Model" value={node.model} />
-                        <Field label="Capacity" value={node.capacity} />
+                        <Field label="Capacity" value={node.capacity} unit={node.capacity ? " Ton" : ""} />
+                        <Field label="AC code" value={node.code} />
                         <Field label="Device ID" value={node.id} />
+                        <Field label="Branch" value={node.branch} />
+                        <Field label="Floor" value={node.floor} />
+                        <Field label="Site" value={node.site} />
+                        <Field label="Installation date" value={node.installationDate} />
+                        <Field label="Maintenance date" value={node.maintenanceDate} />
+                        <Field label="MQTT protocol" value={node.mqtt?.protocol} />
+                        <Field label="MQTT broker" value={node.mqtt?.broker_host} />
+                        <Field label="MQTT port" value={node.mqtt?.broker_port} />
+                        <Field label="MQTT topic" value={node.mqtt?.topic} />
+                        <Field label="MQTT client ID" value={node.mqtt?.client_id} />
+                        <Field label="3TP device ID" value={node.mqtt?.device_id} />
+                        <Field label="3TP sync" value={node.mqtt?.sync_status} />
                         <Field label="Last reading" value={node.lastSeen} />
                     </div>
                 </>
@@ -160,6 +176,12 @@ function Detail({ entry, select, onOpenDashboard }) {
                         <Field label="Energy" value={kwh(node.stats.energy)} unit=" kWh" />
                         {node.meta?.city && <Field label="City" value={node.meta.city} />}
                         {node.meta?.state && <Field label="State" value={node.meta.state} />}
+                        {node.meta?.district && <Field label="District" value={node.meta.district} />}
+                        {node.meta?.taluka && <Field label="Taluka" value={node.meta.taluka} />}
+                        {node.meta?.zone && <Field label="Zone" value={node.meta.zone} />}
+                        {node.meta?.circle && <Field label="Circle" value={node.meta.circle} />}
+                        {node.meta?.region && <Field label="Region" value={node.meta.region} />}
+                        {node.meta?.division && <Field label="Division" value={node.meta.division} />}
                         {node.meta?.admin && <Field label="Branch admin" value={node.meta.admin} />}
                         {node.meta?.email && <Field label="Email" value={node.meta.email} />}
                         {node.meta?.phone && <Field label="Phone" value={node.meta.phone} />}
