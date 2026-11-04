@@ -1,5 +1,6 @@
 from django.urls import path
 from .telemetry_aggregate_views import save_production_type
+from .analytics_views import comparison_analytics
 from .history_views import current_history, telemetry_aggregates
 
 from .hierarchy_site_views import create_hierarchy_site, create_hierarchy_branch
@@ -72,6 +73,7 @@ from .views import (
 )
 
 urlpatterns = [
+    path("analytics/comparison/", comparison_analytics),
     path("save_production_type/", save_production_type),
     path("telemetry-aggregates/", telemetry_aggregates),
     path("auth/login/", login_view),

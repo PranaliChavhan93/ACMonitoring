@@ -135,6 +135,24 @@ export default function App() {
           />
           
           <Route
+            path="/analytics"
+            element={
+              <Page roles={[ROLES.CUSTOMER]}>
+                <Analytics />
+              </Page>
+            }
+          />
+
+          <Route
+            path="/admin/analytics"
+            element={
+              <Page roles={[ROLES.BR_ADMIN]}>
+                <Analytics />
+              </Page>
+            }
+          />
+
+          <Route
             path="/org/reports"
             element={
               <Page>
@@ -221,7 +239,7 @@ export default function App() {
             }
           />
 
-          <Route path="/reports"
+          {/* <Route path="/reports"
             element={
               <Page roles={[ROLES.CUSTOMER]}>
                 Report Page
@@ -235,7 +253,7 @@ export default function App() {
                 Setting Page
               </Page>
             }
-          />
+          /> */}
 
           <Route
             path="/admin/dashboard"

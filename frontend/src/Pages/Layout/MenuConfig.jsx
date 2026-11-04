@@ -211,10 +211,9 @@ export const MENU_CONFIG = {
       ],
     },
     {
-      label: "Analytics (Under Development)",
+      label: "Analytics",
       path: "/org/analytics",
       icon: ChartNoAxesCombined,
-      underDevelopment: true,
     },
     {
       label: "Reports (Under Development)",
