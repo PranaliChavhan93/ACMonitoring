@@ -246,10 +246,10 @@ export default function ProfilePage({ currentUser, onOpenDashboard }) {
 
     return (
         <div className="pf-page">
-            <header className="pf-pagehead">
+            {/* <header className="pf-pagehead">
                 <div><h1>My Profile</h1><p>Your account and everything that sits under it.</p></div>
                 {source === "mock" && <span className="pf-mock">Sample data</span>}
-            </header>
+            </header> */}
 
             <div className="pf-layout">
                 <IdentityCard user={user || {}} />

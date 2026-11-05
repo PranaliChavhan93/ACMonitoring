@@ -4481,7 +4481,7 @@ function RelayControl({ deviceId, telemetryRelay, deviceOnline, disabled }) {
     }
   };
 
-  const off = disabled || sending || !deviceId || !deviceOnline;
+  const off = disabled || sending || !deviceId;
   const isOn = current === 1;
   return (
     <div className="trends-relay">
@@ -4914,13 +4914,13 @@ export default function Trends({
               {deviceStatus === "UNKNOWN" ? "Select AC" : deviceStatus}
             </span>
           </div>
-          {deviceOnline && (
+          {selectedDeviceId && (
             <RelayControl
               deviceId={selectedDeviceId}
               telemetryRelay={telemetryRelay}
               deviceOnline={deviceOnline}
               disabled={loading}
-            />
+           />
           )}
           <div className="trends-last-updated" style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <span

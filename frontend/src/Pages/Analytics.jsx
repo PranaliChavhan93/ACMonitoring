@@ -548,7 +548,7 @@
 
 // export default Analytics;
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ResponsiveContainer,
     BarChart,
@@ -588,6 +588,13 @@ const MONTHS = [
     "July", "August", "September", "October", "November", "December",
 ];
 
+const MULTI_PARAMETER = false;
+
+const PERIOD_OPTIONS = [
+    { value: "MONTHLY", label: "Monthly" },
+    { value: "YEARLY", label: "Yearly" },
+];
+
 const tokenFromStorage = () => {
     const keys = ["access_token", "accessToken", "token", "authToken", "jwt", "id_token"];
     for (const storage of [window.localStorage, window.sessionStorage]) {
@@ -601,8 +608,6 @@ const tokenFromStorage = () => {
 
 const normalizeFilters = (filters = {}) => {
     const normalized = { ...filters };
-    // FilterDashboard emits both device and device_id aliases. The backend
-    // accepts them, but empty values are omitted to keep requests predictable.
     Object.keys(normalized).forEach((key) => {
         if (normalized[key] === "" || normalized[key] == null) delete normalized[key];
     });
@@ -680,7 +685,7 @@ function Analytics() {
 
     const [globalFilters, setGlobalFilters] = useState({ hierarchy: defaultHierarchy });
     const [activeModule, setActiveModule] = useState("comparison");
-    const [parameter, setParameter] = useState("energy");
+    
     const [granularity, setGranularity] = useState("MONTHLY");
     const [year, setYear] = useState(new Date().getFullYear());
     const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -691,10 +696,25 @@ function Analytics() {
     const [error, setError] = useState("");
     const [hasGenerated, setHasGenerated] = useState(false);
 
-    const selectedParameter = PARAMETER_OPTIONS.find((item) => item.value === parameter) || PARAMETER_OPTIONS[0];
+    const [parameters, setParameters] = useState(["energy"]);
+
+    const selectedParameter =
+        PARAMETER_OPTIONS.find((item) => item.value === parameters[0]) || PARAMETER_OPTIONS[0];
+    const parameter = selectedParameter.value;
+    
     const yearOptions = useMemo(() => {
         const currentYear = new Date().getFullYear();
         return Array.from({ length: Math.max(5, currentYear - 2020 + 1) }, (_, index) => currentYear - index);
+    }, []);
+
+    // const parameter = parameters[0]; // primary one – rest of your code keeps using this
+
+    const toggleParameter = useCallback((value) => {
+        setParameters((prev) => {
+            if (!MULTI_PARAMETER) return [value];
+            if (!prev.includes(value)) return [...prev, value];
+            return prev.length > 1 ? prev.filter((v) => v !== value) : prev; // keep at least one
+        });
     }, []);
 
     const handleFilterChange = useCallback((nextFilters) => {
@@ -717,6 +737,10 @@ function Analytics() {
             params.set(key, String(value));
         });
         params.set("parameter", parameter);
+        // params.set("parameter", parameter);
+        if (MULTI_PARAMETER) params.set("parameters", parameters.join(","));
+        if (parameters.includes("energy_cost")) params.set("tariff_per_kwh", String(Number(tariff)));
+
         params.set("granularity", granularity);
         params.set("year", String(year));
         if (granularity === "MONTHLY") params.set("month", String(month));
@@ -744,7 +768,14 @@ function Analytics() {
         } finally {
         setLoading(false);
         }
-    }, [globalFilters, parameter, granularity, year, month, comparePrevious, tariff]);
+    
+    }, [globalFilters, parameters, parameter, granularity, year, month, comparePrevious, tariff]);
+    // }, [globalFilters, parameter, granularity, year, month, comparePrevious, tariff]);
+
+    useEffect(() => {
+        if (!hasGenerated) return;
+        generateComparison();
+    }, [parameter]);
 
     const periodLabel = granularity === "MONTHLY"
         ? `${MONTHS[month - 1]} ${year}`
@@ -790,19 +821,82 @@ function Analytics() {
                         <span>Select one metric and a period. The charts below update using this configuration.</span>
                     </div>
                     <div className="analytics-builder-grid">
-                        <label className="analytics-field">
-                            <span>Parameter</span>
-                            <select value={parameter} onChange={(event) => setParameter(event.target.value)}>
-                                {PARAMETER_OPTIONS.map((item) => <option key={item.value} value={item.value}>{item.label} {item.unit ? `(${item.unit})` : ""}</option>)}
-                            </select>
-                        </label>
-                        <label className="analytics-field">
+                        <div className="analytics-field analytics-field-wide">
+                            <span>Parameter{MULTI_PARAMETER ? "s" : ""}</span>
+                            <div className="analytics-chips" role="group" aria-label="Parameters to compare">
+                                {PARAMETER_OPTIONS.map((item) => {
+                                    const on = parameters.includes(item.value);
+                                    return (
+                                        <button
+                                            key={item.value}
+                                            type="button"
+                                            className={`analytics-chip${on ? " active" : ""}`}
+                                            aria-pressed={on}
+                                            onClick={() => toggleParameter(item.value)}
+                                        >
+                                            {item.label}
+                                            {item.unit && <small>{item.unit}</small>}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="analytics-field analytics-field-wide">
                             <span>Time period</span>
-                            <select value={granularity} onChange={(event) => setGranularity(event.target.value)}>
-                                <option value="MONTHLY">Monthly</option>
-                                <option value="YEARLY">Yearly</option>
-                            </select>
-                        </label>
+
+                            <div className="analytics-period-row">
+                                {/* Monthly / Yearly */}
+                                <div className="analytics-chips" role="group" aria-label="Period type">
+                                    {PERIOD_OPTIONS.map((item) => (
+                                        <button
+                                            key={item.value}
+                                            type="button"
+                                            className={`analytics-chip${granularity === item.value ? " active" : ""}`}
+                                            aria-pressed={granularity === item.value}
+                                            onClick={() => setGranularity(item.value)}
+                                        >
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Year */}
+                                {/* <select
+                                    className="analytics-year-select"
+                                    value={year}
+                                    onChange={(event) => setYear(Number(event.target.value))}
+                                    aria-label="Year"
+                                >
+                                    {yearOptions.map((item) => <option key={item} value={item}>{item}</option>)}
+                                </select> */}
+                            </div>
+
+                            {/* Month chips – only for Monthly */}
+                            {/* {granularity === "MONTHLY" && (
+                                <div className="analytics-month-grid" role="group" aria-label="Month">
+                                    {MONTHS.map((name, index) => {
+                                        const value = index + 1;
+                                        const now = new Date();
+                                        const isFuture = year === now.getFullYear() && value > now.getMonth() + 1;
+                                        return (
+                                            <button
+                                                key={name}
+                                                type="button"
+                                                title={name}
+                                                disabled={isFuture}
+                                                className={`analytics-chip${month === value ? " active" : ""}`}
+                                                aria-pressed={month === value}
+                                                onClick={() => setMonth(value)}
+                                            >
+                                                {name.slice(0, 3)}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )} */}
+                        </div>
+
                         <label className="analytics-field">
                             <span>Year</span>
                             <select value={year} onChange={(event) => setYear(Number(event.target.value))}>
@@ -928,10 +1022,6 @@ function Analytics() {
                                         />
                                         <XAxis dataKey="label" />
                                         <YAxis />
-                                        {/* <YAxis
-                                            domain={[0, (dataMax) => getYAxisDomain(dataMax, 100)]}
-                                            allowDataOverflow={false}
-                                        /> */}
                                         <Tooltip />
                                         <Legend />
                                         <Line 

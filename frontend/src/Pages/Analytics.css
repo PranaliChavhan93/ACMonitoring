@@ -25,7 +25,7 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   padding: 5px;
   width: fit-content;
   max-width: 100%;
@@ -81,6 +81,7 @@
 
 .analytics-builder {
   width: 100%;
+  margin-top: 10px;
   min-width: 0;
   margin-bottom: 18px;
   padding: 18px;
@@ -232,13 +233,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 
 .analytics-metric-card {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
   min-width: 0;
   padding: 16px;
   border: 1px solid #e2e8f0;
@@ -292,9 +293,9 @@
 
 .analytics-chart-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(1, minmax(0, 1fr));
   gap: 18px;
-  margin-bottom: 18px;
+  margin-bottom: 10px;
 }
 
 .analytics-chart-card {
@@ -614,5 +615,70 @@
 
   .analytics-metric-card strong {
     font-size: 23px;
+  }
+}
+
+/* =========================================================
+   PARAMETER CHIPS
+   ========================================================= */
+
+.analytics-field-wide {
+  grid-column: 1 / -1;
+}
+
+.analytics-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.analytics-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: var(--surface, #ffffff);
+  color: #475569;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.analytics-chip small {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.analytics-chip:hover {
+  border-color: #3182bd;
+  color: #3182bd;
+}
+
+.analytics-chip.active {
+  border-color: #3182bd;
+  background: #3182bd12;
+  color: #3182bd;
+  box-shadow: 0 0 0 3px #3182bd18;
+}
+
+.analytics-chip.active small {
+  color: #3182bd;
+}
+
+.analytics-chip:focus-visible {
+  outline: 2px solid #3182bd;
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .analytics-chip {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }

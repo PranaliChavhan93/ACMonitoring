@@ -95,7 +95,7 @@ urlpatterns = [
 
     path("devices/", devices),
     path("devices/cloud/<str:device_id>/", CloudDeviceDetailView.as_view(), name="cloud-device-detail"),
-    path( "devices/<uuid:pk>/", DeviceDetailView.as_view()),
+    path("devices/<uuid:pk>/", DeviceDetailView.as_view()),
     path("devices/unassigned/", unassigned_devices),
     path("devices/relay/", control_device_relay),
     path("devices/create/", DeviceCreateView.as_view()),

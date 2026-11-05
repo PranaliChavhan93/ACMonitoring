@@ -1,4 +1,3 @@
-
 import json
 import logging
 import os
@@ -567,6 +566,14 @@ def _refresh():
                     )
                     continue
 
+                # Track when the server last saw a NEW sample, so ONLINE/OFFLINE
+                # does not depend on the device clock being correct.
+                prev = _live.get(rec["ac_id"])
+                if prev and prev.get("timestamp") == rec.get("timestamp"):
+                    rec["received_at"] = prev.get("received_at")
+                elif rec.get("source") == "3tp":
+                    rec["received_at"] = time.time()
+
                 # Update the in-memory cache, preserving the last known values.
                 _live[rec["ac_id"]] = rec
 
@@ -639,6 +646,10 @@ def get_records():
             except (KeyError, TypeError, ValueError):
                 age_seconds = None
 
+            # Prefer the time the server last received a new sample.
+            if r.get("received_at"):
+                age_seconds = max(0, now - r["received_at"])
+
             if age_seconds is None:
                 # No timestamp means a live connection cannot be confirmed.
                 r["status"] = "OFFLINE"
@@ -688,4 +699,3 @@ def get_status():
             "last_error": _state["last_error"],
             "cache_sec": CACHE_SEC,
         }
-

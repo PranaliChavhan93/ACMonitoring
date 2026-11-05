@@ -3587,20 +3587,19 @@ const getTemperature = (item) =>
 
 const getHumidity = (item) => numberValue(item?.indoor_humidity ?? item?.humidity);
 
-// Active AC KPI represents device connectivity (ONLINE/OFFLINE), not
-// whether the compressor/relay is currently drawing power. Relay state is
-// evaluated separately by isRunning() for live power/current calculations.
-const getDeviceStatus = (item) =>
-    String(
-        item?.device_status ??
-        item?.connectivity_status ??
-        item?.status ??
-        ""
-    )
-        .trim()
-        .toUpperCase();
+const getDeviceStatus = (item) => {
+    const status =
+        item?.connectivity_status ||
+        item?.device_status ||
+        item?.status ||
+        "";
 
-const isActive = (item) => getDeviceStatus(item) === "ONLINE";
+    return String(status).trim().toUpperCase();
+};
+
+const isActive = (item) => {
+    return getDeviceStatus(item) === "ONLINE";
+};
 
 const getHealthStatus = (item) =>
     String(

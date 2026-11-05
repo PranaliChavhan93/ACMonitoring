@@ -224,20 +224,10 @@ TELEMETRY_INGEST_TOKEN = os.environ.get("TELEMETRY_INGEST_TOKEN", "")
 TELEMETRY_INGEST_MAX_BATCH = int(os.environ.get("TELEMETRY_INGEST_MAX_BATCH", "500"))
 # ONLINE timeout = expected device publish interval + grace period.
 # The project simulator currently publishes every 2 seconds.
-TELEMETRY_EXPECTED_INTERVAL_SECONDS = int(
-    os.environ.get("TELEMETRY_EXPECTED_INTERVAL_SECONDS", "2")
-)
-TELEMETRY_GRACE_SECONDS = int(
-    os.environ.get("TELEMETRY_GRACE_SECONDS", "5")
-)
-# Keep support for an explicit legacy timeout override.
-TELEMETRY_STALE_SECONDS = int(
-    os.environ.get(
-        "TELEMETRY_STALE_SECONDS",
-        os.environ.get(
-            "TPT_STALE_SEC",
-            str(TELEMETRY_EXPECTED_INTERVAL_SECONDS + TELEMETRY_GRACE_SECONDS),
-        ),
-    )
-)
-TELEMETRY_OFFLINE_AFTER_SECONDS = TELEMETRY_STALE_SECONDS
+TELEMETRY_EXPECTED_INTERVAL_SECONDS = 5
+TELEMETRY_GRACE_SECONDS = 10
+
+TELEMETRY_OFFLINE_AFTER_SECONDS = 7
+TELEMETRY_STALE_SECONDS = 7
+
+TELEMETRY_LONG_OFFLINE_AFTER_SECONDS = 7 * 24 * 60 * 60

@@ -54,6 +54,18 @@ DEVICES = [
         "username": os.getenv("TEST_AC_02_USERNAME", ""),
         "password": os.getenv("TEST_AC_02_PASSWORD", ""),
     },
+    {
+            "ac_id": "TEST-AC-03",
+            "client_id": "TEST-AC-03",
+            "username": os.getenv("TEST_AC_03_USERNAME", ""),
+            "password": os.getenv("TEST_AC_03_PASSWORD", ""),
+    },
+    {
+        "ac_id": "TEST-AC-04",
+        "client_id": "TEST-AC-04",
+        "username": os.getenv("TEST_AC_04_USERNAME", ""),
+        "password": os.getenv("TEST_AC_04_PASSWORD", ""),
+    },
 ]
 
 
