@@ -13,7 +13,7 @@
 
 // import "./CustomerCreation.css";
 
-// const API_BASE = "http://192.168.1.9:8000/api";
+// const API_BASE = import.meta.env.VITE_API_BASE_URL || `http://${window.location.hostname}:8000/api`;
 // const LOCATIONS_URL = `${API_BASE}/v1/filters/locations/`;
 
 // const CUSTOMERS_URL = `${API_BASE}/customers/`;
@@ -733,7 +733,7 @@
 //             onClick={openAssignSite}
 //           >
 //             <span className="step-num">4</span>
-//             Assign Site
+//             Assign Branch
 //           </button>
 //         </li>
 
@@ -1449,7 +1449,7 @@
 //               disabled={!form.id}
 //             >
 //               <FiMapPin />
-//               Continue to Assign Site
+//               Continue to Assign Branch
 //             </button>
 //           </div>
 //         </div>
@@ -1460,15 +1460,15 @@
 //           <div className="admins-panel-header">
 //             <FiMapPin size={22} />
 //             <div>
-//               <h2>Assign Customer to Site</h2>
+//               <h2>Assign Customer to Branch</h2>
 //               <p>
-//                 Select a customer and one of its sites to create the assignment.
+//                 Select a customer and one of its Branch to create the assignment.
 //               </p>
 //             </div>
 //           </div>
 
 //           {assignLoading ? (
-//             <div className="admins-loading">Loading customers and sites...</div>
+//             <div className="admins-loading">Loading customers and branch...</div>
 //           ) : (
 //             <form onSubmit={handleAssignSite} className="admins-form">
 //               <div className="assign-card">
@@ -1495,7 +1495,7 @@
 //                   </label>
 
 //                   <label>
-//                     Select Site *
+//                     Select Branch *
 //                     <select
 //                       value={assignSiteId}
 //                       onChange={(e) => {
@@ -1506,7 +1506,7 @@
 //                       disabled={!assignCustomerId}
 //                     >
                       
-//                     <option value="">Choose a site</option>
+//                     <option value="">Choose a branch</option>
 //                       {assignSites.map((site) => {
 //                         const siteId = site.tpt_site_id ?? site.id;
 //                         const siteName = site.name || "Unnamed site";
@@ -1536,7 +1536,7 @@
 //                     </p>
                     
 //                     <p>
-//                       <strong>Site:</strong>{" "}
+//                       <strong>Branch:</strong>{" "}
 //                       {assignSites.find(
 //                         (site) =>
 //                           String(site.tpt_site_id ?? site.id) === String(assignSiteId)
@@ -1825,6 +1825,36 @@ function CustomerCreation() {
   
   const isEditing = Boolean(form.id);
 
+  // Branch chosen on the create form (assigned right after the customer is created)
+  const [formSites, setFormSites] = useState([]);
+  const [formSiteId, setFormSiteId] = useState("");
+  const [sitesLoading, setSitesLoading] = useState(false);
+  const [sitesError, setSitesError] = useState("");
+
+  const loadSites = useCallback(async () => {
+    setSitesLoading(true);
+    setSitesError("");
+
+    try {
+      const res = await fetch(SITES_URL, {
+        method: "GET",
+        headers: authHeaders(),
+        cache: "no-store",
+      });
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok || body.status === "error" || !Array.isArray(body.sites)) {
+        throw new Error(body.message || `Could not load branches (${res.status}).`);
+      }
+
+      setFormSites(body.sites);
+    } catch (e) {
+      setSitesError(e.message || "Could not load branches.");
+    } finally {
+      setSitesLoading(false);
+    }
+  }, []);
+
   //  FETCH CUSTOMERS
 
   const fetchCustomers = useCallback(async () => {
@@ -2085,6 +2115,8 @@ function CustomerCreation() {
 
   const goToCreate = () => {
     setForm({ ...emptyForm });
+    setFormSiteId("");
+    loadSites();
     setSelectedHierarchy("");
     setFormError("");
     setHierarchyError("");
@@ -2133,6 +2165,7 @@ function CustomerCreation() {
   const backToList = () => {
     setView("list");
     setForm({ ...emptyForm });
+    setFormSiteId("");
     setSelectedHierarchy("");
     setFormError("");
     setHierarchyError("");
@@ -2180,6 +2213,7 @@ function CustomerCreation() {
     if (!form.state) return "Please select a state.";
     if (!form.district) return "Please select a district.";
     if (!form.taluka) return "Please select a taluka.";
+    if (!isEditing && !formSiteId) return "Please select a branch.";
 
     if (!isEditing) {
       if (!form.password.trim()) return "Password is required.";
@@ -2284,6 +2318,34 @@ function CustomerCreation() {
 
             await fetchCustomers();
 
+      if (!isEditing) {
+        // Assign the chosen branch to the customer that was just created.
+        const assignRes = await fetch(`${API_BASE}/customers/assign/site/`, {
+          method: "POST",
+          headers: authHeaders(),
+          body: JSON.stringify({
+            customer_id: String(saved.id),
+            tpt_site_id: String(formSiteId),
+          }),
+        });
+        const assignBody = await assignRes.json().catch(() => ({}));
+
+        if (!assignRes.ok) {
+          // The customer exists now; keep it and let the user retry from the
+          // list (pin icon) instead of losing it.
+          setForm((prev) => ({ ...prev, id: saved.id }));
+          setFormError("");
+          setView("hierarchy");
+          showToast(
+            "error",
+            `Customer created, but branch assignment failed: ${
+              assignBody.message || assignBody.details || assignRes.status
+            }. Use the pin icon in the customer list to retry.`
+          );
+          return;
+        }
+      }
+
       if (isEditing) {
         backToList();
         showToast("success", "Customer updated successfully.");
@@ -2386,16 +2448,6 @@ function CustomerCreation() {
           </button>
         </li>
         
-        <li className={view === "assignSite" ? "active" : ""}>
-          <button
-            type="button"
-            className="step-btn"
-            onClick={openAssignSite}
-          >
-            <span className="step-num">4</span>
-            Assign Branch
-          </button>
-        </li>
 
       </ol>
 
@@ -2842,6 +2894,41 @@ function CustomerCreation() {
               </div>
             </div>
 
+            {!isEditing && (
+              <div className="assign-card" style={{ marginTop: "20px" }}>
+                <div className="assign-row">
+                  <span className="assign-label">Branch Assignment</span>
+                </div>
+
+                <div className="form-grid" style={{ marginTop: "16px" }}>
+                  <label>
+                    Branch *
+                    <select
+                      value={formSiteId}
+                      disabled={sitesLoading}
+                      onChange={(e) => setFormSiteId(e.target.value)}
+                    >
+                      <option value="">
+                        {sitesLoading ? "Loading branches..." : "Choose a branch"}
+                      </option>
+
+                      {formSites.map((site) => {
+                        const id = String(site.tpt_site_id ?? site.id);
+                        return (
+                          <option key={id} value={id}>
+                            {site.name || "Unnamed site"}
+                            {site.code ? ` (${site.code})` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                </div>
+
+                {sitesError && <p className="form-error">{sitesError}</p>}
+              </div>
+            )}
+
             <div className="assign-card" style={{ marginTop: "20px" }}>
               <div className="assign-row">
                 <span className="assign-label">Location Hierarchy *</span>
@@ -3013,7 +3100,7 @@ function CustomerCreation() {
           </div>
 
           {selectedHierarchy === "GEOGRAPHICAL" && (
-            <div className="assign-card" style={{ marginTop: "20px" }}>
+            <div className="assign-card" style={{ marginTop: "10px" }}>
               <h3 style={{ marginTop: 0 }}>Geographical Hierarchy</h3>
 
               <div
@@ -3030,7 +3117,7 @@ function CustomerCreation() {
                 </div>
 
                 <div style={{ color: "#6b7280", lineHeight: "2" }}>
-                  India → State → District → Taluka → City → Branch
+                  India → State → District → Taluka → Branch
                 </div>
 
                 <div
@@ -3102,15 +3189,6 @@ function CustomerCreation() {
               Save and Exit
             </button>
 
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={() => openAssignSite(form.id)}
-              disabled={!form.id}
-            >
-              <FiMapPin />
-              Continue to Assign Branch
-            </button>
           </div>
         </div>
       )}

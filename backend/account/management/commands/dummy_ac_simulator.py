@@ -14,6 +14,10 @@ import paho.mqtt.client as mqtt
 # $env:TEST_AC_01_PASSWORD="TEST-AC-01"
 # $env:TEST_AC_02_USERNAME="TEST-AC-02"
 # $env:TEST_AC_02_PASSWORD="TEST-AC-02"
+# $env:TEST_AC_03_USERNAME="TEST-AC-03"
+# $env:TEST_AC_03_PASSWORD="TEST-AC-03"
+# $env:TEST_AC_04_USERNAME="TEST-AC-04"
+# $env:TEST_AC_04_PASSWORD="TEST-AC-04"
 
 # ==========================================================
 # MQTT BROKER CONFIGURATION
@@ -68,10 +72,6 @@ DEVICES = [
     },
 ]
 
-
-# ==========================================================
-# LOGGING
-# ==========================================================
 
 logging.basicConfig(
     level=logging.INFO,
